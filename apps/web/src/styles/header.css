@@ -1,0 +1,239 @@
+:root {
+  --bg-1: #1f1a2e;
+  --bg-2: #2a1630;
+  --text: #e9e6f2;
+  --muted: #c8bfdc;
+  --gold: #f6c449;
+  --gold-2: #dba51e;
+  --ring: rgba(255, 255, 255, 0.06);
+}
+
+/* ШАПКА — фуллвью */
+.su-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  width: 100%;
+  background: linear-gradient(90deg, var(--bg-1), var(--bg-2));
+  border-bottom: 1px solid var(--ring);
+  backdrop-filter: saturate(120%) blur(2px);
+}
+
+/* Внутренний бар */
+.su-header__inner {
+  height: 64px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text);
+}
+
+/* ЛОГО */
+.logo {
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 0.3px;
+  text-decoration: none;
+}
+.logo-step {
+  color: #c88bf2;
+}
+.logo-unity {
+  color: #f39acb;
+}
+
+/* ЦЕНТР МЕНЮ (десктоп) */
+.su-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.su-nav {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 0;
+  margin: 0;
+}
+.divider {
+  width: 1px;
+  height: 22px;
+  background: var(--ring);
+  margin: 0 8px;
+}
+
+/* Ссылки с анимированным underline */
+.nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--muted);
+  padding: 8px 2px;
+  font-weight: 600;
+  transition: color 0.18s ease;
+  will-change: color;
+}
+.nav-link:hover {
+  color: var(--text);
+}
+.nav-link--active {
+  color: var(--text);
+}
+
+/* underline (плавная анимация ширины + прозрачности) */
+.nav-underline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent 8%,
+    var(--gold) 50%,
+    transparent 92%
+  );
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: center;
+  opacity: 0;
+  transition: transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.22s;
+}
+.nav-link:hover .nav-underline,
+.nav-link--active .nav-underline {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+/* Кнопка Add video (десктоп) */
+.su-btn {
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  border: 1.5px solid var(--ring);
+  color: var(--text);
+}
+.su-btn--accent {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.12) inset;
+}
+.su-btn--accent:hover {
+  box-shadow: 0 0 0 2px rgba(219, 165, 30, 0.22) inset;
+}
+
+/* Правый блок (десктоп) */
+.su-right {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.auth-link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.auth-link:hover {
+  opacity: 1;
+}
+.su-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ring);
+}
+
+/* ===== МОБИЛЬНАЯ ВЕРСИЯ ===== */
+
+/* Бургер-иконка */
+.su-mobile-toggle {
+  display: none;
+  position: relative;
+  width: 38px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--ring);
+  background: transparent;
+  padding: 6px 8px;
+}
+.su-mobile-toggle span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: var(--text);
+  margin: 5px 0;
+  transition: transform 0.2s, opacity 0.2s;
+}
+.su-mobile-toggle.is-open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.su-mobile-toggle.is-open span:nth-child(2) {
+  opacity: 0;
+}
+.su-mobile-toggle.is-open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Панель */
+.su-mobile-panel {
+  display: none;
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--bg-1), var(--bg-2));
+  border-bottom: 1px solid var(--ring);
+  transform-origin: top;
+  transform: scaleY(0);
+  opacity: 0;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+.su-mobile-panel.open {
+  transform: scaleY(1);
+  opacity: 1;
+}
+.su-mobile-panel nav {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 10px 20px 16px;
+  display: grid;
+  gap: 10px;
+}
+.mobile-link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 10px 2px;
+}
+.mobile-btn {
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  border: 1.5px solid var(--gold);
+  color: var(--text);
+  justify-self: flex-start;
+}
+.mobile-divider {
+  height: 1px;
+  background: var(--ring);
+  margin: 6px 0;
+}
+.mobile-auth {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* ===== РЕСПОНСИВ ===== */
+@media (max-width: 880px) {
+  .su-center,
+  .su-right {
+    display: none;
+  } /* прячем десктопные блоки */
+  .su-mobile-toggle {
+    display: block;
+  }
+}
