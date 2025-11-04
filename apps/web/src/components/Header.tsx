@@ -1,7 +1,7 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import Logo from "./Logo";
-import "../styles/header.css";
+import "../styles/components/header.css";
 
 import { getUser, clearAuth, onAuthChange } from "../lib/auth";
 
@@ -23,10 +23,10 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
 export default function Header() {
   const navigate = useNavigate();
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false); // мобильное меню
   const [user, setUser] = useState(getUser());
 
-  // dropdown
+  // dropdown user-chip
   const [menuOpen, setMenuOpen] = useState(false);
   const chipRef = useRef<HTMLDivElement | null>(null);
   const closeTimer = useRef<number | null>(null);
@@ -117,37 +117,43 @@ export default function Header() {
               className={"user-chip has-dropdown" + (menuOpen ? " open" : "")}
               onMouseEnter={openNow}
               onMouseLeave={closeWithDelay}
+              onClick={() => setMenuOpen((v) => !v)}
+              role="button"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
             >
-              <button
-                className="user-chip-btn"
-                onClick={() => (menuOpen ? setMenuOpen(false) : openNow())}
-                aria-expanded={menuOpen}
-                aria-haspopup="menu"
-              >
+              <div className="avatar">
                 <img
-                  className="user-chip-avatar"
                   src={user.avatarUrl || "/uploads/_noavatar.png"}
-                  alt="avatar"
+                  alt={user.username || "User"}
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src =
                       "/uploads/_noavatar.png";
                   }}
                 />
-                <span className="user-chip-name">{user.username}</span>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  className={"chev" + (menuOpen ? " up" : "")}
-                >
-                  <path
-                    d="M6 9l6 6 6-6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  />
-                </svg>
-              </button>
+              </div>
 
+              <div className="meta">
+                <span className="name">{user.username}</span>
+                <span className="sub">Profile</span>
+              </div>
+
+              <svg
+                className={"chev" + (menuOpen ? " up" : "")}
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  d="M6 9l6 6 6-6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                />
+              </svg>
+
+              {/* dropdown */}
               {menuOpen && (
                 <div
                   className="user-dropdown"
@@ -164,7 +170,9 @@ export default function Header() {
                   >
                     My profile
                   </button>
+
                   <div className="user-dropdown-divider" />
+
                   <button
                     className="user-dropdown-item danger"
                     onClick={logout}

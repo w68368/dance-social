@@ -1,0 +1,112 @@
+/* Фон приложения */
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  color: var(--text);
+  /* плавный вертикальный градиент как на макете */
+  background: linear-gradient(
+    180deg,
+    var(--app-top),
+    var(--app-mid) 45%,
+    var(--app-bot)
+  );
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+main {
+  padding: 32px 24px;
+}
+
+h1 {
+  margin-bottom: 12px;
+  font-size: 32px;
+  font-weight: 700;
+}
+p {
+  font-size: 16px;
+  opacity: 0.85;
+}
+/* === GLOBAL BUTTONS === */
+.su-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: none;
+
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+
+  cursor: pointer;
+  text-decoration: none;
+
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  color: #fff;
+
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 4px 12px rgba(158, 102, 255, 0.3);
+
+  transition: all 0.2s ease;
+}
+
+.su-btn:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, var(--accent-2), var(--accent-3));
+  box-shadow: 0 6px 18px rgba(157, 102, 255, 0.35);
+  filter: brightness(1.05);
+}
+
+.su-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(157, 102, 255, 0.25);
+}
+
+.su-btn:disabled,
+.su-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  filter: grayscale(0.4);
+  box-shadow: none;
+}
+
+/* === Add video: как было (тонкий золотой контур) === */
+.su-header .su-btn.su-btn--accent {
+  background: transparent; /* без заливки */
+  color: var(--text);
+  border: 1.5px solid var(--gold);
+  box-shadow: none; /* убираем глобальный shadow */
+  height: 38px; /* вровень с user-chip */
+  padding: 0 16px;
+  border-radius: 999px;
+  transition: transform 0.08s ease, box-shadow 0.2s ease, background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.su-header .su-btn.su-btn--accent:hover {
+  transform: translateY(-1px);
+  background: rgba(246, 196, 73, 0.1); /* лёгкий подсвет на hover */
+  border-color: var(--gold-2);
+  box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.12) inset;
+}
+
+.su-header .su-btn.su-btn--accent:active {
+  transform: translateY(0);
+  box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.16) inset;
+}
+
+.su-header .su-btn.su-btn--accent:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.18) inset,
+    0 0 0 3px rgba(246, 196, 73, 0.18);
+  border-color: var(--gold);
+}
