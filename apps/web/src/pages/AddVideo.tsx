@@ -3,8 +3,7 @@ export default function AddVideo() {
     <main style={{ padding: 20 }}>
       <h1>Add Video</h1>
       <p>
-        Форма загрузки видео появится здесь (заголовок, файл, теги,
-        приватность).
+        The video upload form will appear here (title, file, tags, privacy).
       </p>
     </main>
   );

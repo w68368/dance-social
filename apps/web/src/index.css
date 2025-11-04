@@ -1,45 +1,333 @@
-/* Базовый сброс */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ===================================
+   STEPUNITY — GLOBAL THEME
+=================================== */
+:root {
+  --su-text: #e8e8f0;
+  --su-muted: #9d96b5;
+
+  --su-bg-top: #14122a;
+  --su-bg-mid: #120f24;
+  --su-bg-bottom: #110e21;
+
+  --su-btn-1: #7e52ff;
+  --su-btn-2: #9268ff;
+  --su-btn-3: #a983ff;
+
+  --su-card-bg: rgba(20, 14, 35, 0.55);
+  --su-card-border: rgba(255, 255, 255, 0.07);
 }
 
+/* ===================================
+   RESET
+=================================== */
+* {
+  box-sizing: border-box;
+}
 html,
 body,
 #root {
   height: 100%;
 }
 
-/* Глобальные настройки */
-:root {
-  color-scheme: dark;
-}
-
+/* ===================================
+   BACKGROUND
+=================================== */
 body {
-  min-width: 320px;
-  background: #1d1d1d; /* общий тёмный фон */
-  color: #e9e6f2;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
-    Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  color: var(--su-text);
 
-  /* ВАЖНО: убираем центрирование шаблона Vite */
-  display: block;
+  background: linear-gradient(
+    180deg,
+    #0f0e24 0%,
+    #181530 32%,
+    #1f162e 52%,
+    #2c1128 78%,
+    #3b1029 100%
+  );
+
+  background-attachment: fixed;
 }
 
-/* Корневой контейнер приложения */
-#root {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Центровка контента (НЕ шапки) */
 .container {
-  max-width: 1200px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 24px 20px;
+  padding: 16px;
+}
+
+/* ===================================
+   AUTH PAGE
+=================================== */
+.auth-page {
+  min-height: calc(100dvh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* ===================================
+   REGISTER CARD
+=================================== */
+.register-card {
   width: 100%;
+  max-width: 520px;
+  padding: 32px;
+  border-radius: 18px;
+  position: relative;
+
+  background: var(--su-card-bg);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--su-card-border);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.register-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 20px;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(126, 82, 255, 0.45),
+    rgba(169, 131, 255, 0.32)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.register-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===================================
+   TITLES
+=================================== */
+.register-card h2 {
+  margin: 0 0 12px 0;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  background: linear-gradient(90deg, #a46bff 10%, #8a42ff 50%, #b66bff 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.register-sub {
+  margin: 0 0 16px 0;
+  color: var(--su-muted);
+  font-size: 14px;
+}
+
+/* ===================================
+   FORM
+=================================== */
+.form-grid {
+  display: grid;
+  gap: 16px;
+}
+.form-row {
+  display: grid;
+  gap: 8px;
+}
+.form-row label {
+  font-size: 13px;
+  color: var(--su-muted);
+}
+
+.input,
+.select,
+.file-input {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--su-text);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.08s ease;
+}
+
+.select {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+
+  color: #121212;
+  font-weight: 600;
+
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.08s ease;
+}
+
+.select option {
+  color: #121212;
+  background: #ffffff;
+}
+
+.input:hover,
+.select:hover,
+.file-input:hover {
+  transform: translateY(-1px);
+}
+.input:focus,
+.select:focus,
+.file-input:focus {
+  border-color: rgba(170, 110, 255, 0.5);
+  box-shadow: 0 0 0 4px rgba(150, 80, 255, 0.18);
+}
+
+.file-input {
+  height: auto;
+  padding: 10px 12px;
+}
+
+.avatar-preview {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+.avatar-preview img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.helper {
+  font-size: 12px;
+  color: var(--su-muted);
+}
+
+/* ===================================
+   BUTTONS
+=================================== */
+.su-btn {
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 0.09s ease, filter 0.2s ease, box-shadow 0.2s ease,
+    background-position 0.25s ease;
+}
+
+.su-btn-primary {
+  background-image: linear-gradient(
+    140deg,
+    var(--su-btn-1) 0%,
+    var(--su-btn-2) 55%,
+    var(--su-btn-3) 100%
+  );
+  background-size: 140% 100%;
+  background-position: 0% 0%;
+  color: #f7f3ff;
+  box-shadow: 0 10px 26px rgba(130, 75, 255, 0.28);
+}
+.su-btn-primary:hover {
+  background-position: 20% 0%;
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 34px rgba(140, 75, 255, 0.42);
+}
+.su-btn-primary:active {
+  transform: translateY(0);
+  filter: brightness(0.99);
+}
+.su-btn-primary:disabled {
+  opacity: 0.65;
+  filter: grayscale(0.2);
+  cursor: default;
+}
+
+/* ===================================
+   MESSAGES
+=================================== */
+.msg {
+  margin-top: 4px;
+  font-size: 13px;
+}
+.msg.error {
+  color: #ff6b6b;
+}
+.msg.success {
+  color: #6bff9a;
+}
+
+/* ===================================
+   MOBILE
+=================================== */
+@media (max-width: 560px) {
+  .register-card {
+    padding: 24px;
+  }
+}
+
+/* ===== User chip in header ===== */
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 10px 0 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.06s ease, background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.user-chip-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.user-chip-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-chip-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.user-chip-logout {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.06s ease, background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+.user-chip-logout:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
 }

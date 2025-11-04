@@ -2,7 +2,7 @@ export default function Ranking() {
   return (
     <main style={{ padding: 20 }}>
       <h1>Ranking</h1>
-      <p>Тут будет рейтинг танцоров/команд, таблицы и фильтры.</p>
+      <p>Here you will find the dancer/team ratings, tables and filters.</p>
     </main>
   );
 }

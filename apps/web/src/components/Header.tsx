@@ -1,7 +1,9 @@
-import { Link, NavLink } from "react-router-dom";
-import { useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
 import Logo from "./Logo";
 import "../styles/header.css";
+
+import { getUser, clearAuth, onAuthChange } from "../lib/auth";
 
 function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
   return (
@@ -19,17 +21,66 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
 }
 
 export default function Header() {
+  const navigate = useNavigate();
+
   const [open, setOpen] = useState(false);
+  const [user, setUser] = useState(getUser());
+
+  // dropdown
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chipRef = useRef<HTMLDivElement | null>(null);
+  const closeTimer = useRef<number | null>(null);
+
+  const openNow = () => {
+    if (closeTimer.current) {
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+    setMenuOpen(true);
+  };
+
+  const closeWithDelay = () => {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => {
+      setMenuOpen(false);
+      closeTimer.current = null;
+    }, 220);
+  };
+
+  useEffect(() => {
+    const off = onAuthChange(() => setUser(getUser()));
+    setUser(getUser());
+    return off;
+  }, []);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!chipRef.current) return;
+      if (!chipRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  const logout = () => {
+    clearAuth();
+    navigate("/login");
+  };
 
   return (
     <header className="su-header">
       <div className="su-header__inner">
-        {/* Лого (слева) */}
         <div className="su-left">
           <Logo />
         </div>
 
-        {/* Навигация (центр) — только десктоп */}
         <nav className="su-center" aria-label="Main">
           <ul className="su-nav">
             <li>
@@ -50,17 +101,82 @@ export default function Header() {
           </ul>
         </nav>
 
-        {/* Право — auth (десктоп) */}
         <div className="su-right">
-          <Link className="auth-link" to="/login">
-            Sign in
-          </Link>
-          <Link className="auth-link su-pill" to="/register">
-            Sign up
-          </Link>
+          {!user ? (
+            <>
+              <Link className="auth-link" to="/login">
+                Sign in
+              </Link>
+              <Link className="auth-link su-pill" to="/register">
+                Sign up
+              </Link>
+            </>
+          ) : (
+            <div
+              ref={chipRef}
+              className={"user-chip has-dropdown" + (menuOpen ? " open" : "")}
+              onMouseEnter={openNow}
+              onMouseLeave={closeWithDelay}
+            >
+              <button
+                className="user-chip-btn"
+                onClick={() => (menuOpen ? setMenuOpen(false) : openNow())}
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+              >
+                <img
+                  className="user-chip-avatar"
+                  src={user.avatarUrl || "/uploads/_noavatar.png"}
+                  alt="avatar"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src =
+                      "/uploads/_noavatar.png";
+                  }}
+                />
+                <span className="user-chip-name">{user.username}</span>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  className={"chev" + (menuOpen ? " up" : "")}
+                >
+                  <path
+                    d="M6 9l6 6 6-6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                </svg>
+              </button>
+
+              {menuOpen && (
+                <div
+                  className="user-dropdown"
+                  role="menu"
+                  onMouseEnter={openNow}
+                  onMouseLeave={closeWithDelay}
+                >
+                  <button
+                    className="user-dropdown-item"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate("/profile");
+                    }}
+                  >
+                    My profile
+                  </button>
+                  <div className="user-dropdown-divider" />
+                  <button
+                    className="user-dropdown-item danger"
+                    onClick={logout}
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Бургер (мобайл) */}
         <button
           className={"su-mobile-toggle" + (open ? " is-open" : "")}
           aria-label="Toggle menu"
@@ -74,7 +190,6 @@ export default function Header() {
         </button>
       </div>
 
-      {/* Мобильная панель */}
       <div
         id="su-mobile-panel"
         className={"su-mobile-panel" + (open ? " open" : "")}
@@ -90,18 +205,33 @@ export default function Header() {
           <Link className="mobile-link" to="/recommendations">
             Recommendations
           </Link>
-
           <Link className="mobile-btn" to="/add-video">
             Add video
           </Link>
 
           <div className="mobile-divider" />
-          <Link className="mobile-auth" to="/login">
-            Sign in
-          </Link>
-          <Link className="mobile-auth" to="/register">
-            Sign up
-          </Link>
+          {!user ? (
+            <>
+              <Link className="mobile-auth" to="/login">
+                Sign in
+              </Link>
+              <Link className="mobile-auth" to="/register">
+                Sign up
+              </Link>
+            </>
+          ) : (
+            <>
+              <button
+                className="mobile-auth"
+                onClick={() => navigate("/profile")}
+              >
+                {user.username}
+              </button>
+              <button className="mobile-auth" onClick={logout}>
+                Logout
+              </button>
+            </>
+          )}
         </nav>
       </div>
     </header>
