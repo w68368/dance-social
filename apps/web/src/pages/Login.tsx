@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { setAuth } from "../lib/auth";
+import "../styles/pages/auth.css";
 
 export default function Login() {
   const navigate = useNavigate();

@@ -11,9 +11,9 @@
 .su-header {
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 100; /* чуть выше для дропдауна */
   width: 100%;
-  background: linear-gradient(90deg, var(--bg-1), var(--bg-2));
+  background: linear-gradient(90deg, var(--head-left), var(--head-right));
   border-bottom: 1px solid var(--ring);
   backdrop-filter: saturate(120%) blur(2px);
 }
@@ -29,17 +29,47 @@
   color: var(--text);
 }
 
+/* === LOGO: общий градиент + hover на весь текст === */
 .logo {
-  font-weight: 800;
-  font-size: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 900;
+  font-size: 26px;
   letter-spacing: 0.3px;
   text-decoration: none;
+  line-height: 1;
+
+  /* общий градиент на ВЕСЬ лого */
+  --logo-grad: linear-gradient(90deg, #c88bf2 0%, #f39acb 50%, #ffd2a1 100%);
+  background: var(--logo-grad);
+  background-size: 200% 100%;
+  transition: background-position 0.4s ease, transform 0.15s ease,
+    filter 0.25s ease;
+
+  /* чтобы текст якоря сам стал градиентным */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.logo-step {
-  color: #c88bf2;
+
+/* делаем так, чтобы спаны тоже брали градиент с родителя */
+.logo span {
+  background: inherit;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent; /* на случай старых правил color */
 }
+
+.logo:hover {
+  background-position: 100% 0;
+  filter: drop-shadow(0 0 8px rgba(245, 196, 255, 0.35));
+  transform: translateY(-1px);
+}
+
+/* снимаем прежние фиксированные цвета, если где-то остались */
+.logo-step,
 .logo-unity {
-  color: #f39acb;
+  color: transparent !important;
 }
 
 .su-center {
@@ -105,19 +135,26 @@
 }
 
 .su-btn {
-  text-decoration: none;
-  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px; /* фиксируем высоту = user-chip */
+  padding: 0 14px; /* чтобы по высоте ровно */
   border-radius: 999px;
   font-weight: 700;
   border: 1.5px solid var(--ring);
   color: var(--text);
+  text-decoration: none;
+  transition: transform 0.08s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .su-btn--accent {
   border-color: var(--gold);
-  box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.12) inset;
+  box-shadow: inset 0 0 0 2px rgba(246, 196, 73, 0.12);
 }
 .su-btn--accent:hover {
-  box-shadow: 0 0 0 2px rgba(219, 165, 30, 0.22) inset;
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 2px rgba(219, 165, 30, 0.22),
+    0 6px 22px rgba(246, 196, 73, 0.15); /* мягкое свечение */
 }
 
 .su-right {
@@ -125,6 +162,7 @@
   gap: 14px;
   align-items: center;
 }
+
 .auth-link {
   color: var(--text);
   text-decoration: none;
@@ -215,16 +253,109 @@
   font-weight: 600;
 }
 
-/* === User chip dropdown === */
+/* ================================
+   USER CHIP – базовый вид
+   (новые стили)
+================================ */
+.user-chip {
+  /* grid делает идеальное выравнивание без «сползаний» */
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center; /* по вертикали */
+  justify-content: center; /* по горизонтали */
+  gap: 10px;
+
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ring);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+  transition: background 0.18s ease, transform 0.08s ease,
+    border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.user-chip * {
+  line-height: 1;
+} /* убираем «вспучивание» из-за line-height */
+
+.user-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+}
+.user-chip:active {
+  transform: translateY(0);
+}
+.user-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(246, 196, 73, 0.2);
+  border-color: var(--gold);
+}
+
+.user-chip .avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.user-chip .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.user-chip .meta {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  row-gap: 2px;
+}
+
+.user-chip .name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+.user-chip .sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.user-chip .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #62ffa3;
+  box-shadow: 0 0 0 2px rgba(98, 255, 163, 0.2);
+}
+
+@media (max-width: 1080px) {
+  .user-chip .sub {
+    display: none;
+  }
+}
+
+/* ================================
+   USER CHIP – dropdown
+   (расширения и состояния)
+================================ */
 .user-chip.has-dropdown {
   position: relative;
-  padding-bottom: 12px; /* ← мостик-hover */
+  padding-bottom: 12px;
 }
 .user-chip .chev {
-  opacity: 0.8;
+  opacity: 0.85;
   transition: transform 0.15s ease;
 }
 .user-chip .chev.up {
+  transform: rotate(180deg);
+}
+/* Если в JS добавляешь .open на .user-chip */
+.user-chip.has-dropdown.open .chev {
   transform: rotate(180deg);
 }
 
@@ -267,10 +398,14 @@
   color: #eae7f6;
   cursor: pointer;
   transition: background-color 0.15s ease, transform 0.06s ease;
+  text-align: left;
 }
 .user-dropdown-item:hover {
   background: rgba(255, 255, 255, 0.06);
   transform: translateY(-1px);
+}
+.user-dropdown-item:active {
+  transform: translateY(0);
 }
 .user-dropdown-item.danger {
   color: #ffd0d0;
@@ -286,6 +421,9 @@
   border-radius: 1px;
 }
 
+/* ================================
+   RESPONSIVE
+================================ */
 @media (max-width: 880px) {
   .su-center,
   .su-right {
