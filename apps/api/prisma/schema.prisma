@@ -1,3 +1,4 @@
+// apps/api/prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,47 +8,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  displayName String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  username      String   @unique   
+  passwordHash  String
+  gender        Gender?
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  // Обратные связи (важно для понятности и чтобы не было конфликтов)
-  posts        Post[]        @relation("UserPosts")
-  teamMembers  TeamMember[]  @relation("UserTeamMembers")
+  @@index([email])
+  @@index([username])
 }
 
-model Team {
-  id        String       @id @default(cuid())
-  name      String       @unique
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
-  members   TeamMember[] @relation("TeamMembers")
-}
-
-model TeamMember {
-  id     String @id @default(cuid())
-  userId String
-  teamId String
-  role   String
-
-  // Явно именуем обе стороны связей
-  user User @relation("UserTeamMembers", fields: [userId], references: [id])
-  team Team @relation("TeamMembers",     fields: [teamId], references: [id])
-
-  @@unique([userId, teamId])
-}
-
-model Post {
-  id        String   @id @default(cuid())
-  authorId  String
-  caption   String?
-  videoUrl  String?
-  createdAt DateTime @default(now())
-
-  // Явно именуем связь с User
-  author User @relation("UserPosts", fields: [authorId], references: [id])
-}

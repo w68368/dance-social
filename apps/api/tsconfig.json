@@ -1,16 +1,26 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
-    "rootDir": "./",
+    /* ============ OUTPUT ============ */
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "dist",
+    "rootDir": "./",
+
+    /* ============ FEATURES ============ */
     "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* ============ STRICT MODE ============ */
     "strict": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
+
+    /* ============ TYPES ============ */
     "types": ["node"]
   },
+
   "include": ["src/**/*.ts", "prisma/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

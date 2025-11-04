@@ -8,6 +8,9 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import NotFound from "../pages/NotFound";
 
+import Profile from "../pages/Profile";
+import ProtectedRoute from "./ProtectedRoute";
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -19,7 +22,15 @@ export default function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* 404 */}
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

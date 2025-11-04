@@ -3,7 +3,8 @@ export default function Feed() {
     <main style={{ padding: 20 }}>
       <h1>Feed</h1>
       <p>
-        Лента видео и постов сообщества. Здесь позже появится фид с карточками.
+        A feed of community videos and posts. A feed of cards will appear here
+        later.
       </p>
     </main>
   );
