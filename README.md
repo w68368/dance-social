@@ -58,3 +58,8 @@ Utwórz plik .env:
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/dance_social?schema=public"
 PORT=3000
 JWT_SECRET="stepunity_secret_key"
+
+## 4️⃣ Uruchom bazę danych PostgreSQL
+✅ Wariant A — Docker (zalecany)
+
+W katalogu głównym projektu:
