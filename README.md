@@ -60,6 +60,89 @@ PORT=3000
 JWT_SECRET="stepunity_secret_key"
 
 ## 4️⃣ Uruchom bazę danych PostgreSQL
-✅ Wariant A — Docker (zalecany)
 
+✅ Wariant A — Docker (zalecany)
 W katalogu głównym projektu:
+docker-compose up -d
+
+✅ Wariant B — lokalna instalacja PostgreSQL
+psql -U postgres
+CREATE DATABASE dance_social;
+
+## 5️⃣ Migracje Prisma
+
+pnpm --filter @app/api prisma:generate
+pnpm --filter @app/api prisma:migrate
+
+## 6️⃣ Otwórz bazę graficznie (Prisma Studio)
+
+pnpm --filter @app/api prisma:studio
+
+Dostępne pod adresem:
+👉 http://localhost:5555
+
+## 7️⃣ Uruchamianie aplikacji
+
+▶️ Backend (API)
+pnpm dev:api
+
+API będzie dostępne pod:
+👉 http://localhost:3000
+
+💻 Frontend (React)
+pnpm dev:web
+
+Frontend otworzy się pod:
+👉 http://localhost:5173
+
+## ⚙️ Najważniejsze komendy
+
+| Komenda                                | Działanie                     |
+| -------------------------------------- | ----------------------------- |
+| `pnpm install`                         | Instalacja zależności         |
+| `pnpm dev:web`                         | Uruchomienie frontendu        |
+| `pnpm dev:api`                         | Uruchomienie backendu         |
+| `pnpm build`                           | Budowanie wszystkich pakietów |
+| `pnpm lint`                            | Sprawdzanie błędów w kodzie   |
+| `pnpm --filter @app/api prisma:studio` | Podgląd bazy danych           |
+| `docker-compose up -d`                 | Uruchomienie PostgreSQL       |
+
+## 🗂 Struktura danych (Prisma)
+
+Przykładowy model użytkownika:
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  gender       String?
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+}
+
+## 🔌 API Endpoints
+
+| Endpoint             | Metoda | Opis                        |
+| -------------------- | ------ | --------------------------- |
+| `/api/auth/register` | POST   | Rejestracja                 |
+| `/api/auth/login`    | POST   | Logowanie (JWT)             |
+| `/api/auth/me`       | GET    | Pobranie danych użytkownika |
+| `/api/users`         | GET    | Lista użytkowników          |
+
+## 🔒 Autoryzacja (JWT)
+
+Po poprawnym logowaniu token JWT jest zapisywany w localStorage.
+Każde zapytanie API automatycznie dodaje nagłówek:
+
+Authorization: Bearer <token>
+
+## 🧰 Komendy Git do wysyłania zmian
+
+git status
+git add .
+git commit -m "Aktualizacja stylów, dropdown, konfiguracji i dokumentacji README"
+git push
+
+## 👨‍💻 Autor
+Anastasiya Bialkevich
+GitHub: https://github.com/w68368
