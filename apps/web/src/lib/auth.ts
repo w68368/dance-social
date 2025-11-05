@@ -1,53 +1,46 @@
-// Simple helper for storing auth state locally
-export type AuthUser = {
+// Храним только ПУБЛИЧНЫЕ данные пользователя (без токенов)
+export type PublicUser = {
   id: string;
   email: string;
   username: string;
   avatarUrl?: string | null;
-  gender?: string | null;
-  createdAt?: string;
+  createdAt: string;
 };
 
-const TOKEN_KEY = "token";
-const USER_KEY = "user";
+const KEY = "user";
 
-// Custom event for Header and others to subscribe to changes
-const AUTH_EVENT = "stepunity:authchange";
+let listeners: Array<() => void> = [];
 
-export function setAuth(token: string, user: AuthUser) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-  window.dispatchEvent(new Event(AUTH_EVENT));
-}
-
-export function clearAuth() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-  window.dispatchEvent(new Event(AUTH_EVENT));
-}
-
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function getUser(): AuthUser | null {
-  const raw = localStorage.getItem(USER_KEY);
+export function getUser(): PublicUser | null {
   try {
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    const raw = localStorage.getItem(KEY);
+    return raw ? (JSON.parse(raw) as PublicUser) : null;
   } catch {
     return null;
   }
 }
 
-export function onAuthChange(listener: () => void) {
-  const handler = () => listener();
-  window.addEventListener(AUTH_EVENT, handler);
-  const storageHandler = (e: StorageEvent) => {
-    if (e.key === TOKEN_KEY || e.key === USER_KEY) listener();
-  };
-  window.addEventListener("storage", storageHandler);
+export function setUser(user: PublicUser | null) {
+  try {
+    if (user) localStorage.setItem(KEY, JSON.stringify(user));
+    else localStorage.removeItem(KEY);
+  } finally {
+    listeners.forEach((fn) => fn());
+  }
+}
+
+export function clearAuth() {
+  setUser(null);
+}
+
+export function onAuthChange(cb: () => void) {
+  listeners.push(cb);
   return () => {
-    window.removeEventListener(AUTH_EVENT, handler);
-    window.removeEventListener("storage", storageHandler);
+    listeners = listeners.filter((x) => x !== cb);
   };
 }
+
+// синхронизация между вкладками
+window.addEventListener("storage", (e) => {
+  if (e.key === KEY) listeners.forEach((fn) => fn());
+});

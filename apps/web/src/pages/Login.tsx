@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import { setAuth } from "../lib/auth";
+import { setAccessToken } from "../lib/accessToken";
+import { setUser } from "../lib/auth";
 import "../styles/pages/auth.css";
 
 export default function Login() {
@@ -13,11 +14,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // NEW: состояния для лимита и блокировки
+  // состояния для лимита и блокировки
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
   const [lockMs, setLockMs] = useState<number | null>(null);
 
-  // Обратный отсчёт (если есть lockMs)
+  // тикер обратного отсчёта при блокировке
   useEffect(() => {
     if (lockMs === null) return;
     if (lockMs <= 0) {
@@ -32,7 +33,6 @@ export default function Login() {
 
   const lockMinutesLeft = useMemo(() => {
     if (lockMs === null) return null;
-    // показываем в формате М:СС
     const totalSec = Math.ceil(lockMs / 1000);
     const m = Math.floor(totalSec / 60);
     const s = totalSec % 60;
@@ -53,8 +53,10 @@ export default function Login() {
         password: password.trim(),
       });
 
-      if (data?.ok && data?.token && data?.user) {
-        setAuth(data.token, data.user);
+      // ожидаем { ok, accessToken, user }
+      if (data?.ok && data?.accessToken && data?.user) {
+        setAccessToken(data.accessToken); // access — в память
+        setUser(data.user); // профиль — в localStorage (+событие)
         navigate("/");
       } else {
         setError("Incorrect email or password");
@@ -63,7 +65,6 @@ export default function Login() {
       const status = err?.response?.status;
       const data = err?.response?.data;
 
-      // Если сервер вернул блокировку
       if (status === 429) {
         setError(
           data?.error ||
@@ -73,7 +74,6 @@ export default function Login() {
           setLockMs(data.lockRemainingMs);
         setAttemptsLeft(0);
       } else {
-        // Обычная неверная попытка
         const msg = data?.error || "Login error";
         setError(msg);
         if (typeof data?.attemptsLeft === "number") {
@@ -130,7 +130,6 @@ export default function Login() {
             {loading ? "Signing in..." : "Sign in"}
           </button>
 
-          {/* Информеры */}
           {attemptsLeft !== null && attemptsLeft > 0 && (
             <p className="msg warn">Attempts remaining: {attemptsLeft}</p>
           )}

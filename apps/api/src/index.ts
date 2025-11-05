@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
+import cookieParser from "cookie-parser";
 
 import authRouter from "./routes/auth.js";
 import { prisma } from "./lib/prisma.js";
@@ -10,21 +11,42 @@ dotenv.config();
 
 const app = express();
 
-// JSON body
+/**
+ * Если API будет за reverse-proxy (например, nginx / render / railway),
+ * это нужно для корректного req.ip и работы secure-cookie по HTTPS.
+ */
+app.set("trust proxy", 1);
+
+// -----------------------
+// JSON + Cookies
+// -----------------------
 app.use(express.json());
+app.use(cookieParser());
 
-// CORS для фронта
-app.use(cors({ origin: "*", credentials: true }));
+// -----------------------
+// CORS с куками
+// НЕЛЬЗЯ использовать origin:"*" вместе с credentials:true.
+// Подставляем точный фронтенд из .env
+// -----------------------
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+app.use(
+  cors({
+    origin: FRONTEND_ORIGIN,
+    credentials: true, // чтобы браузер слал/получал HttpOnly-cookie
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-// =======================
+// -----------------------
 // STATIC: отдача аватарок
-// =======================
+// -----------------------
 const uploadsDir = path.join(process.cwd(), "uploads");
 app.use("/uploads", express.static(uploadsDir));
 
-// =======================
+// -----------------------
 // HEALTH CHECK
-// =======================
+// -----------------------
 app.get("/api/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -43,15 +65,14 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-// =======================
-// AUTH ROUTES
-// =======================
+// -----------------------
+// AUTH ROUTES (login/refresh/logout/...)
+// -----------------------
 app.use("/api/auth", authRouter);
 
-// =======================
+// -----------------------
 // USERS LIST (optional)
-// =======================
-
+// -----------------------
 app.get("/api/users", async (_req, res) => {
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
@@ -59,11 +80,12 @@ app.get("/api/users", async (_req, res) => {
   res.json(users);
 });
 
-// =======================
+// -----------------------
 // START SERVER
-// =======================
+// -----------------------
 const PORT = Number(process.env.PORT) || 3000;
 
 app.listen(PORT, () => {
   console.log(`✅ API running on http://localhost:${PORT}`);
+  console.log(`CORS origin: ${FRONTEND_ORIGIN}`);
 });

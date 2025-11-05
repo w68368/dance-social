@@ -1,22 +1,50 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { AuthUser } from "../lib/auth";
-import { getUser } from "../lib/auth";
+import type { PublicUser } from "../lib/auth";
+import { getUser, setUser } from "../lib/auth";
 
 export default function Profile() {
-  const [me, setMe] = useState<AuthUser | null>(getUser());
+  const [me, setMe] = useState<PublicUser | null>(getUser());
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let alive = true;
+
     api
       .get("/auth/me")
       .then(({ data }) => {
-        if (data?.ok && data?.user) setMe(data.user);
+        if (!alive) return;
+        if (data?.ok && data?.user) {
+          setMe(data.user);
+          // Обновим локальный кэш пользователя (на случай, если данные изменились)
+          setUser(data.user);
+        }
       })
-      .catch((e) =>
-        setError(e?.response?.data?.error || "Failed to load profile")
-      );
+      .catch((e) => {
+        if (!alive) return;
+        const msg =
+          e?.response?.data?.error ||
+          "Failed to load profile (maybe login expired)";
+        setError(msg);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
   }, []);
+
+  if (loading) {
+    return (
+      <div className="container">
+        <h2>Profile</h2>
+        <p className="helper">Loading...</p>
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -31,7 +59,7 @@ export default function Profile() {
     return (
       <div className="container">
         <h2>Profile</h2>
-        <p className="helper">Loading...</p>
+        <p className="msg error">You are not logged in.</p>
       </div>
     );
   }
@@ -72,12 +100,8 @@ export default function Profile() {
           <div>
             <b>Email:</b> {me.email}
           </div>
-          <div>
-            <b>Gender:</b> {me.gender ?? "—"}
-          </div>
           <div className="helper">
-            Profile page placeholder – we'll add profile editing and avatar
-            changes later.
+            Profile page placeholder — editing coming soon.
           </div>
         </div>
       </div>

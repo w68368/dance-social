@@ -1,14 +1,7 @@
-import type { ReactNode } from "react";
-import { Navigate, useLocation } from "react-router-dom";
-import { getToken } from "../lib/auth";
+import { Navigate, Outlet } from "react-router-dom";
+import { getUser } from "../lib/auth";
 
-export default function ProtectedRoute({ children }: { children: ReactNode }) {
-  const token = getToken();
-  const location = useLocation();
-
-  if (!token) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  return <>{children}</>;
+export default function ProtectedRoute() {
+  const user = getUser();
+  return user ? <Outlet /> : <Navigate to="/login" replace />;
 }
