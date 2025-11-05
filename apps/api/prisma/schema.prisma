@@ -15,20 +15,36 @@ enum Gender {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  username      String   @unique
-  passwordHash  String
-  gender        Gender?
-  avatarUrl     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String          @id @default(cuid())
+  email           String          @unique
+  username        String          @unique
+  passwordHash    String
+  avatarUrl       String?
+  failedLoginAttempts Int         @default(0)
+  lockUntil       DateTime?
 
-  // NEW:
-  failedLoginAttempts Int      @default(0)
-  lockUntil           DateTime?
+  // ВАЖНО: обратная сторона связи 1:N
+  refreshTokens   RefreshToken[]
 
-  @@index([email])
-  @@index([username])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
   @@index([lockUntil])
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  // связь к пользователю
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }

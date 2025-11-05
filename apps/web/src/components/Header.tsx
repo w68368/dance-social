@@ -3,6 +3,8 @@ import { useEffect, useState, useRef } from "react";
 import Logo from "./Logo";
 import "../styles/components/header.css";
 
+import { api } from "../api";
+import { clearAccessToken } from "../lib/accessToken";
 import { getUser, clearAuth, onAuthChange } from "../lib/auth";
 
 function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
@@ -24,7 +26,7 @@ export default function Header() {
   const navigate = useNavigate();
 
   const [open, setOpen] = useState(false); // мобильное меню
-  const [user, setUser] = useState(getUser());
+  const [user, setUserState] = useState(getUser());
 
   // dropdown user-chip
   const [menuOpen, setMenuOpen] = useState(false);
@@ -48,8 +50,8 @@ export default function Header() {
   };
 
   useEffect(() => {
-    const off = onAuthChange(() => setUser(getUser()));
-    setUser(getUser());
+    const off = onAuthChange(() => setUserState(getUser()));
+    setUserState(getUser());
     return off;
   }, []);
 
@@ -69,9 +71,16 @@ export default function Header() {
     };
   }, []);
 
-  const logout = () => {
-    clearAuth();
-    navigate("/login");
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout"); // отзываем текущий refresh на сервере
+    } catch {
+      // игнорим сеть, всё равно локально выходим
+    } finally {
+      clearAccessToken();
+      clearAuth();
+      navigate("/login");
+    }
   };
 
   return (
