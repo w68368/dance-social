@@ -8,6 +8,22 @@ import { signToken, requireAuth, AuthedRequest } from "../lib/auth.js";
 const router = Router();
 
 /* =========================
+   CONST & HELPERS
+========================= */
+const MAX_ATTEMPTS = 4;
+const LOCK_MINUTES = 5;
+
+function normalizeEmail(v: string) {
+  return (v ?? "").trim().toLowerCase();
+}
+function normalizeUsername(v: string) {
+  return (v ?? "").trim();
+}
+function normalizePassword(v: string) {
+  return (v ?? "").trim();
+}
+
+/* =========================
    SCHEMAS
 ========================= */
 
@@ -30,9 +46,9 @@ const loginSchema = z.object({
 router.post("/register", upload.single("avatar"), async (req, res) => {
   try {
     const form = {
-      email: req.body.email,
-      username: req.body.username,
-      password: req.body.password,
+      email: normalizeEmail(req.body.email),
+      username: normalizeUsername(req.body.username),
+      password: normalizePassword(req.body.password),
       gender: req.body.gender,
     };
 
@@ -65,6 +81,7 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
         passwordHash,
         gender: parsed.data.gender,
         avatarUrl,
+        // счётчики по умолчанию — Prisma сам поставит default
       },
       select: {
         id: true,
@@ -89,22 +106,86 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
 ========================= */
 router.post("/login", async (req, res) => {
   try {
-    const parsed = loginSchema.safeParse(req.body);
+    const parsed = loginSchema.safeParse({
+      email: normalizeEmail(req.body.email),
+      password: normalizePassword(req.body.password),
+    });
     if (!parsed.success) {
       return res
         .status(400)
         .json({ error: "Validation failed", details: parsed.error.flatten() });
     }
 
+    const now = new Date();
+
     const user = await prisma.user.findUnique({
       where: { email: parsed.data.email },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        gender: true,
+        avatarUrl: true,
+        createdAt: true,
+        passwordHash: true,
+        failedLoginAttempts: true,
+        lockUntil: true,
+      },
     });
-    if (!user)
-      return res.status(401).json({ error: "Invalid email or password" });
+
+    // Унифицированный фолбэк, чтобы не раскрывать существование email
+    const genericFail = (extra?: Record<string, unknown>) =>
+      res.status(401).json({ error: "Invalid email or password", ...extra });
+
+    if (!user) return genericFail();
+
+    // Если пользователь залочен — сообщаем, сколько осталось ждать
+    if (user.lockUntil && user.lockUntil > now) {
+      const lockRemainingMs = user.lockUntil.getTime() - now.getTime();
+      return res.status(429).json({
+        error: "Account is temporarily locked due to multiple failed attempts",
+        unlockAt: user.lockUntil.toISOString(),
+        lockRemainingMs,
+        attemptsLeft: 0,
+      });
+    }
 
     const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
-    if (!ok)
-      return res.status(401).json({ error: "Invalid email or password" });
+    if (!ok) {
+      const current = user.failedLoginAttempts ?? 0;
+      const newCount = current + 1;
+
+      // Достигли лимита — включаем блокировку
+      if (newCount >= MAX_ATTEMPTS) {
+        const unlockAt = new Date(now.getTime() + LOCK_MINUTES * 60 * 1000);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginAttempts: 0, // сброс
+            lockUntil: unlockAt,
+          },
+        });
+        return res.status(429).json({
+          error: "Too many failed attempts. Account locked for a short period.",
+          unlockAt: unlockAt.toISOString(),
+          lockRemainingMs: LOCK_MINUTES * 60 * 1000,
+          attemptsLeft: 0,
+        });
+      }
+
+      // Иначе увеличиваем счётчик и говорим, сколько осталось
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: newCount },
+      });
+      return genericFail({ attemptsLeft: MAX_ATTEMPTS - newCount });
+    }
+
+    // Успешный логин — сбрасываем счётчики
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginAttempts: 0, lockUntil: null },
+    });
 
     const token = signToken(user.id);
 
@@ -131,21 +212,26 @@ router.post("/login", async (req, res) => {
    Требует заголовок: Authorization: Bearer <token>
 ========================= */
 router.get("/me", requireAuth, async (req: AuthedRequest, res) => {
-  const userId = req.userId!;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      username: true,
-      gender: true,
-      avatarUrl: true,
-      createdAt: true,
-    },
-  });
-  if (!user) return res.status(404).json({ error: "User not found" });
+  try {
+    const userId = req.userId!;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        gender: true,
+        avatarUrl: true,
+        createdAt: true,
+      },
+    });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-  res.json({ ok: true, user });
+    res.json({ ok: true, user });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

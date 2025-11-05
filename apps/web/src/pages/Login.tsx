@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { setAuth } from "../lib/auth";
@@ -13,33 +13,79 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // NEW: состояния для лимита и блокировки
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
+  const [lockMs, setLockMs] = useState<number | null>(null);
+
+  // Обратный отсчёт (если есть lockMs)
+  useEffect(() => {
+    if (lockMs === null) return;
+    if (lockMs <= 0) {
+      setLockMs(null);
+      return;
+    }
+    const id = setInterval(() => {
+      setLockMs((ms) => (typeof ms === "number" ? Math.max(ms - 1000, 0) : ms));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lockMs]);
+
+  const lockMinutesLeft = useMemo(() => {
+    if (lockMs === null) return null;
+    // показываем в формате М:СС
+    const totalSec = Math.ceil(lockMs / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }, [lockMs]);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
 
     setError(null);
+    setAttemptsLeft(null);
     setLoading(true);
 
     try {
       const { data } = await api.post("/auth/login", {
-        email: email.trim(),
-        password,
+        email: email.trim().toLowerCase(),
+        password: password.trim(),
       });
 
       if (data?.ok && data?.token && data?.user) {
         setAuth(data.token, data.user);
-
         navigate("/");
       } else {
         setError("Incorrect email or password");
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.error || "Login error";
-      setError(msg);
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+
+      // Если сервер вернул блокировку
+      if (status === 429) {
+        setError(
+          data?.error ||
+            "Too many failed attempts. Account is temporarily locked."
+        );
+        if (typeof data?.lockRemainingMs === "number")
+          setLockMs(data.lockRemainingMs);
+        setAttemptsLeft(0);
+      } else {
+        // Обычная неверная попытка
+        const msg = data?.error || "Login error";
+        setError(msg);
+        if (typeof data?.attemptsLeft === "number") {
+          setAttemptsLeft(data.attemptsLeft);
+        }
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const disabled = loading || (lockMs !== null && lockMs > 0);
 
   return (
     <div className="auth-page">
@@ -58,6 +104,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
+              disabled={disabled}
             />
           </div>
 
@@ -71,16 +118,29 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
+              disabled={disabled}
             />
           </div>
 
           <button
             className="su-btn su-btn-primary"
             type="submit"
-            disabled={loading}
+            disabled={disabled}
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>
+
+          {/* Информеры */}
+          {attemptsLeft !== null && attemptsLeft > 0 && (
+            <p className="msg warn">Attempts remaining: {attemptsLeft}</p>
+          )}
+
+          {lockMs !== null && lockMs > 0 && (
+            <p className="msg error">
+              Your account has been temporarily suspended. Please wait:{" "}
+              {lockMinutesLeft}
+            </p>
+          )}
 
           {error && <p className="msg error">{error}</p>}
         </div>
