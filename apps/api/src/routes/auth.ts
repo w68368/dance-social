@@ -1,5 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import { z } from "zod";
 
 import { prisma } from "../lib/prisma.js";
@@ -11,6 +12,7 @@ import {
   newRefreshRaw,
   refreshCookieOptions,
 } from "../lib/tokens.js";
+import { sendVerificationCode } from "../lib/mailer.js";
 
 const router = Router();
 
@@ -21,6 +23,13 @@ const MAX_ATTEMPTS = 4;
 const LOCK_MINUTES = 5;
 const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 30);
 
+// Для e-mail подтверждения
+const EMAIL_CODE_TTL_MIN = Number(process.env.EMAIL_CODE_TTL_MIN ?? 10);
+const EMAIL_MAX_ATTEMPTS = Number(process.env.EMAIL_MAX_ATTEMPTS ?? 5);
+
+// Дефолтная аватарка (файл положи в apps/api/uploads/defaults/default-avatar.png)
+const DEFAULT_AVATAR_URL = "/uploads/defaults/default-avatar.png";
+
 const normalizeEmail = (v: string) => (v ?? "").trim().toLowerCase();
 const normalizeUsername = (v: string) => (v ?? "").trim();
 const normalizePassword = (v: string) => (v ?? "").trim();
@@ -30,6 +39,11 @@ const addDays = (d: Date, days: number) => {
   x.setDate(x.getDate() + days);
   return x;
 };
+
+const random6 = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+const sha256hex = (s: string) =>
+  crypto.createHash("sha256").update(s).digest("hex");
 
 // единый ответ при неуспехе логина — не раскрываем, существует ли email
 const loginFail = (res: any, extra?: Record<string, unknown>) =>
@@ -51,8 +65,213 @@ const loginSchema = z.object({
   password: z.string().min(6).max(200),
 });
 
+/* ============================================================
+   NEW: Двухшаговая регистрация с e-mail кодом
+   1) /register-start — присылает код и кладёт черновик
+   2) /register-verify — проверяет код, создаёт User и логинит
+============================================================ */
+
+/* =========================
+   POST /api/auth/register-start
+   multipart/form-data (avatar optional)
+========================= */
+router.post("/register-start", upload.single("avatar"), async (req, res) => {
+  try {
+    const form = {
+      email: normalizeEmail(req.body.email),
+      username: normalizeUsername(req.body.username),
+      password: normalizePassword(req.body.password),
+    };
+
+    const parsed = registerSchema.safeParse(form);
+    if (!parsed.success) {
+      return res.status(400).json({
+        ok: false,
+        error: "Validation failed",
+        details: parsed.error.flatten(),
+      });
+    }
+
+    // Уникальность
+    const [byEmail, byUsername] = await Promise.all([
+      prisma.user.findUnique({ where: { email: parsed.data.email } }),
+      prisma.user.findUnique({ where: { username: parsed.data.username } }),
+    ]);
+    if (byEmail)
+      return res.status(409).json({ ok: false, error: "Email already in use" });
+    if (byUsername)
+      return res
+        .status(409)
+        .json({ ok: false, error: "Username already in use" });
+
+    const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+
+    // Если прислали аватар — сохраним URL (файл уже положен multer в /uploads)
+    let avatarUrl: string | undefined;
+    if (req.file) {
+      avatarUrl = "/uploads/" + req.file.filename;
+    }
+
+    // Генерим код и сохраняем черновик
+    const code = random6();
+    const codeHash = sha256hex(code);
+    const expiresAt = new Date(Date.now() + EMAIL_CODE_TTL_MIN * 60 * 1000);
+
+    await prisma.emailVerification.upsert({
+      where: { email: parsed.data.email },
+      create: {
+        email: parsed.data.email,
+        codeHash,
+        expiresAt,
+        attempts: 0,
+        maxAttempts: EMAIL_MAX_ATTEMPTS,
+        payload: {
+          username: parsed.data.username,
+          passwordHash,
+          avatarUrl, // может быть undefined — это ок
+        },
+      },
+      update: {
+        codeHash,
+        expiresAt,
+        attempts: 0,
+        maxAttempts: EMAIL_MAX_ATTEMPTS,
+        payload: {
+          username: parsed.data.username,
+          passwordHash,
+          avatarUrl,
+        },
+      },
+    });
+
+    // Отправляем письмо с кодом (даём понятное сообщение при ошибке SMTP)
+    try {
+      await sendVerificationCode(parsed.data.email, code);
+    } catch (e: any) {
+      console.error("[sendMail] error:", e?.message || e);
+      return res.status(500).json({
+        ok: false,
+        error:
+          "Email sending failed (SMTP). Check SMTP_* in .env or reset Mailtrap credentials.",
+      });
+    }
+
+    return res.json({ ok: true, message: "Verification code sent" });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
+/* =========================
+   POST /api/auth/register-verify
+   JSON: { email, code }
+========================= */
+router.post("/register-verify", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const code = (req.body.code ?? "").toString().trim();
+
+    if (!email || !code || code.length !== 6) {
+      return res.status(400).json({ ok: false, error: "Invalid payload" });
+    }
+
+    const rec = await prisma.emailVerification.findUnique({ where: { email } });
+    if (!rec)
+      return res.status(400).json({ ok: false, error: "Code not found" });
+
+    const now = new Date();
+    if (rec.expiresAt < now) {
+      return res.status(400).json({ ok: false, error: "Code expired" });
+    }
+    if (rec.attempts >= rec.maxAttempts) {
+      return res.status(429).json({ ok: false, error: "Too many attempts" });
+    }
+
+    const ok = rec.codeHash === sha256hex(code);
+    if (!ok) {
+      await prisma.emailVerification.update({
+        where: { email },
+        data: { attempts: { increment: 1 } },
+      });
+      return res.status(400).json({ ok: false, error: "Incorrect code" });
+    }
+
+    // Достаём черновик
+    const payload = (rec.payload ?? {}) as {
+      username?: string;
+      passwordHash?: string;
+      avatarUrl?: string;
+    };
+
+    if (!payload.username || !payload.passwordHash) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "Draft is missing data" });
+    }
+
+    // Повторная проверка уникальности (на всякий случай)
+    const [byEmail, byUsername] = await Promise.all([
+      prisma.user.findUnique({ where: { email } }),
+      prisma.user.findUnique({ where: { username: payload.username! } }),
+    ]);
+    if (byEmail || byUsername) {
+      return res.status(409).json({ ok: false, error: "User already exists" });
+    }
+
+    // Создаём пользователя (если аватар не прислали — ставим дефолт)
+    const user = await prisma.user.create({
+      data: {
+        email,
+        username: payload.username!,
+        passwordHash: payload.passwordHash!,
+        avatarUrl: payload.avatarUrl ?? DEFAULT_AVATAR_URL,
+        emailVerifiedAt: new Date(),
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        avatarUrl: true,
+        createdAt: true,
+      },
+    });
+
+    // Удаляем запись с кодом
+    await prisma.emailVerification.delete({ where: { email } });
+
+    // === Access + Refresh ===
+    const accessToken = signAccess(user.id);
+
+    const refreshRaw = newRefreshRaw();
+    const refreshHash = sha256(refreshRaw);
+
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: refreshHash,
+        expiresAt: addDays(new Date(), REFRESH_TTL_DAYS),
+        ip:
+          (req.headers["x-forwarded-for"] as string) ||
+          req.socket.remoteAddress ||
+          "",
+        userAgent: req.get("user-agent") || "",
+      },
+    });
+
+    // ставим HttpOnly-куку
+    res.cookie("refresh", refreshRaw, refreshCookieOptions());
+
+    return res.json({ ok: true, accessToken, user });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
 /* =========================
    POST /api/auth/register
+   (старый одношаговый, оставлен для совместимости)
    multipart/form-data (avatar)
 ========================= */
 router.post("/register", upload.single("avatar"), async (req, res) => {
@@ -65,13 +284,11 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
 
     const parsed = registerSchema.safeParse(form);
     if (!parsed.success) {
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          error: "Validation failed",
-          details: parsed.error.flatten(),
-        });
+      return res.status(400).json({
+        ok: false,
+        error: "Validation failed",
+        details: parsed.error.flatten(),
+      });
     }
 
     const [byEmail, byUsername] = await Promise.all([
@@ -90,6 +307,8 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
     let avatarUrl: string | undefined;
     if (req.file) {
       avatarUrl = "/uploads/" + req.file.filename; // раздаётся как статика
+    } else {
+      avatarUrl = DEFAULT_AVATAR_URL; // ← дефолт, если не загрузили
     }
 
     const user = await prisma.user.create({
@@ -127,13 +346,11 @@ router.post("/login", async (req, res) => {
       password: normalizePassword(req.body.password),
     });
     if (!parsed.success) {
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          error: "Validation failed",
-          details: parsed.error.flatten(),
-        });
+      return res.status(400).json({
+        ok: false,
+        error: "Validation failed",
+        details: parsed.error.flatten(),
+      });
     }
 
     const now = new Date();

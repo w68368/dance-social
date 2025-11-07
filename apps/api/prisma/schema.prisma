@@ -15,19 +15,22 @@ enum Gender {
 }
 
 model User {
-  id              String          @id @default(cuid())
-  email           String          @unique
-  username        String          @unique
-  passwordHash    String
-  avatarUrl       String?
-  failedLoginAttempts Int         @default(0)
-  lockUntil       DateTime?
+  id                   String          @id @default(cuid())
+  email                String          @unique
+  username             String          @unique
+  passwordHash         String
+  avatarUrl            String?
+  failedLoginAttempts  Int             @default(0)
+  lockUntil            DateTime?
 
-  // ВАЖНО: обратная сторона связи 1:N
-  refreshTokens   RefreshToken[]
+  // ✅ Добавлено: когда e-mail подтверждён
+  emailVerifiedAt      DateTime?
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  // связь 1:N c RefreshToken
+  refreshTokens        RefreshToken[]
+
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
   @@index([lockUntil])
 }
@@ -47,4 +50,30 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+//
+// ✅ Новая таблица для e-mail подтверждений
+//
+model EmailVerification {
+  id          String   @id @default(cuid())
+
+  // email уникален – перезаписываем код при повторной отправке
+  email       String   @unique
+
+  // sha256-код, не храним реальный код
+  codeHash    String
+
+  // код живёт 10 минут
+  expiresAt   DateTime
+
+  // количество попыток ввода
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+
+  // Полезные данные перед созданием аккаунта:
+  // { username, passwordHash, avatarTempPath }
+  payload     Json
+
+  createdAt   DateTime  @default(now())
 }

@@ -1,9 +1,9 @@
 import { useMemo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { setAccessToken } from "../lib/accessToken";
+import EmailCodeModal from "../components/EmailCodeModal";
 import "../styles/pages/auth.css";
-
-type Gender = "MALE" | "FEMALE" | "OTHER";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -11,17 +11,20 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [gender, setGender] = useState<Gender | "">("");
   const [avatar, setAvatar] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // === Модалка ===
+  const [verifyOpen, setVerifyOpen] = useState(false);
+
   const avatarPreview = useMemo(
     () => (avatar ? URL.createObjectURL(avatar) : null),
     [avatar]
   );
+
   useEffect(() => {
     return () => {
       if (avatarPreview) URL.revokeObjectURL(avatarPreview);
@@ -41,24 +44,18 @@ export default function Register() {
       fd.append("email", email.trim());
       fd.append("username", username.trim());
       fd.append("password", password);
-      if (gender) fd.append("gender", gender);
       if (avatar) fd.append("avatar", avatar);
 
-      const { data } = await api.post("/auth/register", fd, {
+      // === ШАГ 1: отправка формы для генерации кода ===
+      const { data } = await api.post("/auth/register-start", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       if (data?.ok) {
-        setSuccess("Account created! Let's proceed to login...");
-        setEmail("");
-        setUsername("");
-        setPassword("");
-        setGender("");
-        setAvatar(null);
-
-        setTimeout(() => navigate("/login"), 1200);
+        setSuccess("Мы отправили код подтверждения на ваш e-mail.");
+        setVerifyOpen(true);
       } else {
-        setError("Failed to create account");
+        setError(data?.error || "Failed to start registration");
       }
     } catch (err: any) {
       const msg =
@@ -68,6 +65,18 @@ export default function Register() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleVerified = (token: string, _user: any) => {
+    setAccessToken(token);
+    setVerifyOpen(false);
+
+    setEmail("");
+    setUsername("");
+    setPassword("");
+    setAvatar(null);
+
+    navigate("/login");
   };
 
   return (
@@ -91,9 +100,6 @@ export default function Register() {
               required
               autoComplete="email"
             />
-            <span className="helper">
-              Required for login and access recovery.
-            </span>
           </div>
 
           <div className="form-row">
@@ -126,20 +132,6 @@ export default function Register() {
           </div>
 
           <div className="form-row">
-            <label>Gender</label>
-            <select
-              className="select"
-              value={gender}
-              onChange={(e) => setGender(e.target.value as Gender | "")}
-            >
-              <option value="">—</option>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </div>
-
-          <div className="form-row">
             <label>Avatar</label>
             <div className="avatar-preview">
               <div>
@@ -152,6 +144,7 @@ export default function Register() {
                   />
                 )}
               </div>
+
               <input
                 className="file-input"
                 type="file"
@@ -159,9 +152,6 @@ export default function Register() {
                 onChange={(e) => setAvatar(e.target.files?.[0] || null)}
               />
             </div>
-            <span className="helper">
-              PNG/JPG up to 5 MB. Can be uploaded later in your profile.
-            </span>
           </div>
 
           <button
@@ -169,13 +159,21 @@ export default function Register() {
             type="submit"
             disabled={loading}
           >
-            {loading ? "Creating..." : "Create account"}
+            {loading ? "Sending code..." : "Create account"}
           </button>
 
           {error && <p className="msg error">{error}</p>}
           {success && <p className="msg success">{success}</p>}
         </div>
       </form>
+
+      {/* Модалка кода */}
+      <EmailCodeModal
+        email={email}
+        open={verifyOpen}
+        onClose={() => setVerifyOpen(false)}
+        onVerified={handleVerified}
+      />
     </div>
   );
 }
