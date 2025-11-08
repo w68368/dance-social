@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import zxcvbn from "zxcvbn";
 import { api } from "../api";
 import { setAccessToken } from "../lib/accessToken";
 import EmailCodeModal from "../components/EmailCodeModal";
@@ -17,20 +18,47 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // === Модалка ===
+  // === Модалка подтверждения e-mail ===
   const [verifyOpen, setVerifyOpen] = useState(false);
 
+  // Превью аватара
   const avatarPreview = useMemo(
     () => (avatar ? URL.createObjectURL(avatar) : null),
     [avatar]
   );
-
   useEffect(() => {
     return () => {
       if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     };
   }, [avatarPreview]);
 
+  // Оценка сложности пароля (0..4) + подсказки
+  const strength = useMemo(
+    () => (password ? zxcvbn(password) : null),
+    [password]
+  );
+  const score = strength?.score ?? 0;
+  const warning = strength?.feedback.warning || "";
+  const suggestions = strength?.feedback.suggestions || [];
+
+  // Общая функция старта регистрации (первичная и “отправить код ещё раз”)
+  const startRegistration = async () => {
+    const fd = new FormData();
+    fd.append("email", email.trim());
+    fd.append("username", username.trim());
+    fd.append("password", password);
+    if (avatar) fd.append("avatar", avatar);
+
+    const { data } = await api.post("/auth/register-start", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    if (!data?.ok) {
+      throw new Error(data?.error || "Failed to start registration");
+    }
+  };
+
+  // Сабмит основной формы
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -40,23 +68,9 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const fd = new FormData();
-      fd.append("email", email.trim());
-      fd.append("username", username.trim());
-      fd.append("password", password);
-      if (avatar) fd.append("avatar", avatar);
-
-      // === ШАГ 1: отправка формы для генерации кода ===
-      const { data } = await api.post("/auth/register-start", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      if (data?.ok) {
-        setSuccess("Мы отправили код подтверждения на ваш e-mail.");
-        setVerifyOpen(true);
-      } else {
-        setError(data?.error || "Failed to start registration");
-      }
+      await startRegistration(); // первая отправка формы
+      setSuccess("Мы отправили код подтверждения на ваш e-mail.");
+      setVerifyOpen(true); // откроется модалка; в ней кулдаун 30s на ресенд
     } catch (err: any) {
       const msg =
         err?.response?.data?.error ||
@@ -67,16 +81,23 @@ export default function Register() {
     }
   };
 
+  // Успешная верификация — сохраним accessToken (опционально) и перейдём на /login
   const handleVerified = (token: string, _user: any) => {
+    // refresh-кука ставится сервером, accessToken сохраняем локально (если нужен для UX)
     setAccessToken(token);
-    setVerifyOpen(false);
 
+    setVerifyOpen(false);
     setEmail("");
     setUsername("");
     setPassword("");
     setAvatar(null);
 
     navigate("/login");
+  };
+
+  // Повторная отправка кода (кнопка в модалке)
+  const handleResend = async () => {
+    await startRegistration();
   };
 
   return (
@@ -129,6 +150,43 @@ export default function Register() {
               required
               autoComplete="new-password"
             />
+
+            {/* Индикатор сложности пароля */}
+            <div className="pw-meter" aria-hidden="true">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span
+                  key={i}
+                  className={
+                    "pw-meter__bar " +
+                    (score >= i
+                      ? score <= 1
+                        ? "is-weak"
+                        : score === 2
+                        ? "is-fair"
+                        : score === 3
+                        ? "is-good"
+                        : "is-strong"
+                      : "")
+                  }
+                />
+              ))}
+            </div>
+            <div className="pw-meter__label">
+              {score === 0 && password && "Very weak"}
+              {score === 1 && "Weak"}
+              {score === 2 && "Fair"}
+              {score === 3 && "Good"}
+              {score === 4 && "Strong"}
+            </div>
+
+            {(warning || suggestions.length > 0) && (
+              <ul className="pw-hints">
+                {warning && <li>{warning}</li>}
+                {suggestions.map((s, idx) => (
+                  <li key={idx}>{s}</li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="form-row">
@@ -167,12 +225,14 @@ export default function Register() {
         </div>
       </form>
 
-      {/* Модалка кода */}
+      {/* Модалка подтверждения e-mail (внутри кулдаун 30с на ресенд) */}
       <EmailCodeModal
         email={email}
         open={verifyOpen}
         onClose={() => setVerifyOpen(false)}
         onVerified={handleVerified}
+        onResend={handleResend}
+        cooldownSec={30}
       />
     </div>
   );

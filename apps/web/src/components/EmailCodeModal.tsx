@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { api } from "../api";
+import { useEffect, useState } from "react";
 import "../styles/pages/auth.css";
 
 interface Props {
@@ -7,6 +6,12 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onVerified: (accessToken: string, user: any) => void;
+
+  /** Вызывает повторную отправку кода (должен дернуть /auth/register-start с формой) */
+  onResend: () => Promise<void>;
+
+  /** Сколько секунд ждать до активной кнопки «отправить ещё раз» */
+  cooldownSec?: number;
 }
 
 export default function EmailCodeModal({
@@ -14,10 +19,36 @@ export default function EmailCodeModal({
   open,
   onClose,
   onVerified,
+  onResend,
+  cooldownSec = 30,
 }: Props) {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // resend
+  const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(cooldownSec);
+  const [info, setInfo] = useState<string | null>(null);
+
+  // сбрасываем состояние при открытии
+  useEffect(() => {
+    if (open) {
+      setCode("");
+      setError(null);
+      setInfo(null);
+      setResending(false);
+      setCooldown(cooldownSec);
+    }
+  }, [open, cooldownSec]);
+
+  // тикер для таймера
+  useEffect(() => {
+    if (!open) return;
+    if (cooldown <= 0) return;
+    const t = setInterval(() => setCooldown((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, [open, cooldown]);
 
   if (!open) return null;
 
@@ -25,23 +56,46 @@ export default function EmailCodeModal({
     e.preventDefault();
     if (loading) return;
     setError(null);
+    setInfo(null);
     setLoading(true);
-
     try {
-      const { data } = await api.post("/auth/register-verify", {
-        email: email.trim(),
-        code: code.trim(),
+      // проверка кода — фронт вызывает это снаружи (см. Register.tsx)
+      const res = await fetch("/api/auth/register-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: email.trim(), code: code.trim() }),
       });
-
+      const data = await res.json();
       if (data?.ok && data?.accessToken && data?.user) {
         onVerified(data.accessToken, data.user);
       } else {
         setError(data?.error || "Verification failed");
       }
     } catch (err: any) {
-      setError(err?.response?.data?.error || "Verification error");
+      setError(err?.message || "Verification error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (cooldown > 0 || resending) return;
+    setError(null);
+    setInfo(null);
+    setResending(true);
+    try {
+      await onResend(); // дергаем повторную отправку формы регистрации
+      setInfo("Код отправлен повторно.");
+      setCooldown(cooldownSec); // перезапуск таймера
+    } catch (e: any) {
+      setError(
+        e?.response?.data?.error ||
+          e?.message ||
+          "Не удалось отправить код. Попробуйте позже."
+      );
+    } finally {
+      setResending(false);
     }
   };
 
@@ -50,12 +104,12 @@ export default function EmailCodeModal({
       <div className="modal">
         <h3>Подтверждение e-mail</h3>
         <p>
-          На адрес <b>{email}</b> отправлен 6-значный код
+          Мы отправили 6-значный код на <b>{email}</b>
         </p>
 
-        <form onSubmit={submit}>
+        <form className="modal-form" onSubmit={submit}>
           <input
-            className="input"
+            className="input code-input"
             type="text"
             maxLength={6}
             inputMode="numeric"
@@ -66,6 +120,7 @@ export default function EmailCodeModal({
           />
 
           {error && <div className="msg error">{error}</div>}
+          {info && <div className="msg success">{info}</div>}
 
           <div className="modal-actions">
             <button
@@ -79,9 +134,23 @@ export default function EmailCodeModal({
             <button
               className="su-btn su-btn-primary"
               type="submit"
-              disabled={loading || code.length !== 6}
+              disabled={loading || code.trim().length !== 6}
             >
               {loading ? "Проверяем..." : "Подтвердить"}
+            </button>
+          </div>
+
+          <div className="modal-resend">
+            <button
+              className="link-btn"
+              type="button"
+              onClick={handleResend}
+              disabled={cooldown > 0 || resending}
+              aria-disabled={cooldown > 0 || resending}
+            >
+              {cooldown > 0
+                ? `Отправить код ещё раз (${cooldown}s)`
+                : "Отправить код ещё раз"}
             </button>
           </div>
         </form>
