@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { z } from "zod";
+import { pwnedCount } from "../lib/pwned.js";
 
 import { prisma } from "../lib/prisma.js";
 import { upload } from "../lib/upload.js";
@@ -103,6 +104,17 @@ router.post("/register-start", upload.single("avatar"), async (req, res) => {
       return res
         .status(409)
         .json({ ok: false, error: "Username already in use" });
+
+    // Проверка пароля на утечки (HIBP)
+    const leaks = await pwnedCount(parsed.data.password);
+    if (leaks > 0) {
+      return res.status(400).json({
+        ok: false,
+        error:
+          "This password appears in known data breaches. Please choose a stronger one.",
+        pwnedCount: leaks,
+      });
+    }
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 10);
 

@@ -123,14 +123,14 @@
 }
 
 /* =========================================================
-   EMAIL VERIFICATION MODAL (StepUnity style)
+   EMAIL VERIFICATION MODAL (StepUnity style) — UPDATED
 ========================================================= */
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.48); /* лёгкое затемнение */
-  backdrop-filter: blur(4px);      /* эффект блюра */
+  backdrop-filter: blur(4px); /* эффект блюра */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,9 +160,19 @@
   color: #b7b7c7;
 }
 
-.modal .input {
+/* --- внутренняя форма: не на всю ширину, по центру --- */
+.modal-form {
+  max-width: 320px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* --- поле кода компактное и по центру --- */
+.modal .input,
+.code-input {
   width: 100%;
-  margin-bottom: 12px;
   height: 44px;
   border-radius: 10px;
   border: 1px solid #2a2f3b;
@@ -173,18 +183,51 @@
   letter-spacing: 6px;
 }
 
-.modal .input:focus {
+.code-input {
+  max-width: 280px;
+  margin: 0 auto 12px;
+}
+
+.modal .input:focus,
+.code-input:focus {
   outline: none;
   border-color: #6b4eff;
 }
 
+/* --- кнопки по центру --- */
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 6px;
 }
 
+/* --- блок "отправить код ещё раз" --- */
+.modal-resend {
+  margin-top: 6px;
+  text-align: center;
+}
+
+/* Кнопка-ссылка для повторной отправки */
+.link-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  color: #b7b7c7;
+}
+
+/* Неактивное состояние (таймер тикает) */
+.link-btn[disabled],
+.link-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  text-decoration: none;
+}
+
+/* --- сообщения --- */
 .msg.error {
   background: #ff3b3b25;
   padding: 8px 12px;
@@ -226,7 +269,50 @@
   }
 }
 
+/* ===== Password strength meter ===== */
+.pw-meter {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
 
+.pw-meter__bar {
+  height: 6px;
+  border-radius: 4px;
+  background: #2a2f3b; /* базовый трек */
+  transition: background 0.2s ease;
+}
+
+.pw-meter__bar.is-weak {
+  background: #e05a5a;
+} /* красный */
+.pw-meter__bar.is-fair {
+  background: #e0a35a;
+} /* янтарный */
+.pw-meter__bar.is-good {
+  background: #78c778;
+} /* зелёный мягкий */
+.pw-meter__bar.is-strong {
+  background: #33b56b;
+} /* зелёный яркий */
+
+.pw-meter__label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #aab0bd;
+}
+
+.pw-hints {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: #aab0bd;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.pw-hints li + li {
+  margin-top: 2px;
+}
 
 @media (max-width: 560px) {
   .register-card {
