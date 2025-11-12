@@ -1,4 +1,5 @@
-import { useMemo, useEffect, useState } from "react";
+// apps/web/src/pages/Register.tsx
+import { useMemo, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import zxcvbn from "zxcvbn";
 import { api } from "../api";
@@ -12,6 +13,8 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmTouched, setConfirmTouched] = useState(false);
   const [avatar, setAvatar] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(false);
@@ -21,7 +24,7 @@ export default function Register() {
   // === Модалка подтверждения e-mail ===
   const [verifyOpen, setVerifyOpen] = useState(false);
 
-  // Превью аватара
+  // === Превью аватара ===
   const avatarPreview = useMemo(
     () => (avatar ? URL.createObjectURL(avatar) : null),
     [avatar]
@@ -32,16 +35,91 @@ export default function Register() {
     };
   }, [avatarPreview]);
 
-  // Оценка сложности пароля (0..4) + подсказки
+  // === Фокус и позиционирование overlay под полем пароля ===
+  const [pwFocused, setPwFocused] = useState(false);
+  const cardRef = useRef<HTMLFormElement | null>(null);
+  const pwInputRef = useRef<HTMLInputElement | null>(null);
+  const [pwOverlayTop, setPwOverlayTop] = useState<number>(0);
+
+  const recomputeOverlayTop = () => {
+    const card = cardRef.current?.getBoundingClientRect();
+    const input = pwInputRef.current?.getBoundingClientRect();
+    if (card && input) {
+      const offset = input.bottom - card.top; // px от верхней границы карточки
+      setPwOverlayTop(Math.max(0, Math.round(offset) + 8)); // +8px отступ ниже инпута
+    }
+  };
+
+  useEffect(() => {
+    if (!pwFocused) return;
+    recomputeOverlayTop();
+    const onResize = () => recomputeOverlayTop();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [pwFocused]);
+
+  useEffect(() => {
+    if (pwFocused) {
+      // при наборе пароля/валидации геометрия может меняться
+      recomputeOverlayTop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [password, email, username, confirmPassword]);
+
+  // === Оценка сложности пароля (0..4) и свёртка в 3 уровня ===
   const strength = useMemo(
     () => (password ? zxcvbn(password) : null),
     [password]
   );
   const score = strength?.score ?? 0;
-  const warning = strength?.feedback.warning || "";
-  const suggestions = strength?.feedback.suggestions || [];
 
-  // Общая функция старта регистрации (первичная и “отправить код ещё раз”)
+  const { levelLabel, progressPct, colorVar } = useMemo(() => {
+    // 0–1 → Very weak (33%), 2 → Weak (66%), 3–4 → Strong (100%)
+    if (!password || score <= 1) {
+      return {
+        levelLabel: "Very weak",
+        progressPct: 33,
+        colorVar: "var(--pw-weak, #ff4d4f)",
+      };
+    }
+    if (score === 2) {
+      return {
+        levelLabel: "Weak",
+        progressPct: 66,
+        colorVar: "var(--pw-mid, #faad14)",
+      };
+    }
+    return {
+      levelLabel: "Strong",
+      progressPct: 100,
+      colorVar: "var(--pw-strong, #52c41a)",
+    };
+  }, [password, score]);
+
+  const tips = useMemo(() => {
+    if (!password) return [] as string[];
+    const out: string[] = [];
+    const warn = strength?.feedback.warning?.trim();
+    if (warn) out.push(warn);
+    (strength?.feedback.suggestions || []).forEach((s) => {
+      if (s && s.trim()) out.push(s.trim());
+    });
+    if (out.length === 0) {
+      if (password.length < 8) out.push("Use at least 8 characters.");
+      if (!/[0-9]/.test(password)) out.push("Add some digits (0–9).");
+      if (!/[A-Z]/.test(password)) out.push("Add an uppercase letter.");
+      if (!/[!@#$%^&*()_\-+=\[{\]};:,.?/~`]/.test(password))
+        out.push("Add a symbol.");
+    }
+    return out.slice(0, 4);
+  }, [password, strength]);
+
+  const passwordsMismatch =
+    confirmTouched &&
+    confirmPassword.length > 0 &&
+    confirmPassword !== password;
+
+  // === Общая функция старта регистрации (первая отправка и «resend code») ===
   const startRegistration = async () => {
     const fd = new FormData();
     fd.append("email", email.trim());
@@ -58,19 +136,25 @@ export default function Register() {
     }
   };
 
-  // Сабмит основной формы
+  // === Сабмит формы ===
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      setConfirmTouched(true);
+      return;
+    }
 
     setError(null);
     setSuccess(null);
     setLoading(true);
 
     try {
-      await startRegistration(); // первая отправка формы
-      setSuccess("Мы отправили код подтверждения на ваш e-mail.");
-      setVerifyOpen(true); // откроется модалка; в ней кулдаун 30s на ресенд
+      await startRegistration();
+      setSuccess("We sent a verification code to your e-mail.");
+      setVerifyOpen(true);
     } catch (err: any) {
       const msg =
         err?.response?.data?.error ||
@@ -81,29 +165,35 @@ export default function Register() {
     }
   };
 
-  // Успешная верификация — сохраним accessToken (опционально) и перейдём на /login
+  // === Успешная верификация ===
   const handleVerified = (token: string, _user: any) => {
-    // refresh-кука ставится сервером, accessToken сохраняем локально (если нужен для UX)
-    setAccessToken(token);
-
+    setAccessToken(token); // refresh-cookie ставит бэкенд, access — для UX
     setVerifyOpen(false);
     setEmail("");
     setUsername("");
     setPassword("");
+    setConfirmPassword("");
     setAvatar(null);
-
     navigate("/login");
   };
 
-  // Повторная отправка кода (кнопка в модалке)
+  // === Повторная отправка кода ===
   const handleResend = async () => {
     await startRegistration();
   };
 
+  const canSubmit =
+    !loading &&
+    email.trim() &&
+    username.trim() &&
+    password.length >= 6 &&
+    confirmPassword.length >= 6 &&
+    password === confirmPassword;
+
   return (
     <div className="auth-page">
-      <form className="register-card" onSubmit={onSubmit}>
-        <h2>Create your account</h2>
+      <form className="register-card" ref={cardRef} onSubmit={onSubmit}>
+        <h2 className="auth-title">Create your account</h2>
         <p className="register-sub">
           Join StepUnity — share choreography, join challenges and climb
           rankings.
@@ -138,54 +228,58 @@ export default function Register() {
             />
           </div>
 
-          <div className="form-row">
+          <div
+            className="form-row form-row--password"
+            style={{
+              position: "relative",
+              zIndex: 20,
+            }} /* инпут выше overlay */
+          >
             <label>Password</label>
             <input
+              ref={pwInputRef}
               className="input"
               type="password"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onFocus={() => {
+                setPwFocused(true);
+                requestAnimationFrame(() => recomputeOverlayTop());
+              }}
+              onBlur={() => setPwFocused(false)}
               minLength={6}
               required
               autoComplete="new-password"
+              aria-invalid={passwordsMismatch ? true : undefined}
             />
+          </div>
 
-            {/* Индикатор сложности пароля */}
-            <div className="pw-meter" aria-hidden="true">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span
-                  key={i}
-                  className={
-                    "pw-meter__bar " +
-                    (score >= i
-                      ? score <= 1
-                        ? "is-weak"
-                        : score === 2
-                        ? "is-fair"
-                        : score === 3
-                        ? "is-good"
-                        : "is-strong"
-                      : "")
-                  }
-                />
-              ))}
-            </div>
-            <div className="pw-meter__label">
-              {score === 0 && password && "Very weak"}
-              {score === 1 && "Weak"}
-              {score === 2 && "Fair"}
-              {score === 3 && "Good"}
-              {score === 4 && "Strong"}
-            </div>
-
-            {(warning || suggestions.length > 0) && (
-              <ul className="pw-hints">
-                {warning && <li>{warning}</li>}
-                {suggestions.map((s, idx) => (
-                  <li key={idx}>{s}</li>
-                ))}
-              </ul>
+          <div className="form-row">
+            <label>Confirm password</label>
+            <input
+              className="input"
+              type="password"
+              placeholder="Repeat password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              onBlur={() => setConfirmTouched(true)}
+              minLength={6}
+              required
+              autoComplete="new-password"
+              aria-invalid={passwordsMismatch ? true : undefined}
+            />
+            {passwordsMismatch && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: 6,
+                  fontSize: 12,
+                  color: "var(--su-danger, #ff4d4f)",
+                }}
+              >
+                Passwords do not match.
+              </div>
             )}
           </div>
 
@@ -215,7 +309,7 @@ export default function Register() {
           <button
             className="su-btn su-btn-primary"
             type="submit"
-            disabled={loading}
+            disabled={!canSubmit}
           >
             {loading ? "Sending code..." : "Create account"}
           </button>
@@ -223,9 +317,44 @@ export default function Register() {
           {error && <p className="msg error">{error}</p>}
           {success && <p className="msg success">{success}</p>}
         </div>
+
+        {/* === Overlay: визуально над карточкой, геометрически под полем пароля === */}
+        {pwFocused && (
+          <div
+            className="pw-overlay"
+            style={
+              {
+                "--pw-progress": progressPct,
+                "--pw-color": colorVar,
+              } as React.CSSProperties
+            }
+          >
+            <div
+              className="pw-panel"
+              style={{ top: `${pwOverlayTop}px` }}
+              role="status"
+              aria-live="polite"
+            >
+              <div className="pw-bar" aria-hidden="true">
+                <div className="pw-bar__fill" />
+              </div>
+              <div className="pw-caption">
+                <span className="pw-label">{levelLabel}</span>
+              </div>
+
+              {tips.length > 0 && (
+                <ul className="pw-tips">
+                  {tips.map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
       </form>
 
-      {/* Модалка подтверждения e-mail (внутри кулдаун 30с на ресенд) */}
+      {/* Модалка подтверждения e-mail */}
       <EmailCodeModal
         email={email}
         open={verifyOpen}
