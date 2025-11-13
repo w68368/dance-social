@@ -1,0 +1,21 @@
+/* Доп-стили именно для страницы Reset password */
+
+.reset-card h2 {
+  margin: 0 0 8px;
+}
+
+.reset-card .register-sub {
+  margin-bottom: 22px;
+}
+
+/* Кнопка во всю ширину карточки, как на регистрации */
+.reset-submit-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* На всякий случай — чтобы поле пароля имело нужный z-index над overlay */
+.reset-card .field--password {
+  position: relative;
+  z-index: 20;
+}
