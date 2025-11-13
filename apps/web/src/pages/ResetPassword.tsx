@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent, CSSProperties } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import zxcvbn from "zxcvbn";
 import { submitPasswordReset } from "../api";
 
-// если используешь zxcvbn — можешь подсветить силу пароля
-// import zxcvbn from "zxcvbn";
+import "../styles/pages/auth.css";
+import "../styles/pages/reset.css";
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
@@ -16,17 +18,90 @@ export default function ResetPassword() {
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
 
+  // === для overlay сложности пароля ===
+  const [pwFocused, setPwFocused] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const pwFieldRef = useRef<HTMLInputElement | null>(null);
+  const [overlayTop, setOverlayTop] = useState<number>(120);
+
   const canSubmit = useMemo(
     () => p1.length >= 8 && p1 === p2 && !!token,
     [p1, p2, token]
   );
 
+  // пересчитать позицию overlay относительно карточки
+  const updateOverlayPos = () => {
+    if (!pwFieldRef.current || !cardRef.current) return;
+    const fieldRect = pwFieldRef.current.getBoundingClientRect();
+    const cardRect = cardRef.current.getBoundingClientRect();
+    const offset = fieldRect.bottom - cardRect.top + 8;
+    setOverlayTop(offset);
+  };
+
   useEffect(() => {
-    // если токена нет — редирект на /forgot
     if (!token) navigate("/forgot", { replace: true });
   }, [token, navigate]);
 
-  const onSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!pwFocused) return;
+    updateOverlayPos();
+    window.addEventListener("resize", updateOverlayPos);
+    return () => window.removeEventListener("resize", updateOverlayPos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pwFocused]);
+
+  const pwInfo = useMemo(() => {
+    if (!p1) {
+      return {
+        progress: 0,
+        label: "Start typing your password",
+        color: "var(--pw-weak)",
+      };
+    }
+
+    const res = zxcvbn(p1);
+    let progress = 0;
+    let label = "Very weak";
+    let color = "var(--pw-weak)";
+
+    switch (res.score) {
+      case 0:
+      case 1:
+        progress = 25;
+        label = "Weak password";
+        color = "var(--pw-weak)";
+        break;
+      case 2:
+        progress = 50;
+        label = "Okay, but could be stronger";
+        color = "var(--pw-mid)";
+        break;
+      case 3:
+        progress = 75;
+        label = "Good password";
+        color = "var(--pw-mid)";
+        break;
+      case 4:
+        progress = 100;
+        label = "Strong password";
+        color = "var(--pw-strong)";
+        break;
+    }
+
+    return { progress, label, color };
+  }, [p1]);
+
+  const panelStyle = useMemo(
+    () =>
+      ({
+        "--pw-overlay-top": `${overlayTop}px`,
+        "--pw-progress": pwInfo.progress,
+        "--pw-color": pwInfo.color,
+      } as CSSProperties),
+    [overlayTop, pwInfo.progress, pwInfo.color]
+  );
+
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (loading || !canSubmit) return;
 
@@ -37,13 +112,11 @@ export default function ResetPassword() {
       await submitPasswordReset(token, p1);
       setOk(true);
     } catch (e: any) {
-      // Пытаемся вытащить сообщение об ошибке с сервера
       const serverMsg = e?.response?.data?.error || e?.response?.data?.message;
 
       if (serverMsg && typeof serverMsg === "string") {
         setErr(serverMsg);
       } else {
-        // запасной вариант, если сервер ничего не прислал
         setErr("Invalid or expired reset link. Please request a new one.");
       }
     } finally {
@@ -53,49 +126,92 @@ export default function ResetPassword() {
 
   if (ok) {
     return (
-      <div className="card auth-card">
-        <h2>Password changed</h2>
-        <p>You can now log in with your new password.</p>
-        <Link to="/login" className="button">
-          Go to login
-        </Link>
+      <div className="auth-page">
+        <div className="register-card reset-card">
+          <h2>Password changed</h2>
+          <p className="register-sub">
+            You can now log in with your new password.
+          </p>
+          <Link to="/login" className="su-btn su-btn-primary reset-submit-btn">
+            Go to login
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="card auth-card">
-      <h2>Set a new password</h2>
-      <form onSubmit={onSubmit}>
-        <label>
-          New password
-          <input
-            type="password"
-            required
-            value={p1}
-            onChange={(e) => setP1(e.target.value)}
-            autoComplete="new-password"
-          />
-        </label>
-        <label>
-          Repeat new password
-          <input
-            type="password"
-            required
-            value={p2}
-            onChange={(e) => setP2(e.target.value)}
-            autoComplete="new-password"
-          />
-        </label>
-        {err && (
-          <div className="error" role="alert">
-            {err}
+    <div className="auth-page">
+      <div className="register-card reset-card" ref={cardRef}>
+        {pwFocused && (
+          <div className="pw-overlay">
+            <div className="pw-panel" style={panelStyle}>
+              <div className="pw-bar">
+                <div className="pw-bar__fill" />
+              </div>
+              <div className="pw-caption">
+                <span className="pw-label">{pwInfo.label}</span>
+              </div>
+              <ul className="pw-tips">
+                <li>Use at least 10–12 characters.</li>
+                <li>Mix letters, numbers and symbols.</li>
+                <li>Avoid dates, names and common phrases.</li>
+              </ul>
+            </div>
           </div>
         )}
-        <button type="submit" disabled={!canSubmit || loading}>
-          {loading ? "Saving..." : "Save new password"}
-        </button>
-      </form>
+
+        <h2>Set a new password</h2>
+        <p className="register-sub">
+          Choose a strong password for your StepUnity account.
+        </p>
+
+        <form className="form-grid" onSubmit={onSubmit}>
+          <div className="form-row field--password">
+            <label>New password</label>
+            <input
+              ref={pwFieldRef}
+              className="input"
+              type="password"
+              required
+              value={p1}
+              onChange={(e) => setP1(e.target.value)}
+              onFocus={() => {
+                setPwFocused(true);
+                updateOverlayPos();
+              }}
+              onBlur={() => setPwFocused(false)}
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div className="form-row">
+            <label>Repeat new password</label>
+            <input
+              className="input"
+              type="password"
+              required
+              value={p2}
+              onChange={(e) => setP2(e.target.value)}
+              autoComplete="new-password"
+            />
+          </div>
+
+          {err && (
+            <div className="msg error" role="alert">
+              {err}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={!canSubmit || loading}
+            className="su-btn su-btn-primary reset-submit-btn"
+          >
+            {loading ? "Saving..." : "Save new password"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
