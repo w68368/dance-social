@@ -1,5 +1,6 @@
+// apps/web/src/pages/Login.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api";
 import { setAccessToken } from "../lib/accessToken";
 import { setUser } from "../lib/auth";
@@ -120,6 +121,13 @@ export default function Login() {
               autoComplete="current-password"
               disabled={disabled}
             />
+
+            {/* Ссылка Forgot password? — по центру и голубого цвета */}
+            <div className="auth-forgot-right">
+              <Link to="/forgot" className="auth-link-blue">
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           <button
@@ -142,6 +150,16 @@ export default function Login() {
           )}
 
           {error && <p className="msg error">{error}</p>}
+
+          {/* Блок: Don't have an account? Create account — по центру и голубая ссылка */}
+          <div className="auth-links">
+            <div className="auth-links-row">
+              <span className="auth-muted">Don't have an account?</span>{" "}
+              <Link to="/register" className="auth-link-blue">
+                Create account
+              </Link>
+            </div>
+          </div>
         </div>
       </form>
     </div>

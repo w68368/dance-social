@@ -1,4 +1,5 @@
-import axios from "axios";
+// apps/web/src/api.ts
+import axios, { AxiosError } from "axios";
 import {
   getAccessToken,
   setAccessToken,
@@ -8,8 +9,10 @@ import {
 // ------------------------
 // Базовый клиент
 // ------------------------
+const BASE_URL = import.meta?.env?.VITE_API_BASE || "/api";
+
 export const api = axios.create({
-  baseURL: "/api",
+  baseURL: BASE_URL,
   withCredentials: true, // важно: чтобы браузер слал refresh-cookie
 });
 
@@ -19,8 +22,10 @@ export const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
   if (token) {
-    config.headers = config.headers || {};
-    (config.headers as any).Authorization = `Bearer ${token}`;
+    config.headers = config.headers ?? {};
+    (config.headers as Record<string, string>)[
+      "Authorization"
+    ] = `Bearer ${token}`;
   }
   return config;
 });
@@ -38,18 +43,24 @@ function onRefreshed(newToken: string | null) {
 
 api.interceptors.response.use(
   (res) => res,
-  async (error) => {
-    const original = error.config;
+  async (error: AxiosError & { config: any }) => {
+    const original = error.config || {};
+    const status = error?.response?.status;
 
-    // Если токен просрочен / нет доступа → пытаемся обновить
-    if (error?.response?.status === 401 && !original._retry) {
+    // Не рефрешим для самого /auth/refresh, чтобы не зациклиться
+    const isRefreshCall =
+      typeof original?.url === "string" &&
+      original.url.replace(BASE_URL, "").includes("/auth/refresh");
+
+    if (status === 401 && !original._retry && !isRefreshCall) {
       original._retry = true;
 
-      // ---- Если уже идёт refresh — ждём результат
+      // Если уже идёт refresh — ждём
       if (isRefreshing) {
         return new Promise((resolve) => {
           waiting.push((token) => {
             if (token) {
+              original.headers = original.headers ?? {};
               original.headers.Authorization = `Bearer ${token}`;
             }
             resolve(api(original));
@@ -57,20 +68,20 @@ api.interceptors.response.use(
         });
       }
 
-      // ---- Запускаем refresh
+      // Запускаем refresh
       isRefreshing = true;
       try {
         const { data } = await axios.post(
-          "/api/auth/refresh",
+          `${BASE_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );
 
         if (data?.ok && data?.accessToken) {
           setAccessToken(data.accessToken);
-
           onRefreshed(data.accessToken);
 
+          original.headers = original.headers ?? {};
           original.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(original);
         } else {
@@ -90,3 +101,14 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ----------------------------------------------------
+// Helper API calls for Forgot / Reset password
+// ----------------------------------------------------
+export function requestPasswordReset(email: string) {
+  return api.post("/auth/forgot", { email: email.trim().toLowerCase() });
+}
+
+export function submitPasswordReset(token: string, newPassword: string) {
+  return api.post("/auth/reset", { token, newPassword });
+}

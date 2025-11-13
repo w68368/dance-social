@@ -1,4 +1,3 @@
-// apps/api/prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -23,11 +22,14 @@ model User {
   failedLoginAttempts  Int             @default(0)
   lockUntil            DateTime?
 
-  // ✅ Добавлено: когда e-mail подтверждён
+  // ✅ e-mail подтверждён
   emailVerifiedAt      DateTime?
 
-  // связь 1:N c RefreshToken
+  // ✅ Связь 1:N с refresh-токенами
   refreshTokens        RefreshToken[]
+
+  // ✅ Связь 1:N с PasswordReset
+  passwordResets       PasswordReset[]
 
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
@@ -45,7 +47,6 @@ model RefreshToken {
   expiresAt  DateTime
   revokedAt  DateTime?
 
-  // связь к пользователю
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -53,27 +54,53 @@ model RefreshToken {
 }
 
 //
-// ✅ Новая таблица для e-mail подтверждений
+// ✅ Таблица для подтверждения e-mail
 //
 model EmailVerification {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
 
-  // email уникален – перезаписываем код при повторной отправке
-  email       String   @unique
+  // email уникален – при повторной отправке перезаписывается
+  email       String    @unique
 
-  // sha256-код, не храним реальный код
+  // sha256-код (реальный код не храним)
   codeHash    String
 
-  // код живёт 10 минут
+  // срок действия кода (например, 10 минут)
   expiresAt   DateTime
 
-  // количество попыток ввода
+  // число попыток ввода
   attempts    Int       @default(0)
   maxAttempts Int       @default(5)
 
-  // Полезные данные перед созданием аккаунта:
+  // полезные данные для будущего создания пользователя:
   // { username, passwordHash, avatarTempPath }
   payload     Json
 
   createdAt   DateTime  @default(now())
+}
+
+//
+// ✅ Новая таблица для сброса пароля (Forgot / Reset)
+//
+model PasswordReset {
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+
+  // ✅ Храним только хэш токена
+  tokenHash    String   @unique
+
+  // ⏳ Срок действия (обычно 30 минут)
+  expiresAt    DateTime
+
+  // ❗ Отметка, что токен уже использован (одноразовый)
+  usedAt       DateTime?
+
+  createdAt    DateTime @default(now())
+
+  // IP / User-Agent с которого запросили восстановление
+  requestedIp  String?
+  requestedUA  String?
+
+  @@index([expiresAt])
 }

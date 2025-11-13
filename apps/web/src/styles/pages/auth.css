@@ -269,6 +269,44 @@
   }
 }
 
+.auth-links {
+  margin-top: 12px;
+  text-align: center;
+  display: grid;
+  gap: 10px;
+}
+
+/* Forgot password — справа */
+.auth-forgot-right {
+  margin-top: 4px;
+  text-align: right;
+}
+
+.auth-forgot-right .auth-link-blue {
+  font-size: 14px;
+}
+
+.auth-links-row {
+  display: inline-flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+}
+.auth-muted {
+  opacity: 0.8;
+  font-size: 14px;
+}
+.auth-link-blue {
+  color: #6ea8ff;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.auth-link-blue:hover {
+  color: #9bc5ff;
+  text-decoration: underline;
+}
+
 /* ===== Password overlay (3-step strength bar) ===== */
 
 .register-card {
