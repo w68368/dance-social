@@ -12,8 +12,16 @@ import {
   sha256,
   newRefreshRaw,
   refreshCookieOptions,
+  generateResetToken,
 } from "../lib/tokens.js";
-import { sendVerificationCode } from "../lib/mailer.js";
+import { sendVerificationCode, sendPasswordResetEmail } from "../lib/mailer.js";
+import {
+  forgotLimiter,
+  resetLimiter,
+  loginLimiter,
+  registerStartLimiter,
+  registerVerifyLimiter,
+} from "../middlewares/limits.js";
 
 const router = Router();
 
@@ -22,11 +30,15 @@ const router = Router();
 ========================= */
 const MAX_ATTEMPTS = 4;
 const LOCK_MINUTES = 5;
-const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 30);
+const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TOKEN_DAYS ?? 30);
 
 // Для e-mail подтверждения
 const EMAIL_CODE_TTL_MIN = Number(process.env.EMAIL_CODE_TTL_MIN ?? 10);
 const EMAIL_MAX_ATTEMPTS = Number(process.env.EMAIL_MAX_ATTEMPTS ?? 5);
+
+// Для сброса пароля
+const RESET_TOKEN_TTL_MIN = Number(process.env.RESET_TOKEN_TTL_MIN ?? 30);
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
 // Дефолтная аватарка (файл положи в apps/api/uploads/defaults/default-avatar.png)
 const DEFAULT_AVATAR_URL = "/uploads/defaults/default-avatar.png";
@@ -66,6 +78,16 @@ const loginSchema = z.object({
   password: z.string().min(6).max(200),
 });
 
+// Forgot/Reset схемы
+const forgotSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetSchema = z.object({
+  token: z.string().min(20),
+  newPassword: z.string().min(8).max(128),
+});
+
 /* ============================================================
    NEW: Двухшаговая регистрация с e-mail кодом
    1) /register-start — присылает код и кладёт черновик
@@ -76,110 +98,119 @@ const loginSchema = z.object({
    POST /api/auth/register-start
    multipart/form-data (avatar optional)
 ========================= */
-router.post("/register-start", upload.single("avatar"), async (req, res) => {
-  try {
-    const form = {
-      email: normalizeEmail(req.body.email),
-      username: normalizeUsername(req.body.username),
-      password: normalizePassword(req.body.password),
-    };
-
-    const parsed = registerSchema.safeParse(form);
-    if (!parsed.success) {
-      return res.status(400).json({
-        ok: false,
-        error: "Validation failed",
-        details: parsed.error.flatten(),
-      });
-    }
-
-    // Уникальность
-    const [byEmail, byUsername] = await Promise.all([
-      prisma.user.findUnique({ where: { email: parsed.data.email } }),
-      prisma.user.findUnique({ where: { username: parsed.data.username } }),
-    ]);
-    if (byEmail)
-      return res.status(409).json({ ok: false, error: "Email already in use" });
-    if (byUsername)
-      return res
-        .status(409)
-        .json({ ok: false, error: "Username already in use" });
-
-    // Проверка пароля на утечки (HIBP)
-    const leaks = await pwnedCount(parsed.data.password);
-    if (leaks > 0) {
-      return res.status(400).json({
-        ok: false,
-        error:
-          "This password appears in known data breaches. Please choose a stronger one.",
-        pwnedCount: leaks,
-      });
-    }
-
-    const passwordHash = await bcrypt.hash(parsed.data.password, 10);
-
-    // Если прислали аватар — сохраним URL (файл уже положен multer в /uploads)
-    let avatarUrl: string | undefined;
-    if (req.file) {
-      avatarUrl = "/uploads/" + req.file.filename;
-    }
-
-    // Генерим код и сохраняем черновик
-    const code = random6();
-    const codeHash = sha256hex(code);
-    const expiresAt = new Date(Date.now() + EMAIL_CODE_TTL_MIN * 60 * 1000);
-
-    await prisma.emailVerification.upsert({
-      where: { email: parsed.data.email },
-      create: {
-        email: parsed.data.email,
-        codeHash,
-        expiresAt,
-        attempts: 0,
-        maxAttempts: EMAIL_MAX_ATTEMPTS,
-        payload: {
-          username: parsed.data.username,
-          passwordHash,
-          avatarUrl, // может быть undefined — это ок
-        },
-      },
-      update: {
-        codeHash,
-        expiresAt,
-        attempts: 0,
-        maxAttempts: EMAIL_MAX_ATTEMPTS,
-        payload: {
-          username: parsed.data.username,
-          passwordHash,
-          avatarUrl,
-        },
-      },
-    });
-
-    // Отправляем письмо с кодом (даём понятное сообщение при ошибке SMTP)
+router.post(
+  "/register-start",
+  registerStartLimiter,
+  upload.single("avatar"),
+  async (req, res) => {
     try {
-      await sendVerificationCode(parsed.data.email, code);
-    } catch (e: any) {
-      console.error("[sendMail] error:", e?.message || e);
-      return res.status(500).json({
-        ok: false,
-        error:
-          "Email sending failed (SMTP). Check SMTP_* in .env or reset Mailtrap credentials.",
-      });
-    }
+      const form = {
+        email: normalizeEmail(req.body.email),
+        username: normalizeUsername(req.body.username),
+        password: normalizePassword(req.body.password),
+      };
 
-    return res.json({ ok: true, message: "Verification code sent" });
-  } catch (e) {
-    console.error(e);
-    return res.status(500).json({ ok: false, error: "Internal server error" });
+      const parsed = registerSchema.safeParse(form);
+      if (!parsed.success) {
+        return res.status(400).json({
+          ok: false,
+          error: "Validation failed",
+          details: parsed.error.flatten(),
+        });
+      }
+
+      // Уникальность
+      const [byEmail, byUsername] = await Promise.all([
+        prisma.user.findUnique({ where: { email: parsed.data.email } }),
+        prisma.user.findUnique({ where: { username: parsed.data.username } }),
+      ]);
+      if (byEmail)
+        return res
+          .status(409)
+          .json({ ok: false, error: "Email already in use" });
+      if (byUsername)
+        return res
+          .status(409)
+          .json({ ok: false, error: "Username already in use" });
+
+      // Проверка пароля на утечки (HIBP)
+      const leaks = await pwnedCount(parsed.data.password);
+      if (leaks > 0) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "This password appears in known data breaches. Please choose a stronger one.",
+          pwnedCount: leaks,
+        });
+      }
+
+      const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+
+      // Если прислали аватар — сохраним URL (файл уже положен multer в /uploads)
+      let avatarUrl: string | undefined;
+      if (req.file) {
+        avatarUrl = "/uploads/" + req.file.filename;
+      }
+
+      // Генерим код и сохраняем черновик
+      const code = random6();
+      const codeHash = sha256hex(code);
+      const expiresAt = new Date(Date.now() + EMAIL_CODE_TTL_MIN * 60 * 1000);
+
+      await prisma.emailVerification.upsert({
+        where: { email: parsed.data.email },
+        create: {
+          email: parsed.data.email,
+          codeHash,
+          expiresAt,
+          attempts: 0,
+          maxAttempts: EMAIL_MAX_ATTEMPTS,
+          payload: {
+            username: parsed.data.username,
+            passwordHash,
+            avatarUrl, // может быть undefined — это ок
+          },
+        },
+        update: {
+          codeHash,
+          expiresAt,
+          attempts: 0,
+          maxAttempts: EMAIL_MAX_ATTEMPTS,
+          payload: {
+            username: parsed.data.username,
+            passwordHash,
+            avatarUrl,
+          },
+        },
+      });
+
+      // Отправляем письмо с кодом (даём понятное сообщение при ошибке SMTP)
+      try {
+        await sendVerificationCode(parsed.data.email, code);
+      } catch (e: any) {
+        console.error("[sendMail] error:", e?.message || e);
+        return res.status(500).json({
+          ok: false,
+          error:
+            "Email sending failed (SMTP). Check SMTP_* in .env or reset Mailtrap credentials.",
+        });
+      }
+
+      return res.json({ ok: true, message: "Verification code sent" });
+    } catch (e) {
+      console.error(e);
+      return res
+        .status(500)
+        .json({ ok: false, error: "Internal server error" });
+    }
   }
-});
+);
 
 /* =========================
    POST /api/auth/register-verify
    JSON: { email, code }
 ========================= */
-router.post("/register-verify", async (req, res) => {
+router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);
     const code = (req.body.code ?? "").toString().trim();
@@ -351,7 +382,7 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
    JSON: { email, password }
    -> set-cookie: refresh=... (HttpOnly) + { accessToken, user }
 ========================= */
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   try {
     const parsed = loginSchema.safeParse({
       email: normalizeEmail(req.body.email),
@@ -562,6 +593,143 @@ router.get("/me", requireAuth, async (req: AuthedRequest, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
+/* =========================================================
+   NEW: Forgot / Reset password
+========================================================= */
+
+/* =========================
+   POST /api/auth/forgot
+   JSON: { email }
+   Ответ всегда одинаковый — не палим существование почты
+========================= */
+router.post("/forgot", forgotLimiter, async (req, res) => {
+  try {
+    const { email } = forgotSchema.parse({
+      email: normalizeEmail(req.body.email),
+    });
+
+    // общий ответ
+    const genericOk = {
+      ok: true,
+      message: "If this email exists, we've sent reset instructions.",
+    };
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true },
+    });
+
+    if (!user) {
+      // Не раскрываем, что почта не найдена
+      return res.json(genericOk);
+    }
+
+    // Генерируем и сохраняем одноразовый токен (хэш)
+    const token = generateResetToken();
+    const tokenHash = sha256(token);
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MIN * 60 * 1000);
+
+    await prisma.passwordReset.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+        requestedIp:
+          (req.headers["x-forwarded-for"] as string) ||
+          req.socket.remoteAddress ||
+          "",
+        requestedUA: req.get("user-agent") || "",
+      },
+    });
+
+    const resetUrl = `${FRONTEND_ORIGIN}/reset?token=${encodeURIComponent(
+      token
+    )}`;
+
+    try {
+      await sendPasswordResetEmail(user.email, resetUrl);
+    } catch (e) {
+      // Не выдаём деталей наружу
+    }
+
+    return res.json(genericOk);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
+/* =========================
+   POST /api/auth/reset
+   JSON: { token, newPassword }
+   Меняет пароль, помечает токен использованным, отзывает все refresh
+========================= */
+router.post("/reset", resetLimiter, async (req, res) => {
+  try {
+    const { token, newPassword } = resetSchema.parse(req.body);
+    const tokenHash = sha256(token);
+
+    const record = await prisma.passwordReset.findUnique({
+      where: { tokenHash },
+      select: {
+        id: true,
+        userId: true,
+        expiresAt: true,
+        usedAt: true,
+      },
+    });
+
+    // единый ответ на любые фейлы
+    const bad = () =>
+      res.status(400).json({ ok: false, error: "Invalid or expired token." });
+
+    if (!record) return bad();
+    if (record.usedAt) return bad();
+    if (record.expiresAt < new Date()) return bad();
+
+    // Доп.проверка на утечки/слабость пароля (опционально)
+    const leaks = await pwnedCount(newPassword);
+    if (leaks > 0) {
+      return res.status(400).json({
+        ok: false,
+        error:
+          "This password appears in known data breaches. Please choose a stronger one.",
+        pwnedCount: leaks,
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.$transaction(async (tx) => {
+      // 1) Сменить пароль пользователя
+      await tx.user.update({
+        where: { id: record.userId },
+        data: {
+          passwordHash,
+          // passwordVersion: { increment: 1 }, // если используешь версионирование
+        },
+      });
+
+      // 2) Отозвать все активные refresh токены
+      await tx.refreshToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      // 3) Пометить токен использованным
+      await tx.passwordReset.update({
+        where: { tokenHash },
+        data: { usedAt: new Date() },
+      });
+    });
+
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 });
 

@@ -1,4 +1,4 @@
-import { randomUUID, createHash } from "crypto";
+import crypto, { randomUUID, createHash } from "crypto";
 import jwt, {
   type Secret,
   type SignOptions,
@@ -6,7 +6,11 @@ import jwt, {
 } from "jsonwebtoken";
 import type { CookieOptions } from "express";
 
-// допустимые форматы для expiresIn
+// ====================================================
+// ===================== JWT ==========================
+// ====================================================
+
+// допустимые форматы expiresIn
 type ExpiresLike =
   | number
   | `${number}${"ms" | "s" | "m" | "h" | "d" | "w" | "y"}`;
@@ -24,17 +28,27 @@ export function verifyAccess(token: string) {
   return jwt.verify(token, JWT_SECRET) as JwtPayload & { sub: string };
 }
 
+// ====================================================
+// =================== HASH (SHA-256) =================
+// ====================================================
+
 export function sha256(input: string) {
   return createHash("sha256").update(input).digest("hex");
 }
 
+// ====================================================
+// =========== REFRESH TOKEN (RAW + COOKIE) ===========
+// ====================================================
+
 export function newRefreshRaw() {
+  // raw-строка: UUID.UUID — достаточно длинная, непредсказуемая
   return `${randomUUID()}.${randomUUID()}`;
 }
 
 export function refreshCookieOptions(): CookieOptions {
-  const days = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 30);
+  const days = Number(process.env.REFRESH_TOKEN_DAYS ?? 30);
   const isProd = process.env.NODE_ENV === "production";
+
   return {
     httpOnly: true,
     secure: isProd ? true : false, // dev: false, prod: true
@@ -42,4 +56,19 @@ export function refreshCookieOptions(): CookieOptions {
     path: "/api/auth",
     maxAge: days * 24 * 60 * 60 * 1000,
   };
+}
+
+// ====================================================
+// ========= PASSWORD RESET TOKEN GENERATOR ===========
+// ====================================================
+
+/**
+ * Генерируем криптографически сильный токен для сброса пароля.
+ * Он:
+ *  ✅ длинный (48 байт → ~64 символа base64url)
+ *  ✅ не угадывается
+ *  ✅ идеально подходит для одноразовых ссылок
+ */
+export function generateResetToken(): string {
+  return crypto.randomBytes(48).toString("base64url");
 }

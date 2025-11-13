@@ -11,20 +11,29 @@ import NotFound from "../pages/NotFound";
 import Profile from "../pages/Profile";
 import ProtectedRoute from "./ProtectedRoute";
 
+// новые страницы
+import Forgot from "../pages/ForgotPassword";
+import Reset from "../pages/ResetPassword";
+
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Публичные страницы */}
+      {/* Public pages */}
       <Route path="/" element={<Feed />} />
       <Route path="/ranking" element={<Ranking />} />
       <Route path="/challenges" element={<Challenges />} />
       <Route path="/recommendations" element={<Recommendations />} />
       <Route path="/add-video" element={<AddVideo />} />
 
+      {/* Auth pages */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* Protected routes */}
+      {/* Forgot / Reset password */}
+      <Route path="/forgot" element={<Forgot />} />
+      <Route path="/reset" element={<Reset />} />
+
+      {/* Protected */}
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<Profile />} />
       </Route>
