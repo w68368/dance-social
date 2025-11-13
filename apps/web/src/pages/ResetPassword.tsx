@@ -17,7 +17,7 @@ export default function ResetPassword() {
   const [ok, setOk] = useState(false);
 
   const canSubmit = useMemo(
-    () => p1.length >= 8 && p1 === p2 && token,
+    () => p1.length >= 8 && p1 === p2 && !!token,
     [p1, p2, token]
   );
 
@@ -29,13 +29,23 @@ export default function ResetPassword() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading || !canSubmit) return;
+
     setErr(null);
     setLoading(true);
+
     try {
       await submitPasswordReset(token, p1);
       setOk(true);
     } catch (e: any) {
-      setErr("Invalid or expired reset link. Please request a new one.");
+      // Пытаемся вытащить сообщение об ошибке с сервера
+      const serverMsg = e?.response?.data?.error || e?.response?.data?.message;
+
+      if (serverMsg && typeof serverMsg === "string") {
+        setErr(serverMsg);
+      } else {
+        // запасной вариант, если сервер ничего не прислал
+        setErr("Invalid or expired reset link. Please request a new one.");
+      }
     } finally {
       setLoading(false);
     }
