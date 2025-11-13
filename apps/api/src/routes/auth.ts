@@ -690,7 +690,24 @@ router.post("/reset", resetLimiter, async (req, res) => {
     if (record.usedAt) return bad();
     if (record.expiresAt < new Date()) return bad();
 
-    // Доп.проверка на утечки/слабость пароля (опционально)
+    // Находим пользователя и проверяем, не совпадает ли пароль с текущим
+    const user = await prisma.user.findUnique({
+      where: { id: record.userId },
+      select: { passwordHash: true },
+    });
+
+    if (!user) return bad();
+
+    const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
+
+    if (isSamePassword) {
+      return res.status(400).json({
+        ok: false,
+        error: "Your new password must be different from the current password.",
+      });
+    }
+
+    // Доп.проверка на утечки/слабость пароля
     const leaks = await pwnedCount(newPassword);
     if (leaks > 0) {
       return res.status(400).json({
