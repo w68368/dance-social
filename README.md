@@ -1,148 +1,129 @@
 # 🩰 StepUnity — Platforma Społecznościowa dla Tancerzy
 
-**StepUnity** to nowoczesna aplikacja webowa stworzona dla tancerzy z różnych miast, pozwalająca tworzyć profile, dodawać nagrania, brać udział w rankingach oraz wyzwaniach tanecznych.
+Nowoczesna pełnoprawna aplikacja webowa dla tancerzy, umożliwiająca tworzenie profili, dodawanie nagrań, udział w rankingach oraz wyzwaniach.  
+Projekt wykonany jako **monorepo** z rozdzieleniem backendu i frontendu oraz pełnym systemem uwierzytelniania.
 
-Projekt został wykonany jako **monorepo** z wykorzystaniem pnpm workspaces, React, Express, Prisma oraz PostgreSQL.
+## 📁 Struktura Monorepo
 
----
-
-## 📦 Struktura Monorepo
-
+```
 dance-social/
 │
 ├── apps/
-│ ├── api/ → Backend (Express + TypeScript)
-│ └── web/ → Frontend (React + Vite + TypeScript)
+│   ├── api/      → Backend (Express + TypeScript + Prisma)
+│   └── web/      → Frontend (React + Vite + TypeScript)
 │
 ├── packages/
-│ └── shared/ → Wspólne typy oraz moduły
+│   └── shared/   → Wspólne typy i moduły (TS)
 │
 ├── docker-compose.yml
 ├── pnpm-workspace.yaml
 └── package.json
+```
 
----
+## 📦 Technologie
 
-## ✅ Wymagania
+### **Frontend**
 
-Przed instalacją upewnij się, że zainstalowano:
+- React + Vite + TypeScript
+- Axios z interceptorami
+- ReCAPTCHA v2
+- Zaawansowana walidacja haseł (zxcvbn)
+- Password strength overlay
+- Modal weryfikacji email
 
-| Narzędzie | Wersja | Sprawdzenie |
-|----------|--------|-------------|
-| **Node.js** | 18+ | `node -v` |
-| **pnpm** | 8+ | `pnpm -v` |
-| **PostgreSQL** | 14+ | `psql --version` |
-| **Git** | 2.4+ | `git --version` |
+### **Backend**
 
-Rekomendowany edytor: **Visual Studio Code**
+- Express + TypeScript
+- Prisma ORM + PostgreSQL
+- JWT Access Token + **Refresh Token Rotation**
+- HttpOnly secure cookies
+- Dwustopniowa rejestracja `/register-start` + `/register-verify`
+- Weryfikacja emaili (Mailtrap/SMTP)
+- Forgot/Reset password
+- Pwned Passwords (HIBP)
+- Limity prób logowania
+- reCAPTCHA v2
+- Skrypt cleanup tokenów
 
----
+## 🔐 System Logowania i Rejestracji
 
-# 🚀 Instalacja na nowym komputerze
+### Dwustopniowa Rejestracja
 
-## 1️⃣ Sklonuj repozytorium
+1. `/auth/register-start` – walidacja, captcha, wysyłka kodu
+2. `/auth/register-verify` – tworzenie użytkownika + tokeny
 
+### Logowanie
+
+- Blokady konta
+- Refresh cookie + rotacja
+
+### Reset Hasła
+
+- `/forgot` – anonimowy komunikat
+- `/reset` – walidacja + unieważnienie tokenów
+
+### reCAPTCHA v2
+
+- Rejestracja
+- Resend
+- Forgot password
+
+## 🧹 Maintenance (Cleanup)
+
+Skrypt:
+
+```
+apps/api/src/scripts/cleanupTokens.ts
+```
+
+Uruchamianie:
+
+```
+pnpm --filter @app/api cleanup:tokens
+```
+
+## ⚙️ Wymagania
+
+Node 18+, pnpm 8+, PostgreSQL 14+
+
+## 🚀 Instalacja
+
+```bash
 git clone https://github.com/w68368/dance-social.git
-cd dance-social
-
-## 2️⃣ Zainstaluj zależności
-
 pnpm install
+```
 
-## 3️⃣ Skonfiguruj zmienne środowiskowe
+Dotenv w `apps/api/.env` (skrócone):
 
-cd apps/api
+```
+DATABASE_URL=...
+JWT_SECRET=...
+RECAPTCHA_SECRET=...
+SMTP_HOST=...
+```
 
-Utwórz plik .env:
+## 🧰 Komendy
 
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/dance_social?schema=public"
-PORT=3000
-JWT_SECRET="stepunity_secret_key"
-
-## 4️⃣ Uruchom bazę danych PostgreSQL
-
-✅ Wariant A — Docker (zalecany)
-W katalogu głównym projektu:
-docker-compose up -d
-
-✅ Wariant B — lokalna instalacja PostgreSQL
-psql -U postgres
-CREATE DATABASE dance_social;
-
-## 5️⃣ Migracje Prisma
-
-pnpm --filter @app/api prisma:generate
-pnpm --filter @app/api prisma:migrate
-
-## 6️⃣ Otwórz bazę graficznie (Prisma Studio)
-
-pnpm --filter @app/api prisma:studio
-
-Dostępne pod adresem:
-👉 http://localhost:5555
-
-## 7️⃣ Uruchamianie aplikacji
-
-▶️ Backend (API)
-pnpm dev:api
-
-API będzie dostępne pod:
-👉 http://localhost:3000
-
-💻 Frontend (React)
-pnpm dev:web
-
-Frontend otworzy się pod:
-👉 http://localhost:5173
-
-## ⚙️ Najważniejsze komendy
-
-| Komenda                                | Działanie                     |
-| -------------------------------------- | ----------------------------- |
-| `pnpm install`                         | Instalacja zależności         |
-| `pnpm dev:web`                         | Uruchomienie frontendu        |
-| `pnpm dev:api`                         | Uruchomienie backendu         |
-| `pnpm build`                           | Budowanie wszystkich pakietów |
-| `pnpm lint`                            | Sprawdzanie błędów w kodzie   |
-| `pnpm --filter @app/api prisma:studio` | Podgląd bazy danych           |
-| `docker-compose up -d`                 | Uruchomienie PostgreSQL       |
-
-## 🗂 Struktura danych (Prisma)
-
-Przykładowy model użytkownika:
-model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  username     String   @unique
-  passwordHash String
-  gender       String?
-  avatarUrl    String?
-  createdAt    DateTime @default(now())
-}
+| Komenda        | Opis                |
+| -------------- | ------------------- |
+| pnpm dev:web   | frontend            |
+| pnpm dev:api   | backend             |
+| prisma:studio  | GUI bazy            |
+| cleanup:tokens | czyszczenie tokenów |
 
 ## 🔌 API Endpoints
 
-| Endpoint             | Metoda | Opis                        |
-| -------------------- | ------ | --------------------------- |
-| `/api/auth/register` | POST   | Rejestracja                 |
-| `/api/auth/login`    | POST   | Logowanie (JWT)             |
-| `/api/auth/me`       | GET    | Pobranie danych użytkownika |
-| `/api/users`         | GET    | Lista użytkowników          |
+| Endpoint              | Metoda | Opis          |
+| --------------------- | ------ | ------------- |
+| /auth/register-start  | POST   | wysłanie kodu |
+| /auth/register-verify | POST   | finalizacja   |
+| /auth/login           | POST   | logowanie     |
+| /auth/refresh         | POST   | refresh       |
+| /auth/forgot          | POST   | reset link    |
+| /auth/reset           | POST   | zmiana hasła  |
+| /auth/me              | GET    | profil        |
 
-## 🔒 Autoryzacja (JWT)
+## 👤 Autor
 
-Po poprawnym logowaniu token JWT jest zapisywany w localStorage.
-Każde zapytanie API automatycznie dodaje nagłówek:
-
-Authorization: Bearer <token>
-
-## 🧰 Komendy Git do wysyłania zmian
-
-git status
-git add .
-git commit -m "Aktualizacja stylów, dropdown, konfiguracji i dokumentacji README"
-git push
-
-## 👨‍💻 Autor
-Anastasiya Bialkevich
-GitHub: https://github.com/w68368
+Anastasiya Bialkevich  
+https://github.com/w68368
