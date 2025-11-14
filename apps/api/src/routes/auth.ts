@@ -22,6 +22,7 @@ import {
   registerStartLimiter,
   registerVerifyLimiter,
 } from "../middlewares/limits.js";
+import { verifyRecaptcha } from "../lib/recaptcha.js";
 
 const router = Router();
 
@@ -104,6 +105,20 @@ router.post(
   upload.single("avatar"),
   async (req, res) => {
     try {
+      // reCAPTCHA v2
+      const captchaToken = req.body.captchaToken as string | undefined;
+      const captcha = await verifyRecaptcha(
+        captchaToken,
+        (req.headers["x-forwarded-for"] as string) ?? req.ip
+      );
+
+      if (!captcha.ok) {
+        return res.status(400).json({
+          ok: false,
+          error: "captcha_failed",
+        });
+      }
+
       const form = {
         email: normalizeEmail(req.body.email),
         username: normalizeUsername(req.body.username),
@@ -319,6 +334,20 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
 ========================= */
 router.post("/register", upload.single("avatar"), async (req, res) => {
   try {
+    // reCAPTCHA v2
+    const captchaToken = req.body.captchaToken as string | undefined;
+    const captcha = await verifyRecaptcha(
+      captchaToken,
+      (req.headers["x-forwarded-for"] as string) ?? req.ip
+    );
+
+    if (!captcha.ok) {
+      return res.status(400).json({
+        ok: false,
+        error: "captcha_failed",
+      });
+    }
+
     const form = {
       email: normalizeEmail(req.body.email),
       username: normalizeUsername(req.body.username),
@@ -607,6 +636,20 @@ router.get("/me", requireAuth, async (req: AuthedRequest, res) => {
 ========================= */
 router.post("/forgot", forgotLimiter, async (req, res) => {
   try {
+    // reCAPTCHA v2
+    const captchaToken = req.body.captchaToken as string | undefined;
+    const captcha = await verifyRecaptcha(
+      captchaToken,
+      (req.headers["x-forwarded-for"] as string) ?? req.ip
+    );
+
+    if (!captcha.ok) {
+      return res.status(400).json({
+        ok: false,
+        error: "captcha_failed",
+      });
+    }
+
     const { email } = forgotSchema.parse({
       email: normalizeEmail(req.body.email),
     });
