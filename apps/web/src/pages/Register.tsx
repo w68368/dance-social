@@ -1,6 +1,8 @@
 // apps/web/src/pages/Register.tsx
+import type React from "react";
 import { useMemo, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ReCAPTCHA from "react-google-recaptcha";
 import zxcvbn from "zxcvbn";
 import { api } from "../api";
 import { setAccessToken } from "../lib/accessToken";
@@ -20,6 +22,9 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // reCAPTCHA
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   // === Модалка подтверждения e-mail ===
   const [verifyOpen, setVerifyOpen] = useState(false);
@@ -126,6 +131,8 @@ export default function Register() {
     fd.append("username", username.trim());
     fd.append("password", password);
     if (avatar) fd.append("avatar", avatar);
+    // reCAPTCHA токен
+    fd.append("recaptchaToken", captchaToken || "");
 
     const { data } = await api.post("/auth/register-start", fd, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -144,6 +151,11 @@ export default function Register() {
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       setConfirmTouched(true);
+      return;
+    }
+
+    if (!captchaToken) {
+      setError("Please confirm that you are not a robot.");
       return;
     }
 
@@ -174,12 +186,21 @@ export default function Register() {
     setPassword("");
     setConfirmPassword("");
     setAvatar(null);
+    setCaptchaToken(null);
     navigate("/login");
   };
 
   // === Повторная отправка кода ===
   const handleResend = async () => {
-    await startRegistration();
+    try {
+      await startRegistration();
+      setSuccess("We re-sent the verification code to your e-mail.");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error ||
+        (typeof err?.message === "string" ? err.message : "Resend error");
+      setError(msg);
+    }
   };
 
   const canSubmit =
@@ -188,7 +209,8 @@ export default function Register() {
     username.trim() &&
     password.length >= 6 &&
     confirmPassword.length >= 6 &&
-    password === confirmPassword;
+    password === confirmPassword &&
+    !!captchaToken;
 
   return (
     <div className="auth-page">
@@ -302,6 +324,19 @@ export default function Register() {
                 type="file"
                 accept="image/*"
                 onChange={(e) => setAvatar(e.target.files?.[0] || null)}
+              />
+            </div>
+          </div>
+
+          {/* reCAPTCHA */}
+          <div className="form-row">
+            <label>Verification</label>
+
+            <div className="captcha-box">
+              <ReCAPTCHA
+                sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                onChange={(token: string | null) => setCaptchaToken(token)}
+                onExpired={() => setCaptchaToken(null)}
               />
             </div>
           </div>

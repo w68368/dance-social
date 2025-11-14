@@ -1,9 +1,10 @@
 .auth-page {
-  min-height: calc(100dvh - 80px);
+  min-height: calc(100vh - 80px); /* вместо 100dvh — более предсказуемо */
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow: hidden; /* чтобы overlay/капча не создавали скролл */
 }
 
 .register-card {
@@ -16,7 +17,7 @@
   backdrop-filter: blur(14px);
   border: 1px solid var(--su-card-border);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
+  overflow: visible; /* чтобы overlay не «резал» края карточки */
 }
 .register-card h2 {
   margin: 0 0 8px;
@@ -393,6 +394,17 @@
   --pw-weak: #ff4d4f; /* красный */
   --pw-mid: #faad14; /* янтарный */
   --pw-strong: #52c41a; /* зелёный */
+}
+
+.captcha-box {
+  display: flex;
+  justify-content: flex-start; /* влево */
+  align-items: center;
+  margin-top: 4px;
+}
+
+.captcha-box > div {
+  transform-origin: left;
 }
 
 @media (max-width: 560px) {
