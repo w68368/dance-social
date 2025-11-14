@@ -1,13 +1,18 @@
-/* Фон приложения */
 html,
 body,
 #root {
   height: 100%;
 }
+
+/* ← ДОБАВЬ ЭТО */
+html,
+body {
+  overflow-x: hidden; /* убираем горизонтальный скролл и тёмную «полосу» сбоку */
+}
+
 body {
   margin: 0;
   color: var(--text);
-  /* плавный вертикальный градиент как на макете */
   background: linear-gradient(
     180deg,
     var(--app-top),
