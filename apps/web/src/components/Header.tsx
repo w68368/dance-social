@@ -1,5 +1,6 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+// apps/web/src/components/Header.tsx
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState, useRef, type ReactNode } from "react";
 import Logo from "./Logo";
 import "../styles/components/header.css";
 
@@ -7,7 +8,7 @@ import { api } from "../api";
 import { clearAccessToken } from "../lib/accessToken";
 import { getUser, clearAuth, onAuthChange } from "../lib/auth";
 
-function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
+function NavItem({ to, children }: { to: string; children: ReactNode }) {
   return (
     <NavLink
       to={to}
@@ -24,6 +25,7 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
 
 export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [open, setOpen] = useState(false); // мобильное меню
   const [user, setUserState] = useState(getUser());
@@ -61,7 +63,10 @@ export default function Header() {
       if (!chipRef.current.contains(e.target as Node)) setMenuOpen(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setOpen(false);
+      }
     }
     document.addEventListener("click", onDocClick);
     document.addEventListener("keydown", onKey);
@@ -70,6 +75,11 @@ export default function Header() {
       document.removeEventListener("keydown", onKey);
     };
   }, []);
+
+  // при смене страницы закрываем мобильное меню
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
 
   const logout = async () => {
     try {
@@ -194,6 +204,7 @@ export default function Header() {
           )}
         </div>
 
+        {/* бургер-кнопка */}
         <button
           className={"su-mobile-toggle" + (open ? " is-open" : "")}
           aria-label="Toggle menu"
@@ -207,50 +218,79 @@ export default function Header() {
         </button>
       </div>
 
-      <div
-        id="su-mobile-panel"
-        className={"su-mobile-panel" + (open ? " open" : "")}
-        onClick={() => setOpen(false)}
-      >
-        <nav aria-label="Mobile">
-          <Link className="mobile-link" to="/ranking">
-            Ranking
-          </Link>
-          <Link className="mobile-link" to="/challenges">
-            Challenges
-          </Link>
-          <Link className="mobile-link" to="/recommendations">
-            Recommendations
-          </Link>
-          <Link className="mobile-btn" to="/add-video">
-            Add video
-          </Link>
+      {/* мобильное меню как модалка с фоном */}
+      {open && (
+        <div
+          className="su-mobile-overlay"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+        >
+          <div
+            id="su-mobile-panel"
+            className="su-mobile-panel open"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <nav aria-label="Mobile">
+              <Link className="mobile-link" to="/ranking">
+                Ranking
+              </Link>
+              <Link className="mobile-link" to="/challenges">
+                Challenges
+              </Link>
+              <Link className="mobile-link" to="/recommendations">
+                Recommendations
+              </Link>
+              <Link className="mobile-btn" to="/add-video">
+                Add video
+              </Link>
 
-          <div className="mobile-divider" />
-          {!user ? (
-            <>
-              <Link className="mobile-auth" to="/login">
-                Sign in
-              </Link>
-              <Link className="mobile-auth" to="/register">
-                Sign up
-              </Link>
-            </>
-          ) : (
-            <>
-              <button
-                className="mobile-auth"
-                onClick={() => navigate("/profile")}
-              >
-                {user.username}
-              </button>
-              <button className="mobile-auth" onClick={logout}>
-                Logout
-              </button>
-            </>
-          )}
-        </nav>
-      </div>
+              <div className="mobile-divider" />
+
+              {!user ? (
+                <>
+                  <Link className="mobile-auth" to="/login">
+                    Sign in
+                  </Link>
+                  <Link className="mobile-auth" to="/register">
+                    Sign up
+                  </Link>
+                </>
+              ) : (
+                <div className="mobile-user">
+                  <button
+                    className="mobile-user-info"
+                    onClick={() => {
+                      setOpen(false); // закрываем меню перед переходом
+                      navigate("/profile");
+                    }}
+                  >
+                    <img
+                      className="mobile-user-avatar"
+                      src={user.avatarUrl || "/uploads/_noavatar.png"}
+                      alt={user.username}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src =
+                          "/uploads/_noavatar.png";
+                      }}
+                    />
+                    <span className="mobile-user-name">{user.username}</span>
+                  </button>
+
+                  <button
+                    className="mobile-auth logout"
+                    onClick={() => {
+                      setOpen(false);
+                      logout();
+                    }}
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </nav>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

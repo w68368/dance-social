@@ -1,16 +1,20 @@
 // apps/web/src/pages/Login.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { setAccessToken } from "../lib/accessToken";
 import { setUser } from "../lib/auth";
+import { useCapsLock } from "../hooks/useCapsLock";
 import "../styles/pages/auth.css";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
+  const { capsLock, handleKey, reset } = useCapsLock();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +44,22 @@ export default function Login() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, [lockMs]);
 
+  // читаем и безопасно парсим next
+  const nextPath = useMemo(() => {
+    const raw = searchParams.get("next");
+    if (!raw) return "/";
+    try {
+      const decoded = decodeURIComponent(raw);
+      // защита от внешних URL: только внутренние пути "/..."
+      if (decoded.startsWith("/") && !decoded.startsWith("//")) {
+        return decoded;
+      }
+      return "/";
+    } catch {
+      return "/";
+    }
+  }, [searchParams]);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -52,13 +72,16 @@ export default function Login() {
       const { data } = await api.post("/auth/login", {
         email: email.trim().toLowerCase(),
         password: password.trim(),
+        rememberMe,
       });
 
       // ожидаем { ok, accessToken, user }
       if (data?.ok && data?.accessToken && data?.user) {
-        setAccessToken(data.accessToken); // access — в память
-        setUser(data.user); // профиль — в localStorage (+событие)
-        navigate("/");
+        setAccessToken(data.accessToken);
+        setUser(data.user);
+
+        // ⬇️ вот это — главное: возвращаем туда, откуда пришли
+        navigate(nextPath);
       } else {
         setError("Incorrect email or password");
       }
@@ -105,6 +128,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
+              autoFocus
               disabled={disabled}
             />
           </div>
@@ -120,14 +144,35 @@ export default function Login() {
               required
               autoComplete="current-password"
               disabled={disabled}
+              onKeyUp={handleKey}
+              onKeyDown={handleKey}
+              onBlur={reset}
             />
 
-            {/* Ссылка Forgot password? — по центру и голубого цвета */}
+            {/* CapsLock Warning */}
+            {capsLock && (
+              <div className="msg warn" style={{ marginTop: 6 }}>
+                ⚠️ Caps Lock is ON
+              </div>
+            )}
+
             <div className="auth-forgot-right">
               <Link to="/forgot" className="auth-link-blue">
                 Forgot password?
               </Link>
             </div>
+          </div>
+
+          <div className="auth-remember-row">
+            <label>
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={disabled}
+              />{" "}
+              Remember me on this device
+            </label>
           </div>
 
           <button
@@ -151,7 +196,6 @@ export default function Login() {
 
           {error && <p className="msg error">{error}</p>}
 
-          {/* Блок: Don't have an account? Create account — по центру и голубая ссылка */}
           <div className="auth-links">
             <div className="auth-links-row">
               <span className="auth-muted">Don't have an account?</span>{" "}

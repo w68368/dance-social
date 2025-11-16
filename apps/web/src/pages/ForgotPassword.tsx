@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import ReCAPTCHA from "react-google-recaptcha";
 import { requestPasswordReset } from "../api";
 import "../styles/pages/auth.css";
 import "../styles/pages/forgot.css";
@@ -9,20 +10,29 @@ export default function ForgotPassword() {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
 
+    if (!captchaToken) {
+      setErr("Please confirm that you're not a robot.");
+      return;
+    }
+
     setErr(null);
     setLoading(true);
 
     try {
-      await requestPasswordReset(email.trim());
-      // backend всегда отвечает одинаково, даже если e-mail не найден
+      await requestPasswordReset(email, captchaToken);
       setSent(true);
-    } catch (_e: any) {
-      setErr("Something went wrong. Please try again.");
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.error ||
+        e?.response?.data?.message ||
+        "Something went wrong. Please try again.";
+      setErr(msg);
     } finally {
       setLoading(false);
     }
@@ -52,7 +62,7 @@ export default function ForgotPassword() {
     );
   }
 
-  // --- основная форма forgot password (дизайн как у Sign in) ---
+  // --- основной экран формы ---
   return (
     <div className="auth-page">
       <form className="register-card forgot-card" onSubmit={onSubmit}>
@@ -78,6 +88,14 @@ export default function ForgotPassword() {
             <p className="forgot-hint">
               We&apos;ll send reset instructions if this e-mail exists.
             </p>
+          </div>
+
+          <div className="form-row">
+            <ReCAPTCHA
+              sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+              onChange={(token: string | null) => setCaptchaToken(token)}
+              onExpired={() => setCaptchaToken(null)}
+            />
           </div>
 
           {err && <p className="msg error">{err}</p>}

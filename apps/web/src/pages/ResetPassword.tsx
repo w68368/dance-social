@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, CSSProperties } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import zxcvbn from "zxcvbn";
 import { submitPasswordReset } from "../api";
 
@@ -17,6 +17,7 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const [countdown, setCountdown] = useState(5); // таймер до редиректа
 
   // === для overlay сложности пароля ===
   const [pwFocused, setPwFocused] = useState(false);
@@ -49,6 +50,26 @@ export default function ResetPassword() {
     return () => window.removeEventListener("resize", updateOverlayPos);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pwFocused]);
+
+  // эффект для таймера после успешного сброса
+  useEffect(() => {
+    if (!ok) return;
+
+    setCountdown(5); // каждый раз при входе в состояние "ок" начинаем заново
+
+    const intervalId = window.setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(intervalId);
+          navigate("/login");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [ok, navigate]);
 
   const pwInfo = useMemo(() => {
     if (!p1) {
@@ -125,16 +146,33 @@ export default function ResetPassword() {
   };
 
   if (ok) {
+    const progress = (countdown / 5) * 100;
+
     return (
       <div className="auth-page">
         <div className="register-card reset-card">
           <h2>Password changed</h2>
           <p className="register-sub">
-            You can now log in with your new password.
+            Password successfully changed. Redirecting to login via{" "}
+            <strong>{countdown}</strong> seс...
           </p>
-          <Link to="/login" className="su-btn su-btn-primary reset-submit-btn">
-            Go to login
-          </Link>
+
+          <div className="reset-timer">
+            <div className="reset-timer__bar">
+              <div
+                className="reset-timer__fill"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            <button
+              type="button"
+              className="su-btn su-btn-secondary reset-submit-btn"
+              onClick={() => navigate("/login")}
+            >
+              Login now
+            </button>
+          </div>
         </div>
       </div>
     );

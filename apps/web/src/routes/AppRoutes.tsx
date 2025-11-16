@@ -1,3 +1,4 @@
+// apps/web/src/routes/AppRoutes.tsx
 import { Routes, Route } from "react-router-dom";
 import Feed from "../pages/Feed";
 import Ranking from "../pages/Ranking";
@@ -23,7 +24,6 @@ export default function AppRoutes() {
       <Route path="/ranking" element={<Ranking />} />
       <Route path="/challenges" element={<Challenges />} />
       <Route path="/recommendations" element={<Recommendations />} />
-      <Route path="/add-video" element={<AddVideo />} />
 
       {/* Auth pages */}
       <Route path="/login" element={<Login />} />
@@ -33,9 +33,10 @@ export default function AppRoutes() {
       <Route path="/forgot" element={<Forgot />} />
       <Route path="/reset" element={<Reset />} />
 
-      {/* Protected */}
+      {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<Profile />} />
+        <Route path="/add-video" element={<AddVideo />} />
       </Route>
 
       {/* 404 */}

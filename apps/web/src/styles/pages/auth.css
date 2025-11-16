@@ -407,6 +407,52 @@
   transform-origin: left;
 }
 
+.auth-remember-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.auth-remember-row input[type="checkbox"] {
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+  /* если хочешь акцентировать цвет */
+  accent-color: var(--su-accent, #4f46e5);
+}
+
+.password-wrapper {
+  position: relative;
+  width: 100%; /* 👈 добавили */
+  display: block; /* 👈 на всякий случай, чтобы не было inline-особенностей */
+}
+
+.pw-toggle-btn {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease;
+}
+
+.pw-toggle-btn:hover {
+  opacity: 1;
+}
+
+.pw-toggle-btn svg {
+  color: #bdbdbd; /* серый цвет — можно заменить var(--text-muted) */
+}
+
 @media (max-width: 560px) {
   .register-card {
     padding: 24px;

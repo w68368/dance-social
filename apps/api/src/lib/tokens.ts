@@ -45,13 +45,14 @@ export function newRefreshRaw() {
   return `${randomUUID()}.${randomUUID()}`;
 }
 
-export function refreshCookieOptions(): CookieOptions {
-  const days = Number(process.env.REFRESH_TOKEN_DAYS ?? 30);
+export function refreshCookieOptions(daysOverride?: number): CookieOptions {
+  const envDays = Number(process.env.REFRESH_TOKEN_DAYS ?? 30);
+  const days = typeof daysOverride === "number" ? daysOverride : envDays;
   const isProd = process.env.NODE_ENV === "production";
 
   return {
     httpOnly: true,
-    secure: isProd ? true : false, // dev: false, prod: true
+    secure: isProd ? true : false,
     sameSite: "lax",
     path: "/api/auth",
     maxAge: days * 24 * 60 * 60 * 1000,

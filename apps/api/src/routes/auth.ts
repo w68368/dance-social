@@ -32,6 +32,9 @@ const router = Router();
 const MAX_ATTEMPTS = 4;
 const LOCK_MINUTES = 5;
 const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TOKEN_DAYS ?? 30);
+const SHORT_REFRESH_TTL_DAYS = Number(
+  process.env.REFRESH_TOKEN_DAYS_SHORT ?? 2
+);
 
 // Для e-mail подтверждения
 const EMAIL_CODE_TTL_MIN = Number(process.env.EMAIL_CODE_TTL_MIN ?? 10);
@@ -77,6 +80,7 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6).max(200),
+  rememberMe: z.boolean().optional().default(true), // <=== NEW
 });
 
 // Forgot/Reset схемы
@@ -408,7 +412,7 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
 
 /* =========================
    POST /api/auth/login
-   JSON: { email, password }
+   JSON: { email, password, rememberMe }
    -> set-cookie: refresh=... (HttpOnly) + { accessToken, user }
 ========================= */
 router.post("/login", loginLimiter, async (req, res) => {
@@ -416,7 +420,9 @@ router.post("/login", loginLimiter, async (req, res) => {
     const parsed = loginSchema.safeParse({
       email: normalizeEmail(req.body.email),
       password: normalizePassword(req.body.password),
+      rememberMe: req.body.rememberMe, // <=== важно!
     });
+
     if (!parsed.success) {
       return res.status(400).json({
         ok: false,
@@ -425,9 +431,11 @@ router.post("/login", loginLimiter, async (req, res) => {
       });
     }
 
+    const { email, password, rememberMe } = parsed.data;
+
     const now = new Date();
     const user = await prisma.user.findUnique({
-      where: { email: parsed.data.email },
+      where: { email },
       select: {
         id: true,
         email: true,
@@ -454,7 +462,7 @@ router.post("/login", loginLimiter, async (req, res) => {
       });
     }
 
-    const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
+    const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
       const current = user.failedLoginAttempts ?? 0;
       const newCount = current + 1;
@@ -493,11 +501,14 @@ router.post("/login", loginLimiter, async (req, res) => {
     const refreshRaw = newRefreshRaw();
     const refreshHash = sha256(refreshRaw);
 
+    // Выбираем TTL для refresh token
+    const ttlDays = rememberMe ? REFRESH_TTL_DAYS : SHORT_REFRESH_TTL_DAYS;
+
     await prisma.refreshToken.create({
       data: {
         userId: user.id,
         tokenHash: refreshHash,
-        expiresAt: addDays(new Date(), REFRESH_TTL_DAYS),
+        expiresAt: addDays(new Date(), ttlDays),
         ip:
           (req.headers["x-forwarded-for"] as string) ||
           req.socket.remoteAddress ||
@@ -507,7 +518,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     });
 
     // ставим HttpOnly-куку
-    res.cookie("refresh", refreshRaw, refreshCookieOptions());
+    res.cookie("refresh", refreshRaw, refreshCookieOptions(ttlDays));
 
     return res.json({
       ok: true,

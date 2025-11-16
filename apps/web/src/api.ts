@@ -105,8 +105,11 @@ api.interceptors.response.use(
 // ----------------------------------------------------
 // Helper API calls for Forgot / Reset password
 // ----------------------------------------------------
-export function requestPasswordReset(email: string) {
-  return api.post("/auth/forgot", { email: email.trim().toLowerCase() });
+export function requestPasswordReset(email: string, captchaToken: string) {
+  return api.post("/auth/forgot", {
+    email: email.trim().toLowerCase(),
+    captchaToken,
+  });
 }
 
 export function submitPasswordReset(token: string, newPassword: string) {
