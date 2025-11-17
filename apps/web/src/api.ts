@@ -4,6 +4,7 @@ import {
   setAccessToken,
   clearAccessToken,
 } from "./lib/accessToken";
+import { clearAuth } from "./lib/auth"; // 👈 добавили
 
 // ------------------------
 // Базовый клиент
@@ -54,6 +55,7 @@ api.interceptors.response.use(
     if (status === 401 && !original._retry && !isRefreshCall) {
       original._retry = true;
 
+      // Если refresh уже выполняется — ждём его завершения
       if (isRefreshing) {
         return new Promise((resolve) => {
           waiting.push((token) => {
@@ -75,6 +77,7 @@ api.interceptors.response.use(
         );
 
         if (data?.ok && data?.accessToken) {
+          // ✅ refresh успешен
           setAccessToken(data.accessToken);
           onRefreshed(data.accessToken);
 
@@ -82,14 +85,18 @@ api.interceptors.response.use(
           original.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(original);
         } else {
+          // ❌ refresh невалиден → полная очистка сессии
           clearAccessToken();
+          clearAuth(); // 👈 выкидываем пользователя из состояния
           onRefreshed(null);
-          throw error;
+          return Promise.reject(error);
         }
       } catch (e) {
+        // ❌ ошибка / 401 на /auth/refresh → тоже Logout
         clearAccessToken();
+        clearAuth(); // 👈 важно
         onRefreshed(null);
-        throw e;
+        return Promise.reject(e);
       } finally {
         isRefreshing = false;
       }

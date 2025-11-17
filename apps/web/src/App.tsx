@@ -3,8 +3,8 @@ import { BrowserRouter } from "react-router-dom";
 import Header from "./components/Header";
 import AppRoutes from "./routes/AppRoutes";
 import { api } from "./api";
-import { setAccessToken } from "./lib/accessToken";
-import { setUser } from "./lib/auth";
+import { setAccessToken, clearAccessToken } from "./lib/accessToken";
+import { setUser, clearAuth } from "./lib/auth";
 import "./App.css";
 
 export default function App() {
@@ -13,40 +13,54 @@ export default function App() {
   useEffect(() => {
     let alive = true;
 
-    // 1) Пытаемся восстановить сессию из refresh-cookie
-    api
-      .post("/auth/refresh")
-      .then(async ({ data }) => {
+    (async () => {
+      try {
+        // 1) Пытаемся восстановить сессию из refresh-cookie
+        const { data } = await api.post("/auth/refresh");
+
         if (!alive) return;
 
         if (data?.ok && data?.accessToken) {
           // access — только в память
           setAccessToken(data.accessToken);
 
-          // 2) Подтянем профиль, чтобы Header/ProtectedRoute сразу знали юзера
+          // 2) Подтягиваем профиль, чтобы Header/ProtectedRoute знали юзера
           try {
-            const me = await api.get("/auth/me");
-            if (me?.data?.ok && me?.data?.user) {
-              setUser(me.data.user); // юзера — в localStorage (публичные поля)
+            const meRes = await api.get("/auth/me");
+            if (meRes?.data?.ok && meRes?.data?.user) {
+              setUser(meRes.data.user); // публичные поля в localStorage
+            } else {
+              // если /auth/me вернуло что-то странное — считаем, что не залогинен
+              clearAccessToken();
+              clearAuth();
             }
           } catch {
-            // молча игнорим — пользователь может быть гость
+            // ошибка при /auth/me → тоже вычищаем авторизацию
+            clearAccessToken();
+            clearAuth();
           }
+        } else {
+          // refresh вернулся без accessToken → невалидная сессия
+          clearAccessToken();
+          clearAuth();
         }
-      })
-      .catch(() => {
-        // нет активной refresh-куки — просто гость
-      })
-      .finally(() => {
-        if (alive) setReady(true);
-      });
+      } catch {
+        // ❌ /auth/refresh упал (401 / нет куки / ошибка сети) → считаем гостем
+        clearAccessToken();
+        clearAuth();
+      } finally {
+        if (alive) {
+          setReady(true);
+        }
+      }
+    })();
 
     return () => {
       alive = false;
     };
   }, []);
 
-  // Можно рендерить лоадер/скелетон. Чтобы не мигало — вернём null.
+  // Пока проверяем сессию — ничего не рендерим, чтобы не было мигания.
   if (!ready) return null;
 
   return (

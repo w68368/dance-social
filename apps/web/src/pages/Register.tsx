@@ -132,7 +132,7 @@ export default function Register() {
     fd.append("password", password);
     if (avatar) fd.append("avatar", avatar);
     // reCAPTCHA токен
-    fd.append("recaptchaToken", captchaToken || "");
+    fd.append("captchaToken", captchaToken || "");
 
     const { data } = await api.post("/auth/register-start", fd, {
       headers: { "Content-Type": "multipart/form-data" },
