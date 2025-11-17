@@ -21,6 +21,9 @@ export default function AppRoutes() {
     <Routes>
       {/* Public pages */}
       <Route path="/" element={<Feed />} />
+
+      <Route path="/feed" element={<Feed />} />
+
       <Route path="/ranking" element={<Ranking />} />
       <Route path="/challenges" element={<Challenges />} />
       <Route path="/recommendations" element={<Recommendations />} />

@@ -1,4 +1,3 @@
-// apps/web/src/api.ts
 import axios, { AxiosError } from "axios";
 import {
   getAccessToken,
@@ -47,7 +46,7 @@ api.interceptors.response.use(
     const original = error.config || {};
     const status = error?.response?.status;
 
-    // Не рефрешим для самого /auth/refresh, чтобы не зациклиться
+    // Не рефрешим /auth/refresh → иначе будет цикл
     const isRefreshCall =
       typeof original?.url === "string" &&
       original.url.replace(BASE_URL, "").includes("/auth/refresh");
@@ -55,7 +54,6 @@ api.interceptors.response.use(
     if (status === 401 && !original._retry && !isRefreshCall) {
       original._retry = true;
 
-      // Если уже идёт refresh — ждём
       if (isRefreshing) {
         return new Promise((resolve) => {
           waiting.push((token) => {
@@ -68,7 +66,6 @@ api.interceptors.response.use(
         });
       }
 
-      // Запускаем refresh
       isRefreshing = true;
       try {
         const { data } = await axios.post(
@@ -103,7 +100,7 @@ api.interceptors.response.use(
 );
 
 // ----------------------------------------------------
-// Helper API calls for Forgot / Reset password
+// Forgot / Reset password
 // ----------------------------------------------------
 export function requestPasswordReset(email: string, captchaToken: string) {
   return api.post("/auth/forgot", {
@@ -114,4 +111,63 @@ export function requestPasswordReset(email: string, captchaToken: string) {
 
 export function submitPasswordReset(token: string, newPassword: string) {
   return api.post("/auth/reset", { token, newPassword });
+}
+
+// ----------------------------------------------------
+// Types
+// ----------------------------------------------------
+export interface ApiUserSummary {
+  id: string;
+  username: string;
+  avatarUrl?: string | null;
+}
+
+export interface Post {
+  id: string;
+  caption: string;
+  createdAt: string;
+  updatedAt?: string;
+  author: ApiUserSummary;
+
+  // медиа
+  mediaType?: "image" | "video" | null;
+  mediaUrl?: string | null;
+  mediaLocalPath?: string | null;
+
+  // 🆕 лайки
+  likesCount: number;
+  likedByMe?: boolean | null;
+}
+
+// ----------------------------------------------------
+// Posts
+// ----------------------------------------------------
+
+// Лента
+export function fetchFeed() {
+  return api.get<{ ok: boolean; posts: Post[] }>("/posts");
+}
+
+// Создать пост (с текстом и файлом, если есть)
+export function createPost(caption: string, media?: File | null) {
+  const trimmed = caption.trim();
+
+  if (media) {
+    const formData = new FormData();
+    formData.append("caption", trimmed);
+    formData.append("media", media);
+
+    return api.post<{ ok: boolean; post: Post }>("/posts", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  }
+
+  return api.post<{ ok: boolean; post: Post }>("/posts", { caption: trimmed });
+}
+
+// 🆕 Лайк / Unlike (toggle)
+export function toggleLike(postId: string) {
+  return api.post<{ ok: boolean; liked: boolean; likesCount: number }>(
+    `/posts/${postId}/like`
+  );
 }

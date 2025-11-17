@@ -1,0 +1,156 @@
+.add-post-container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.add-post-title {
+  margin-bottom: 16px;
+}
+
+.add-post-subtitle {
+  margin-bottom: 16px;
+  color: var(--muted);
+}
+
+.add-post-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.add-post-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-post-label-text {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Текстовое поле подписи */
+.add-post-textarea {
+  resize: vertical;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--ring);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  font: inherit;
+}
+
+/* Блок медиа */
+.add-post-media-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Скрытый input[type=file] */
+.add-post-media-input-hidden {
+  display: none;
+}
+
+/* Карточка выбора/превью медиа */
+.add-post-media-card {
+  position: relative;
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.25);
+  min-height: 220px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease,
+    transform 0.1s ease;
+}
+
+.add-post-media-card:hover {
+  border-color: var(--gold);
+  background: rgba(0, 0, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+.add-post-media-card--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-post-media-placeholder {
+  text-align: center;
+  padding: 24px 16px;
+}
+
+.add-post-media-plus {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 1px solid var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin: 0 auto 8px;
+}
+
+.add-post-media-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.add-post-media-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Превью внутри карточки */
+.add-post-media-preview {
+  width: 100%;
+  height: 100%;
+}
+
+.add-post-media-preview-image,
+.add-post-media-preview-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Хэштеги */
+.add-post-hashtags {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 14px;
+}
+
+.add-post-hashtags-title {
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+
+.add-post-hashtags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.add-post-hashtag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--gold);
+  font-size: 13px;
+}
+
+.add-post-error {
+  margin-top: 4px;
+}
+
+.add-post-submit {
+  align-self: flex-start;
+  min-width: 160px;
+}

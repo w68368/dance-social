@@ -5,6 +5,7 @@ import path from "path";
 import cookieParser from "cookie-parser";
 
 import authRouter from "./routes/auth.js";
+import postsRouter from "./routes/posts.js"; // 🆕 роутер постов
 import { prisma } from "./lib/prisma.js";
 
 dotenv.config();
@@ -39,7 +40,7 @@ app.use(
 );
 
 // -----------------------
-// STATIC: отдача аватарок
+// STATIC: отдача аватарок и (позже) медиа постов
 // -----------------------
 const uploadsDir = path.join(process.cwd(), "uploads");
 app.use("/uploads", express.static(uploadsDir));
@@ -69,6 +70,11 @@ app.get("/api/health", async (_req, res) => {
 // AUTH ROUTES (login/refresh/logout/...)
 // -----------------------
 app.use("/api/auth", authRouter);
+
+// -----------------------
+// POSTS ROUTES (feed / создание постов)
+// -----------------------
+app.use("/api/posts", postsRouter);
 
 // -----------------------
 // USERS LIST (optional)

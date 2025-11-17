@@ -7,5 +7,8 @@
     "dev:api": "pnpm --filter @app/api dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint"
+  },
+  "dependencies": {
+    "react-icons": "^5.5.0"
   }
 }

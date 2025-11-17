@@ -114,7 +114,7 @@ export default function Header() {
             <li className="divider" />
             <li>
               <Link to="/add-video" className="su-btn su-btn--accent">
-                Add video
+                Add post
               </Link>
             </li>
           </ul>
@@ -241,7 +241,7 @@ export default function Header() {
                 Recommendations
               </Link>
               <Link className="mobile-btn" to="/add-video">
-                Add video
+                Add post
               </Link>
 
               <div className="mobile-divider" />
