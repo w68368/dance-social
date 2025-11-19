@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 
 import authRouter from "./routes/auth.js";
 import postsRouter from "./routes/posts.js"; // 🆕 роутер постов
+import followRouter from "./routes/follow.js"; // 🆕 роутер подписок
 import { prisma } from "./lib/prisma.js";
 
 dotenv.config();
@@ -77,6 +78,11 @@ app.use("/api/auth", authRouter);
 app.use("/api/posts", postsRouter);
 
 // -----------------------
+// FOLLOW ROUTES (подписки)
+// -----------------------
+app.use("/api/follow", followRouter);
+
+// -----------------------
 // USERS LIST (optional)
 // -----------------------
 app.get("/api/users", async (_req, res) => {
@@ -84,6 +90,33 @@ app.get("/api/users", async (_req, res) => {
     orderBy: { createdAt: "desc" },
   });
   res.json(users);
+});
+
+// 🆕 Один пользователь по id (для UserProfile)
+app.get("/api/users/:id", async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        username: true,
+        avatarUrl: true,
+      },
+    });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ ok: false, message: "Пользователь не найден" });
+    }
+
+    return res.json({ ok: true, user });
+  } catch (err) {
+    console.error("Get user by id error", err);
+    return res
+      .status(500)
+      .json({ ok: false, message: "Не удалось загрузить пользователя" });
+  }
 });
 
 // -----------------------

@@ -35,6 +35,12 @@ model User {
   // 🆕 Лайки, поставленные пользователем
   likedPosts           PostLike[]
 
+  // 🆕 Подписки
+  // пользователи, которые ПОДПИСАНЫ на этого юзера
+  followers            Follow[] @relation("FollowFollowing")
+  // пользователи, на которых ПОДПИСАН этот юзер
+  following            Follow[] @relation("FollowFollower")
+
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 
@@ -131,4 +137,26 @@ model PostLike {
   // один лайк от одного юзера на один пост
   @@unique([userId, postId])
   @@index([postId])
+}
+
+//
+// 🆕 Таблица подписок (follow)
+// followerId  — кто подписался
+// followingId — на кого подписались
+//
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  // юзер, который подписался
+  follower  User @relation("FollowFollower", fields: [followerId], references: [id])
+  // юзер, на которого подписались
+  following User @relation("FollowFollowing", fields: [followingId], references: [id])
+
+  // нельзя подписаться два раза на одного и того же
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }

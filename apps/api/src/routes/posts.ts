@@ -246,4 +246,48 @@ router.get("/", async (_req, res) => {
   }
 });
 
+// Посты одного пользователя: GET /api/posts/user/:userId
+router.get("/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const posts = await prisma.post.findMany({
+      where: { authorId: userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        author: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+        _count: {
+          select: {
+            likes: true,
+          },
+        },
+      },
+    });
+
+    const shaped = posts.map((p) => ({
+      id: p.id,
+      caption: p.caption,
+      mediaType: p.mediaType,
+      mediaUrl: p.mediaUrl,
+      mediaLocalPath: p.mediaLocalPath,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      author: p.author,
+      likesCount: p._count.likes,
+      likedByMe: false, // позже можно учесть текущего юзера
+    }));
+
+    res.json({ ok: true, posts: shaped });
+  } catch (err) {
+    console.error("Fetch user's posts error:", err);
+    res.status(500).json({ ok: false, message: "Server error" });
+  }
+});
+
 export default router;
