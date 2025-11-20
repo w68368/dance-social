@@ -24,3 +24,23 @@ export function requireAuth(
     return res.status(401).json({ ok: false, message: "Unauthorized" });
   }
 }
+
+// 🆕 Необязательная авторизация: если токен есть и валиден — проставляем userId,
+// если нет/битый — просто идём дальше без 401
+export function optionalAuth(
+  req: AuthedRequest,
+  _res: Response,
+  next: NextFunction
+) {
+  const header = req.get("authorization");
+  if (header && header.toLowerCase().startsWith("bearer ")) {
+    const token = header.slice("bearer ".length);
+    try {
+      const payload = verifyAccess(token);
+      req.userId = payload.sub;
+    } catch {
+      // токен невалидный — просто игнорируем
+    }
+  }
+  return next();
+}

@@ -34,6 +34,7 @@ model User {
 
   // 🆕 Лайки, поставленные пользователем
   likedPosts           PostLike[]
+  comments PostComment[]
 
   // 🆕 Подписки
   // пользователи, которые ПОДПИСАНЫ на этого юзера
@@ -113,6 +114,7 @@ model Post {
 
   // 🆕 Лайки
   likes     PostLike[]
+  comments PostComment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -159,4 +161,27 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+}
+
+model PostComment {
+  id   String @id @default(cuid())
+  text String
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String
+
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId String
+
+  // вложенные комментарии (ответы)
+  parent   PostComment?   @relation("CommentReplies", fields: [parentId], references: [id])
+  parentId String?
+  replies  PostComment[]  @relation("CommentReplies")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
 }

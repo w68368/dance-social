@@ -8,7 +8,11 @@ import multer from "multer";
 
 import { prisma } from "../lib/prisma.js";
 import { cloudinary } from "../lib/cloudinary.js";
-import { requireAuth, type AuthedRequest } from "../middlewares/requireAuth.js";
+import {
+  requireAuth,
+  optionalAuth,
+  type AuthedRequest,
+} from "../middlewares/requireAuth.js";
 
 const router = Router();
 
@@ -37,11 +41,17 @@ const upload = multer({
 });
 
 // -----------------------------
-// Валидация подписи
+// Валидация текста
 // -----------------------------
 const captionSchema = z
   .string()
   .max(1000, "Слишком длинный текст")
+  .transform((v) => v.trim());
+
+const commentSchema = z
+  .string()
+  .min(1, "Комментарий не может быть пустым")
+  .max(500, "Слишком длинный комментарий")
   .transform((v) => v.trim());
 
 // -----------------------------
@@ -116,11 +126,12 @@ router.post(
         },
       });
 
-      // Для только что созданного поста лайков ещё нет
+      // Для только что созданного поста лайков и комментариев ещё нет
       const responsePost = {
         ...post,
         likesCount: 0,
         likedByMe: false,
+        commentsCount: 0,
       };
 
       res.json({ ok: true, post: responsePost });
@@ -202,10 +213,116 @@ router.post("/:id/like", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 // -----------------------------
-// GET /api/posts
-// Лента постов с количеством лайков
+// POST /api/posts/:id/comments
+// Добавить комментарий к посту (опционально ответ на другой комментарий)
 // -----------------------------
-router.get("/", async (_req, res) => {
+router.post(
+  "/:id/comments",
+  requireAuth,
+  async (req: AuthedRequest, res): Promise<void> => {
+    if (!req.userId) {
+      res.status(401).json({ ok: false, message: "Unauthorized" });
+      return;
+    }
+
+    const postId = req.params.id;
+    const rawText = typeof req.body.text === "string" ? req.body.text : "";
+    const parentId =
+      typeof req.body.parentId === "string" && req.body.parentId.trim().length
+        ? req.body.parentId.trim()
+        : undefined;
+
+    const parsed = commentSchema.safeParse(rawText);
+    if (!parsed.success) {
+      res.status(400).json({
+        ok: false,
+        message: parsed.error.issues[0]?.message ?? "Неверный комментарий",
+      });
+      return;
+    }
+
+    try {
+      // если это ответ — проверим, что parent принадлежит тому же посту
+      if (parentId) {
+        const parent = await prisma.postComment.findUnique({
+          where: { id: parentId },
+          select: { postId: true },
+        });
+
+        if (!parent || parent.postId !== postId) {
+          res.status(400).json({
+            ok: false,
+            message: "Неверный родительский комментарий",
+          });
+          return;
+        }
+      }
+
+      const comment = await prisma.postComment.create({
+        data: {
+          text: parsed.data,
+          postId,
+          authorId: req.userId,
+          parentId: parentId ?? null,
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      });
+
+      res.json({ ok: true, comment });
+    } catch (err) {
+      console.error("Create comment error:", err);
+      res
+        .status(500)
+        .json({ ok: false, message: "Не удалось добавить комментарий" });
+    }
+  }
+);
+
+// -----------------------------
+// GET /api/posts/:id/comments
+// Получить комментарии поста (flat-список с parentId)
+// -----------------------------
+router.get("/:id/comments", async (req, res) => {
+  const postId = req.params.id;
+
+  try {
+    const comments = await prisma.postComment.findMany({
+      where: { postId },
+      orderBy: { createdAt: "asc" },
+      include: {
+        author: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    res.json({ ok: true, comments });
+  } catch (err) {
+    console.error("Fetch comments error:", err);
+    res
+      .status(500)
+      .json({ ok: false, message: "Не удалось загрузить комментарии" });
+  }
+});
+
+// -----------------------------
+// GET /api/posts
+// Лента постов с количеством лайков и комментариев
+// + признак likedByMe для текущего пользователя
+// -----------------------------
+router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const posts = await prisma.post.findMany({
       orderBy: { createdAt: "desc" },
@@ -221,10 +338,19 @@ router.get("/", async (_req, res) => {
         _count: {
           select: {
             likes: true,
+            comments: true,
+          },
+        },
+        // нужно, чтобы определить likedByMe
+        likes: {
+          select: {
+            userId: true,
           },
         },
       },
     });
+
+    const currentUserId = req.userId;
 
     const shaped = posts.map((p) => ({
       id: p.id,
@@ -236,7 +362,10 @@ router.get("/", async (_req, res) => {
       updatedAt: p.updatedAt,
       author: p.author,
       likesCount: p._count.likes,
-      likedByMe: false, // позже можно вычислять, если будем знать текущего юзера
+      likedByMe: currentUserId
+        ? p.likes.some((l) => l.userId === currentUserId)
+        : false,
+      commentsCount: p._count.comments,
     }));
 
     res.json({ ok: true, posts: shaped });
@@ -246,8 +375,12 @@ router.get("/", async (_req, res) => {
   }
 });
 
-// Посты одного пользователя: GET /api/posts/user/:userId
-router.get("/user/:userId", async (req, res) => {
+// -----------------------------
+// GET /api/posts/user/:userId
+// Посты одного пользователя (для профиля)
+// тоже с likedByMe и количеством комментариев
+// -----------------------------
+router.get("/user/:userId", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const { userId } = req.params;
 
@@ -265,10 +398,18 @@ router.get("/user/:userId", async (req, res) => {
         _count: {
           select: {
             likes: true,
+            comments: true,
+          },
+        },
+        likes: {
+          select: {
+            userId: true,
           },
         },
       },
     });
+
+    const currentUserId = req.userId;
 
     const shaped = posts.map((p) => ({
       id: p.id,
@@ -280,7 +421,10 @@ router.get("/user/:userId", async (req, res) => {
       updatedAt: p.updatedAt,
       author: p.author,
       likesCount: p._count.likes,
-      likedByMe: false, // позже можно учесть текущего юзера
+      likedByMe: currentUserId
+        ? p.likes.some((l) => l.userId === currentUserId)
+        : false,
+      commentsCount: p._count.comments,
     }));
 
     res.json({ ok: true, posts: shaped });
