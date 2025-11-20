@@ -146,6 +146,14 @@ export interface Post {
   likedByMe?: boolean | null;
 }
 
+// 🆕 Статистика подписок
+export interface FollowStatsResponse {
+  ok: boolean;
+  followers: number;
+  following: number;
+  isFollowing: boolean;
+}
+
 // ----------------------------------------------------
 // Posts
 // ----------------------------------------------------
@@ -153,6 +161,11 @@ export interface Post {
 // Лента
 export function fetchFeed() {
   return api.get<{ ok: boolean; posts: Post[] }>("/posts");
+}
+
+// Посты конкретного пользователя
+export function fetchUserPosts(userId: string) {
+  return api.get<{ ok: boolean; posts: Post[] }>(`/posts/user/${userId}`);
 }
 
 // Создать пост (с текстом и файлом, если есть)
@@ -177,4 +190,35 @@ export function toggleLike(postId: string) {
   return api.post<{ ok: boolean; liked: boolean; likesCount: number }>(
     `/posts/${postId}/like`
   );
+}
+
+// ----------------------------------------------------
+// 🆕 Follow system
+// ----------------------------------------------------
+
+// получить статистику + статус подписки на userId
+export function fetchFollowStats(userId: string) {
+  return api.get<FollowStatsResponse>(`/follow/stats/${userId}`);
+}
+
+// подписаться на пользователя
+export function followUser(userId: string) {
+  return api.post<{ ok: boolean; action: "followed" }>(`/follow/${userId}`);
+}
+
+// отписаться от пользователя
+export function unfollowUser(userId: string) {
+  return api.delete<{ ok: boolean; action: "unfollowed" }>(`/follow/${userId}`);
+}
+
+// список фолловеров пользователя
+export function fetchFollowers(userId: string) {
+  return api.get<{ ok: boolean; users: ApiUserSummary[] }>(
+    `/follow/followers/${userId}`
+  );
+}
+
+// получить публичную инфу пользователя по id
+export function fetchUserPublic(userId: string) {
+  return api.get<{ ok: boolean; user: ApiUserSummary }>(`/users/${userId}`);
 }

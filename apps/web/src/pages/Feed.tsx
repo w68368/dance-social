@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchFeed, toggleLike, type Post } from "../api";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
+import { getUser } from "../lib/auth"; // 🆕 кто залогинен
 import "../styles/pages/feed.css";
 
 export default function Feed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // текущий залогиненный пользователь
+  const me = getUser();
 
   useEffect(() => {
     let cancelled = false;
@@ -94,74 +98,79 @@ export default function Feed() {
         )}
 
         <div className="feed-list">
-          {posts.map((post) => (
-            <article key={post.id} className="feed-card">
-              {/* Header: автор → клик на профиль */}
-              <header className="feed-card-header">
-                <Link to="/profile" className="feed-user-link">
-                  <div className="feed-user">
-                    {post.author.avatarUrl ? (
-                      <img
-                        src={post.author.avatarUrl}
-                        alt={post.author.username}
-                        className="feed-avatar"
-                      />
-                    ) : (
-                      <div className="feed-avatar-placeholder">
-                        {post.author.username.slice(0, 1).toUpperCase()}
-                      </div>
-                    )}
+          {posts.map((post) => {
+            const isMe = me && me.id === post.author.id;
+            const profileLink = isMe ? "/profile" : `/users/${post.author.id}`;
 
-                    <div>
-                      <div className="feed-username">
-                        {post.author.username}
-                      </div>
-                      <div className="feed-date">
-                        {new Date(post.createdAt).toLocaleString()}
+            return (
+              <article key={post.id} className="feed-card">
+                {/* Header: автор → клик на профиль */}
+                <header className="feed-card-header">
+                  <Link to={profileLink} className="feed-user-link">
+                    <div className="feed-user">
+                      {post.author.avatarUrl ? (
+                        <img
+                          src={post.author.avatarUrl}
+                          alt={post.author.username}
+                          className="feed-avatar"
+                        />
+                      ) : (
+                        <div className="feed-avatar-placeholder">
+                          {post.author.username.slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+
+                      <div>
+                        <div className="feed-username">
+                          {post.author.username}
+                        </div>
+                        <div className="feed-date">
+                          {new Date(post.createdAt).toLocaleString()}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              </header>
+                  </Link>
+                </header>
 
-              {/* Media сверху */}
-              {post.mediaUrl && post.mediaType === "image" && (
-                <img
-                  src={post.mediaUrl}
-                  className="feed-media feed-media-image"
-                  alt="post media"
-                />
-              )}
+                {/* Media сверху */}
+                {post.mediaUrl && post.mediaType === "image" && (
+                  <img
+                    src={post.mediaUrl}
+                    className="feed-media feed-media-image"
+                    alt="post media"
+                  />
+                )}
 
-              {post.mediaUrl && post.mediaType === "video" && (
-                <video
-                  src={post.mediaUrl}
-                  controls
-                  className="feed-media feed-media-video"
-                />
-              )}
+                {post.mediaUrl && post.mediaType === "video" && (
+                  <video
+                    src={post.mediaUrl}
+                    controls
+                    className="feed-media feed-media-video"
+                  />
+                )}
 
-              {/* Подпись */}
-              {post.caption && <p className="feed-caption">{post.caption}</p>}
+                {/* Подпись */}
+                {post.caption && <p className="feed-caption">{post.caption}</p>}
 
-              {/* Лайки */}
-              <div className="feed-footer">
-                <button
-                  className={`like-btn ${post.likedByMe ? "liked" : ""}`}
-                  onClick={() => handleToggleLike(post.id)}
-                >
-                  {post.likedByMe ? (
-                    <FaHeart className="like-icon" />
-                  ) : (
-                    <FaRegHeart className="like-icon" />
-                  )}
+                {/* Лайки */}
+                <div className="feed-footer">
+                  <button
+                    className={`like-btn ${post.likedByMe ? "liked" : ""}`}
+                    onClick={() => handleToggleLike(post.id)}
+                  >
+                    {post.likedByMe ? (
+                      <FaHeart className="like-icon" />
+                    ) : (
+                      <FaRegHeart className="like-icon" />
+                    )}
 
-                  {/* просто число */}
-                  <span className="like-count">{post.likesCount}</span>
-                </button>
-              </div>
-            </article>
-          ))}
+                    {/* просто число */}
+                    <span className="like-count">{post.likesCount}</span>
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </main>

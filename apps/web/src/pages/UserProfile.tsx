@@ -1,64 +1,63 @@
-// apps/web/src/pages/Profile.tsx
+// apps/web/src/pages/UserProfile.tsx
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
   api,
   fetchUserPosts,
+  fetchFollowStats,
+  followUser,
+  unfollowUser,
   fetchFollowers,
+  fetchUserPublic,
   type Post,
-  type FollowStatsResponse,
   type ApiUserSummary,
+  type FollowStatsResponse,
 } from "../api";
-import type { PublicUser } from "../lib/auth";
-import { getUser, setUser } from "../lib/auth";
 
 import "../styles/pages/profile.css";
-import "../styles/pages/feed.css";
+import "../styles/pages/feed.css"; // стили лайков
 import { FaHeart, FaRegHeart } from "react-icons/fa";
+import { getUser } from "../lib/auth"; // кто залогинен
 
-export default function Profile() {
-  const [me, setMe] = useState<PublicUser | null>(getUser());
+export default function UserProfile() {
+  const { userId } = useParams<{ userId: string }>();
+
+  const [owner, setOwner] = useState<ApiUserSummary | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // статистика подписок
+  // стейт подписок
   const [followStats, setFollowStats] = useState<FollowStatsResponse | null>(
     null
   );
+  const [followLoading, setFollowLoading] = useState(false);
 
-  // 🆕 модалка подписчиков
+  // модалка подписчиков
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followersList, setFollowersList] = useState<ApiUserSummary[]>([]);
   const [followersLoading, setFollowersLoading] = useState(false);
 
+  const me = getUser();
+
+  // -----------------------------
+  // Загрузка постов + профиля
+  // -----------------------------
   useEffect(() => {
+    if (!userId) return;
+
     let alive = true;
 
-    async function load() {
+    async function loadAll(id: string) {
       try {
         setLoading(true);
         setError(null);
 
-        // актуализируем текущего пользователя
-        const { data } = await api.get("/auth/me");
-        if (!alive) return;
-
-        if (!data?.ok || !data?.user) {
-          setError("Не удалось загрузить профиль");
-          setLoading(false);
-          return;
-        }
-
-        const user: PublicUser = data.user;
-        setMe(user);
-        setUser(user); // обновляем кэш в localStorage
-
-        // параллельно грузим посты и статистику подписок
-        const [postsResp, followResp] = await Promise.all([
-          fetchUserPosts(user.id),
-          api.get<FollowStatsResponse>(`/follow/stats/${user.id}`),
+        // грузим посты и публичный профиль параллельно
+        const [postsResp, userResp] = await Promise.all([
+          fetchUserPosts(id),
+          fetchUserPublic(id),
         ]);
 
         if (!alive) return;
@@ -66,15 +65,20 @@ export default function Profile() {
         const loadedPosts = postsResp.data.posts ?? [];
         setPosts(loadedPosts);
 
-        if (followResp.data?.ok) {
-          setFollowStats(followResp.data);
+        if (userResp.data?.ok && userResp.data.user) {
+          setOwner(userResp.data.user);
+        } else if (loadedPosts.length > 0) {
+          // запасной вариант — берем автора из поста
+          setOwner(loadedPosts[0].author);
+        } else {
+          setOwner(null);
         }
       } catch (err: any) {
         if (!alive) return;
 
         const message =
           err?.response?.data?.message ??
-          "Не удалось загрузить профиль. Попробуй ещё раз позже.";
+          "Не удалось загрузить профиль пользователя.";
         setError(message);
       } finally {
         if (!alive) return;
@@ -82,14 +86,42 @@ export default function Profile() {
       }
     }
 
-    load();
+    loadAll(userId);
 
     return () => {
       alive = false;
     };
-  }, []);
+  }, [userId]);
+
+  // -----------------------------
+  // Загрузка статистики подписок
+  // -----------------------------
+  useEffect(() => {
+    if (!userId) return;
+
+    let alive = true;
+
+    async function loadStats(id: string) {
+      try {
+        const { data } = await fetchFollowStats(id);
+        if (!alive) return;
+        if (data.ok) {
+          setFollowStats(data);
+        }
+      } catch (err) {
+        console.error("Follow stats error", err);
+      }
+    }
+
+    loadStats(userId);
+
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
 
   const postsCount = posts.length;
+
   const totalLikes = useMemo(
     () =>
       posts.reduce(
@@ -99,9 +131,7 @@ export default function Profile() {
     [posts]
   );
 
-  const followersCount = followStats?.followers ?? 0;
-  const followingCount = followStats?.following ?? 0;
-
+  // Лайки поста
   async function handleToggleLike(post: Post) {
     try {
       const { data } = await api.post<{
@@ -112,7 +142,6 @@ export default function Profile() {
 
       if (!data?.ok) return;
 
-      // обновляем список в сетке
       setPosts((prev) =>
         prev.map((p) =>
           p.id === post.id
@@ -121,7 +150,6 @@ export default function Profile() {
         )
       );
 
-      // и выбранный пост в модалке
       setSelectedPost((prev) =>
         prev && prev.id === post.id
           ? { ...prev, likedByMe: data.liked, likesCount: data.likesCount }
@@ -132,18 +160,55 @@ export default function Profile() {
     }
   }
 
-  function closePostModal() {
-    setSelectedPost(null);
+  // Подписка / отписка
+  async function handleFollowToggle() {
+    if (!userId || !followStats || followLoading) return;
+
+    try {
+      setFollowLoading(true);
+
+      if (followStats.isFollowing) {
+        const { data } = await unfollowUser(userId);
+        if (data.ok) {
+          setFollowStats((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  isFollowing: false,
+                  followers: Math.max(prev.followers - 1, 0),
+                }
+              : prev
+          );
+        }
+      } else {
+        const { data } = await followUser(userId);
+        if (data.ok) {
+          setFollowStats((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  isFollowing: true,
+                  followers: prev.followers + 1,
+                }
+              : prev
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Follow toggle error", err);
+    } finally {
+      setFollowLoading(false);
+    }
   }
 
-  // 🆕 открыть модалку подписчиков
+  // Открытие модалки followers
   async function openFollowersModal() {
-    if (!me) return;
+    if (!userId) return;
 
     setFollowersOpen(true);
     setFollowersLoading(true);
     try {
-      const { data } = await fetchFollowers(me.id);
+      const { data } = await fetchFollowers(userId);
       if (data.ok) {
         setFollowersList(data.users);
       }
@@ -159,25 +224,24 @@ export default function Profile() {
     setFollowersList([]);
   }
 
-  if (loading && !me) {
+  function closePostModal() {
+    setSelectedPost(null);
+  }
+
+  if (!userId) {
     return (
       <main className="profile-page">
         <div className="profile-container">
-          <p>Загружаем профиль…</p>
+          <p>Не передан id пользователя.</p>
         </div>
       </main>
     );
   }
 
-  if (!me) {
-    return (
-      <main className="profile-page">
-        <div className="profile-container">
-          <p>{error ?? "Профиль не найден."}</p>
-        </div>
-      </main>
-    );
-  }
+  const followersCount = followStats?.followers ?? 0;
+  const followingCount = followStats?.following ?? 0;
+
+  const isOwnProfile = me && owner && me.id === owner.id;
 
   return (
     <main className="profile-page">
@@ -185,15 +249,17 @@ export default function Profile() {
         {/* Шапка профиля */}
         <section className="profile-header">
           <div className="profile-avatar">
-            {me.avatarUrl ? (
-              <img src={me.avatarUrl} alt={me.username} />
+            {owner?.avatarUrl ? (
+              <img src={owner.avatarUrl} alt={owner.username} />
             ) : (
-              <span>{me.username.charAt(0).toUpperCase()}</span>
+              <span>
+                {owner?.username ? owner.username.charAt(0).toUpperCase() : "U"}
+              </span>
             )}
           </div>
 
           <div className="profile-header-main">
-            <h1 className="profile-username">{me.username}</h1>
+            <h1 className="profile-username">{owner?.username ?? "User"}</h1>
 
             <div className="profile-stats">
               <div className="profile-stat">
@@ -205,7 +271,6 @@ export default function Profile() {
                 <span className="profile-stat-label">likes</span>
               </div>
 
-              {/* 🆕 кликабельный followers → модалка */}
               <button
                 type="button"
                 className="profile-stat profile-stat-clickable"
@@ -221,28 +286,36 @@ export default function Profile() {
               </div>
             </div>
 
+            {/* кнопка Follow только для чужого профиля */}
+            {followStats && !isOwnProfile && (
+              <button
+                type="button"
+                className={
+                  "btn-follow" + (followStats.isFollowing ? " following" : "")
+                }
+                disabled={followLoading}
+                onClick={handleFollowToggle}
+              >
+                {followLoading
+                  ? "..."
+                  : followStats.isFollowing
+                  ? "Following"
+                  : "Follow"}
+              </button>
+            )}
+
             <div className="profile-meta">
-              {me.createdAt && (
-                <span>
-                  Joined: {new Date(me.createdAt).toLocaleDateString()}
-                </span>
-              )}
-              {me.email && <span>Email: {me.email}</span>}
+              {loading && <span>Загружаем посты…</span>}
+              {!loading && posts.length === 0 && <span>Пока нет постов.</span>}
             </div>
           </div>
         </section>
 
         <div className="profile-bottom-line"></div>
 
-        {/* Сетка постов */}
         {error && <div className="feed-error">{error}</div>}
 
-        {posts.length === 0 && !loading && (
-          <div className="profile-empty">
-            У тебя ещё нет постов. Добавь первый через кнопку “Add post”.
-          </div>
-        )}
-
+        {/* Сетка постов */}
         {posts.length > 0 && (
           <>
             <h2 className="profile-section-title">Posts</h2>
@@ -305,7 +378,9 @@ export default function Profile() {
             <div className="post-modal-side">
               <div className="post-modal-header">
                 <div>
-                  <div className="post-modal-username">{me.username}</div>
+                  <div className="post-modal-username">
+                    {owner?.username ?? "User"}
+                  </div>
                   <div className="profile-meta">
                     <span>
                       {new Date(selectedPost.createdAt).toLocaleDateString()}
@@ -344,7 +419,7 @@ export default function Profile() {
         </div>
       )}
 
-      {/* 🆕 модалка списка подписчиков */}
+      {/* Модалка списка фолловеров */}
       {followersOpen && (
         <div className="post-modal-backdrop" onClick={closeFollowersModal}>
           <div className="followers-modal" onClick={(e) => e.stopPropagation()}>
@@ -371,10 +446,7 @@ export default function Profile() {
               <ul className="followers-list">
                 {followersList.map((u) => (
                   <li key={u.id} className="followers-item">
-                    <Link
-                      to={`/users/${u.id}`} // 👈 переход на UserProfile
-                      onClick={closeFollowersModal}
-                    >
+                    <Link to={`/users/${u.id}`} onClick={closeFollowersModal}>
                       <div className="followers-avatar">
                         {u.avatarUrl ? (
                           <img src={u.avatarUrl} alt={u.username} />

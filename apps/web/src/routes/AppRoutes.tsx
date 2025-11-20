@@ -7,6 +7,7 @@ import Recommendations from "../pages/Recommendations";
 import AddVideo from "../pages/AddVideo";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
+import UserProfile from "../pages/UserProfile";
 import NotFound from "../pages/NotFound";
 
 import Profile from "../pages/Profile";
@@ -39,6 +40,8 @@ export default function AppRoutes() {
       {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<Profile />} />
+        {/* профиль любого пользователя по id */}
+        <Route path="/users/:userId" element={<UserProfile />} />
         <Route path="/add-video" element={<AddVideo />} />
       </Route>
 

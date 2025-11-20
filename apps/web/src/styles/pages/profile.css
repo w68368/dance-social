@@ -1,0 +1,399 @@
+/* apps/web/src/styles/pages/profile.css */
+
+.profile-page {
+  padding-top: 16px;
+  padding-bottom: 32px;
+}
+
+.profile-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* HEADER */
+
+.profile-header {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+.profile-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--su-card-bg, rgba(0, 0, 0, 0.3));
+  border: 2px solid var(--ring, rgba(255, 255, 255, 0.06));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  font-weight: 600;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-username {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 14px;
+  color: var(--su-muted, #c8bfdc);
+  margin-top: 4px;
+}
+
+.profile-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.profile-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-stat-number {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--text); /* светлый цвет текста */
+}
+
+.profile-stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--su-muted, #c8bfdc);
+}
+
+/* GRID */
+
+.profile-section-title {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 16px 0 8px;
+}
+
+.profile-posts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+/* 🆕 крупнее плитки на больших экранах */
+@media (min-width: 1200px) {
+  .profile-posts-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+  }
+}
+
+.profile-post-tile {
+  position: relative;
+  border: none;
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #000;
+}
+
+.profile-post-media-thumb {
+  width: 100%;
+  aspect-ratio: 1/1;
+  background: #111;
+}
+
+.profile-post-media-thumb img,
+.profile-post-media-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* маленький оверлей с лайками при ховере */
+
+.profile-post-overlay-info {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 6px 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+  pointer-events: none;
+  font-size: 12px;
+}
+
+.profile-post-overlay-info span {
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--gold); /* 🆕 золотой текст */
+  font-weight: 600;
+}
+
+.profile-post-tile:hover .profile-post-overlay-info {
+  opacity: 1;
+}
+
+/* EMPTY */
+
+.profile-empty {
+  margin-top: 24px;
+  color: var(--su-muted, #c8bfdc);
+  font-size: 14px;
+}
+
+/* MODAL / OVERLAY */
+
+.post-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 120;
+}
+
+.post-modal {
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  background: var(--su-card-bg, rgba(0, 0, 0, 0.75));
+  border-radius: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.post-modal-media {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.post-modal-media img,
+.post-modal-media video {
+  width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+
+.post-modal-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.post-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.post-modal-username {
+  font-weight: 500;
+}
+
+.post-modal-caption {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.post-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.post-modal-close {
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.post-modal-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-follow {
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--gold);
+  border: none;
+  margin-top: 10px;
+}
+
+.btn-follow.following {
+  background: transparent;
+  border: 2px solid var(--gold);
+  color: var(--gold);
+}
+
+.profile-stat-clickable {
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 0;
+}
+
+.profile-stat-clickable:hover .profile-stat-label {
+  text-decoration: underline;
+}
+
+/* Модалка списка фолловеров */
+.followers-modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 70vh;
+  background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+  border-radius: 18px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+.followers-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.followers-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.followers-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  overflow-y: auto;
+}
+
+.followers-item a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.followers-item a:hover {
+  background: rgba(255, 255, 255, 0.09);
+  transform: translateY(-1px);
+}
+
+.followers-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.followers-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.followers-username {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.followers-empty {
+  font-size: 14px;
+  color: var(--su-muted, #c8bfdc);
+}
+
+/* Тонкая разделительная линия под шапкой */
+.profile-bottom-line {
+  width: 100%;
+  height: 1.5px;
+  margin: 24px 0 18px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  border-radius: 999px;
+  opacity: 0.9;
+}
+
+/* адаптив */
+
+@media (max-width: 768px) {
+  .profile-header {
+    align-items: flex-start;
+  }
+
+  .post-modal {
+    grid-template-columns: minmax(0, 1fr);
+    max-height: 92vh;
+  }
+
+  .post-modal-media img,
+  .post-modal-media video {
+    max-height: 50vh;
+  }
+}
