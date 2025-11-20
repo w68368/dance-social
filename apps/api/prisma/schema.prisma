@@ -14,39 +14,45 @@ enum Gender {
 }
 
 model User {
-  id                   String          @id @default(cuid())
-  email                String          @unique
-  username             String          @unique
-  passwordHash         String
-  avatarUrl            String?
-  failedLoginAttempts  Int             @default(0)
-  lockUntil            DateTime?
+  id                  String          @id @default(cuid())
+  email               String          @unique
+
+  // технический @username (slug, без пробелов, lowercase)
+  username            String          @unique
+  // как пользователь написал ник (с пробелами, большими буквами и т.д.)
+  displayName         String?
+
+  passwordHash        String
+  avatarUrl           String?
+  failedLoginAttempts Int             @default(0)
+  lockUntil           DateTime?
 
   // подтверждён ли email
-  emailVerifiedAt      DateTime?
+  emailVerifiedAt     DateTime?
 
   // ===== Связи =====
-  refreshTokens        RefreshToken[]
-  passwordResets       PasswordReset[]
+  refreshTokens       RefreshToken[]
+  passwordResets      PasswordReset[]
 
   // 🆕 Связь с постами
-  posts                Post[]
+  posts               Post[]
 
   // 🆕 Лайки, поставленные пользователем
-  likedPosts           PostLike[]
-  comments PostComment[]
+  likedPosts          PostLike[]
+  comments            PostComment[]
 
   // 🆕 Подписки
   // пользователи, которые ПОДПИСАНЫ на этого юзера
-  followers            Follow[] @relation("FollowFollowing")
+  followers           Follow[] @relation("FollowFollowing")
   // пользователи, на которых ПОДПИСАН этот юзер
-  following            Follow[] @relation("FollowFollower")
+  following           Follow[] @relation("FollowFollower")
 
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   @@index([lockUntil])
 }
+
 
 model RefreshToken {
   id         String   @id @default(cuid())

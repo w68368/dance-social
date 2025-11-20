@@ -1,8 +1,11 @@
+// apps/web/src/lib/auth.ts
+
 // Храним только ПУБЛИЧНЫЕ данные пользователя (без токенов)
 export type PublicUser = {
   id: string;
   email: string;
-  username: string;
+  username: string; // slug для @упоминаний
+  displayName?: string | null; // красивый ник, как написал пользователь
   avatarUrl?: string | null;
   createdAt: string;
 };

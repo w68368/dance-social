@@ -124,6 +124,7 @@ export default function Feed() {
           {posts.map((post) => {
             const isMe = me && me.id === post.author.id;
             const profileLink = isMe ? "/profile" : `/users/${post.author.id}`;
+            const authorName = post.author.displayName || post.author.username;
 
             return (
               <article key={post.id} className="feed-card">
@@ -134,19 +135,17 @@ export default function Feed() {
                       {post.author.avatarUrl ? (
                         <img
                           src={post.author.avatarUrl}
-                          alt={post.author.username}
+                          alt={authorName}
                           className="feed-avatar"
                         />
                       ) : (
                         <div className="feed-avatar-placeholder">
-                          {post.author.username.slice(0, 1).toUpperCase()}
+                          {authorName.slice(0, 1).toUpperCase()}
                         </div>
                       )}
 
                       <div>
-                        <div className="feed-username">
-                          {post.author.username}
-                        </div>
+                        <div className="feed-username">{authorName}</div>
                         <div className="feed-date">
                           {new Date(post.createdAt).toLocaleString()}
                         </div>

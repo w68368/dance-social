@@ -93,6 +93,8 @@ export default function Header() {
     }
   };
 
+  const displayName = user?.displayName || user?.username || "User";
+
   return (
     <header className="su-header">
       <div className="su-header__inner">
@@ -144,7 +146,7 @@ export default function Header() {
               <div className="avatar">
                 <img
                   src={user.avatarUrl || "/uploads/_noavatar.png"}
-                  alt={user.username || "User"}
+                  alt={displayName}
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src =
                       "/uploads/_noavatar.png";
@@ -153,7 +155,7 @@ export default function Header() {
               </div>
 
               <div className="meta">
-                <span className="name">{user.username}</span>
+                <span className="name">{displayName}</span>
                 <span className="sub">Profile</span>
               </div>
 
@@ -267,13 +269,13 @@ export default function Header() {
                     <img
                       className="mobile-user-avatar"
                       src={user.avatarUrl || "/uploads/_noavatar.png"}
-                      alt={user.username}
+                      alt={displayName}
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).src =
                           "/uploads/_noavatar.png";
                       }}
                     />
-                    <span className="mobile-user-name">{user.username}</span>
+                    <span className="mobile-user-name">{displayName}</span>
                   </button>
 
                   <button

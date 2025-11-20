@@ -122,14 +122,22 @@ router.get(
       const follows = await prisma.follow.findMany({
         where: { followingId: targetId },
         include: {
-          follower: true, // полные данные пользователя
+          follower: {
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatarUrl: true,
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
       });
 
       const users = follows.map((f) => ({
         id: f.follower.id,
-        username: f.follower.username,
+        username: f.follower.username, // slug для @
+        displayName: f.follower.displayName, // красивый ник
         avatarUrl: f.follower.avatarUrl,
       }));
 

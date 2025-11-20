@@ -49,6 +49,18 @@ const DEFAULT_AVATAR_URL = "/uploads/defaults/default-avatar.png";
 
 const normalizeEmail = (v: string) => (v ?? "").trim().toLowerCase();
 const normalizeUsername = (v: string) => (v ?? "").trim();
+
+// делаем технический username-слуг:
+// - обрезаем пробелы по краям
+// - переводим в нижний регистр
+// - убираем пробелы внутри
+// - оставляем только латинские буквы, цифры и _
+const makeUsernameSlug = (v: string) =>
+  normalizeUsername(v)
+    .toLowerCase()
+    .replace(/\s+/g, "") // убираем все пробелы
+    .replace(/[^a-z0-9_]/g, ""); // всё лишнее выбрасываем
+
 const normalizePassword = (v: string) => (v ?? "").trim();
 
 const addDays = (d: Date, days: number) => {
@@ -138,10 +150,22 @@ router.post(
         });
       }
 
+      // displayName — как ввёл пользователь
+      const rawUsername = normalizeUsername(parsed.data.username);
+      // slug для БД и @упоминаний
+      const usernameSlug = makeUsernameSlug(rawUsername);
+
+      if (!usernameSlug || usernameSlug.length < 3) {
+        return res.status(400).json({
+          ok: false,
+          error: "Invalid username",
+        });
+      }
+
       // Уникальность
       const [byEmail, byUsername] = await Promise.all([
         prisma.user.findUnique({ where: { email: parsed.data.email } }),
-        prisma.user.findUnique({ where: { username: parsed.data.username } }),
+        prisma.user.findUnique({ where: { username: usernameSlug } }),
       ]);
       if (byEmail)
         return res
@@ -185,7 +209,8 @@ router.post(
           attempts: 0,
           maxAttempts: EMAIL_MAX_ATTEMPTS,
           payload: {
-            username: parsed.data.username,
+            usernameSlug,
+            displayName: rawUsername,
             passwordHash,
             avatarUrl, // может быть undefined — это ок
           },
@@ -196,7 +221,8 @@ router.post(
           attempts: 0,
           maxAttempts: EMAIL_MAX_ATTEMPTS,
           payload: {
-            username: parsed.data.username,
+            usernameSlug,
+            displayName: rawUsername,
             passwordHash,
             avatarUrl,
           },
@@ -261,12 +287,13 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
 
     // Достаём черновик
     const payload = (rec.payload ?? {}) as {
-      username?: string;
+      usernameSlug?: string;
+      displayName?: string;
       passwordHash?: string;
       avatarUrl?: string;
     };
 
-    if (!payload.username || !payload.passwordHash) {
+    if (!payload.usernameSlug || !payload.passwordHash) {
       return res
         .status(400)
         .json({ ok: false, error: "Draft is missing data" });
@@ -275,7 +302,7 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
     // Повторная проверка уникальности (на всякий случай)
     const [byEmail, byUsername] = await Promise.all([
       prisma.user.findUnique({ where: { email } }),
-      prisma.user.findUnique({ where: { username: payload.username! } }),
+      prisma.user.findUnique({ where: { username: payload.usernameSlug! } }),
     ]);
     if (byEmail || byUsername) {
       return res.status(409).json({ ok: false, error: "User already exists" });
@@ -285,7 +312,8 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
     const user = await prisma.user.create({
       data: {
         email,
-        username: payload.username!,
+        username: payload.usernameSlug!,
+        displayName: payload.displayName ?? payload.usernameSlug!,
         passwordHash: payload.passwordHash!,
         avatarUrl: payload.avatarUrl ?? DEFAULT_AVATAR_URL,
         emailVerifiedAt: new Date(),
@@ -294,6 +322,7 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
         id: true,
         email: true,
         username: true,
+        displayName: true,
         avatarUrl: true,
         createdAt: true,
       },
@@ -367,9 +396,19 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
       });
     }
 
+    const rawUsername = normalizeUsername(parsed.data.username);
+    const usernameSlug = makeUsernameSlug(rawUsername);
+
+    if (!usernameSlug || usernameSlug.length < 3) {
+      return res.status(400).json({
+        ok: false,
+        error: "Invalid username",
+      });
+    }
+
     const [byEmail, byUsername] = await Promise.all([
       prisma.user.findUnique({ where: { email: parsed.data.email } }),
-      prisma.user.findUnique({ where: { username: parsed.data.username } }),
+      prisma.user.findUnique({ where: { username: usernameSlug } }),
     ]);
     if (byEmail)
       return res.status(409).json({ ok: false, error: "Email already in use" });
@@ -390,7 +429,8 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
     const user = await prisma.user.create({
       data: {
         email: parsed.data.email,
-        username: parsed.data.username,
+        username: usernameSlug,
+        displayName: rawUsername,
         passwordHash,
         avatarUrl,
       },
@@ -398,6 +438,7 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
         id: true,
         email: true,
         username: true,
+        displayName: true,
         avatarUrl: true,
         createdAt: true,
       },
@@ -440,6 +481,7 @@ router.post("/login", loginLimiter, async (req, res) => {
         id: true,
         email: true,
         username: true,
+        displayName: true,
         avatarUrl: true,
         createdAt: true,
         passwordHash: true,
@@ -527,6 +569,7 @@ router.post("/login", loginLimiter, async (req, res) => {
         id: user.id,
         email: user.email,
         username: user.username,
+        displayName: user.displayName,
         avatarUrl: user.avatarUrl,
         createdAt: user.createdAt,
       },
@@ -622,6 +665,7 @@ router.get("/me", requireAuth, async (req: AuthedRequest, res) => {
         id: true,
         email: true,
         username: true,
+        displayName: true,
         avatarUrl: true,
         createdAt: true,
       },

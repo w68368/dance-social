@@ -92,6 +92,7 @@ export default function PostCommentsModal({
   if (!isOpen || !post) return null;
 
   const createdAt = new Date(post.createdAt);
+  const postAuthorName = post.author.displayName || post.author.username;
 
   // сгруппируем комментарии: родитель -> список ответов
   const roots = comments.filter((c) => !c.parentId);
@@ -112,6 +113,7 @@ export default function PostCommentsModal({
     setReplyTo(c);
     setReplyParentId(parentId);
 
+    // для @используем slug username (без пробелов)
     if (!text.startsWith(`@${c.author.username}`)) {
       setText(`@${c.author.username} `);
     }
@@ -161,7 +163,7 @@ export default function PostCommentsModal({
               <div className="pcm-header-text">
                 <div className="pcm-post-title">{post.caption || "Post"}</div>
                 <div className="pcm-post-meta">
-                  <span>{post.author.username}</span>
+                  <span>{postAuthorName}</span>
                   <span>•</span>
                   <span>{createdAt.toLocaleDateString()}</span>
                 </div>
@@ -187,24 +189,27 @@ export default function PostCommentsModal({
                 <ul className="pcm-list">
                   {roots.map((c) => {
                     const replies = repliesByParent.get(c.id) ?? [];
+                    const rootAuthorName =
+                      c.author.displayName || c.author.username;
+
                     return (
                       <li key={c.id} className="pcm-item">
                         <div className="pcm-avatar">
                           {c.author.avatarUrl ? (
                             <img
                               src={c.author.avatarUrl}
-                              alt={c.author.username}
+                              alt={rootAuthorName}
                             />
                           ) : (
                             <div className="pcm-avatar-fallback">
-                              {c.author.username[0]?.toUpperCase()}
+                              {rootAuthorName[0]?.toUpperCase()}
                             </div>
                           )}
                         </div>
                         <div className="pcm-body">
                           <div className="pcm-meta">
                             <span className="pcm-username">
-                              {c.author.username}
+                              {rootAuthorName}
                             </span>
                             {isPostAuthor(c) && (
                               <span className="pcm-author-badge">Автор</span>
@@ -223,47 +228,52 @@ export default function PostCommentsModal({
 
                           {replies.length > 0 && (
                             <ul className="pcm-replies">
-                              {replies.map((r) => (
-                                <li
-                                  key={r.id}
-                                  className="pcm-item pcm-item-reply"
-                                >
-                                  <div className="pcm-avatar pcm-avatar-reply">
-                                    {r.author.avatarUrl ? (
-                                      <img
-                                        src={r.author.avatarUrl}
-                                        alt={r.author.username}
-                                      />
-                                    ) : (
-                                      <div className="pcm-avatar-fallback">
-                                        {r.author.username[0]?.toUpperCase()}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="pcm-body">
-                                    <div className="pcm-meta">
-                                      <span className="pcm-username">
-                                        {r.author.username}
-                                      </span>
-                                      {isPostAuthor(r) && (
-                                        <span className="pcm-author-badge">
-                                          Автор
-                                        </span>
+                              {replies.map((r) => {
+                                const replyAuthorName =
+                                  r.author.displayName || r.author.username;
+
+                                return (
+                                  <li
+                                    key={r.id}
+                                    className="pcm-item pcm-item-reply"
+                                  >
+                                    <div className="pcm-avatar pcm-avatar-reply">
+                                      {r.author.avatarUrl ? (
+                                        <img
+                                          src={r.author.avatarUrl}
+                                          alt={replyAuthorName}
+                                        />
+                                      ) : (
+                                        <div className="pcm-avatar-fallback">
+                                          {replyAuthorName[0]?.toUpperCase()}
+                                        </div>
                                       )}
                                     </div>
-                                    <div className="pcm-text">
-                                      {formatTextWithMentions(r.text)}
+                                    <div className="pcm-body">
+                                      <div className="pcm-meta">
+                                        <span className="pcm-username">
+                                          {replyAuthorName}
+                                        </span>
+                                        {isPostAuthor(r) && (
+                                          <span className="pcm-author-badge">
+                                            Автор
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="pcm-text">
+                                        {formatTextWithMentions(r.text)}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="pcm-reply-btn"
+                                        onClick={() => startReply(r)}
+                                      >
+                                        Ответить
+                                      </button>
                                     </div>
-                                    <button
-                                      type="button"
-                                      className="pcm-reply-btn"
-                                      onClick={() => startReply(r)}
-                                    >
-                                      Ответить
-                                    </button>
-                                  </div>
-                                </li>
-                              ))}
+                                  </li>
+                                );
+                              })}
                             </ul>
                           )}
                         </div>

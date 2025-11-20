@@ -120,6 +120,7 @@ router.post(
             select: {
               id: true,
               username: true,
+              displayName: true,
               avatarUrl: true,
             },
           },
@@ -270,6 +271,7 @@ router.post(
             select: {
               id: true,
               username: true,
+              displayName: true,
               avatarUrl: true,
             },
           },
@@ -302,6 +304,7 @@ router.get("/:id/comments", async (req, res) => {
           select: {
             id: true,
             username: true,
+            displayName: true,
             avatarUrl: true,
           },
         },
@@ -332,6 +335,7 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
           select: {
             id: true,
             username: true,
+            displayName: true,
             avatarUrl: true,
           },
         },
@@ -392,6 +396,7 @@ router.get("/user/:userId", optionalAuth, async (req: AuthedRequest, res) => {
           select: {
             id: true,
             username: true,
+            displayName: true,
             avatarUrl: true,
           },
         },

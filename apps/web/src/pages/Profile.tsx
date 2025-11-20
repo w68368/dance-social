@@ -165,6 +165,8 @@ export default function Profile() {
     );
   }
 
+  const displayName = me.displayName || me.username;
+
   return (
     <main className="profile-page">
       <div className="profile-container">
@@ -172,14 +174,14 @@ export default function Profile() {
         <section className="profile-header">
           <div className="profile-avatar">
             {me.avatarUrl ? (
-              <img src={me.avatarUrl} alt={me.username} />
+              <img src={me.avatarUrl} alt={displayName} />
             ) : (
-              <span>{me.username.charAt(0).toUpperCase()}</span>
+              <span>{displayName.charAt(0).toUpperCase()}</span>
             )}
           </div>
 
           <div className="profile-header-main">
-            <h1 className="profile-username">{me.username}</h1>
+            <h1 className="profile-username">{displayName}</h1>
 
             <div className="profile-stats">
               <div className="profile-stat">
@@ -297,20 +299,24 @@ export default function Profile() {
 
             {!followersLoading && followersList.length > 0 && (
               <ul className="followers-list">
-                {followersList.map((u) => (
-                  <li key={u.id} className="followers-item">
-                    <Link to={`/users/${u.id}`} onClick={closeFollowersModal}>
-                      <div className="followers-avatar">
-                        {u.avatarUrl ? (
-                          <img src={u.avatarUrl} alt={u.username} />
-                        ) : (
-                          <span>{u.username.charAt(0).toUpperCase()}</span>
-                        )}
-                      </div>
-                      <span className="followers-username">{u.username}</span>
-                    </Link>
-                  </li>
-                ))}
+                {followersList.map((u) => {
+                  const name = u.displayName || u.username;
+
+                  return (
+                    <li key={u.id} className="followers-item">
+                      <Link to={`/users/${u.id}`} onClick={closeFollowersModal}>
+                        <div className="followers-avatar">
+                          {u.avatarUrl ? (
+                            <img src={u.avatarUrl} alt={name} />
+                          ) : (
+                            <span>{name.charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <span className="followers-username">{name}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

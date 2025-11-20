@@ -41,7 +41,7 @@ export default function UserProfile() {
   const me = getUser();
 
   // -----------------------------
-  // Загрузка постов + профиля
+  // Загрузка постов + публичного профиля
   // -----------------------------
   useEffect(() => {
     if (!userId) return;
@@ -53,7 +53,6 @@ export default function UserProfile() {
         setLoading(true);
         setError(null);
 
-        // грузим посты и публичный профиль параллельно
         const [postsResp, userResp] = await Promise.all([
           fetchUserPosts(id),
           fetchUserPublic(id),
@@ -67,7 +66,7 @@ export default function UserProfile() {
         if (userResp.data?.ok && userResp.data.user) {
           setOwner(userResp.data.user);
         } else if (loadedPosts.length > 0) {
-          // запасной вариант — берем автора из поста
+          // fallback: берём автора первого поста
           setOwner(loadedPosts[0].author);
         } else {
           setOwner(null);
@@ -119,6 +118,9 @@ export default function UserProfile() {
     };
   }, [userId]);
 
+  // -----------------------------
+  // Вычисления
+  // -----------------------------
   const postsCount = posts.length;
 
   const totalLikes = useMemo(
@@ -130,7 +132,17 @@ export default function UserProfile() {
     [posts]
   );
 
+  const followersCount = followStats?.followers ?? 0;
+  const followingCount = followStats?.following ?? 0;
+
+  const isOwnProfile = me && owner && me.id === owner.id;
+
+  const ownerName = owner ? owner.displayName || owner.username : "User";
+  const ownerHandle = owner ? `@${owner.username}` : "";
+
+  // -----------------------------
   // Подписка / отписка
+  // -----------------------------
   async function handleFollowToggle() {
     if (!userId || !followStats || followLoading) return;
 
@@ -171,7 +183,9 @@ export default function UserProfile() {
     }
   }
 
-  // Открытие модалки followers
+  // -----------------------------
+  // Followers modal
+  // -----------------------------
   async function openFollowersModal() {
     if (!userId) return;
 
@@ -194,11 +208,13 @@ export default function UserProfile() {
     setFollowersList([]);
   }
 
+  // -----------------------------
+  // Комментарии к посту
+  // -----------------------------
   function closePostModal() {
     setSelectedPost(null);
   }
 
-  // когда добавили комментарий в модалке — обновляем счётчики
   const handleCommentAdded = (postId: string) => {
     setPosts((prev) =>
       prev.map((p) =>
@@ -213,6 +229,9 @@ export default function UserProfile() {
     );
   };
 
+  // -----------------------------
+  // Рендер
+  // -----------------------------
   if (!userId) {
     return (
       <main className="profile-page">
@@ -223,10 +242,25 @@ export default function UserProfile() {
     );
   }
 
-  const followersCount = followStats?.followers ?? 0;
-  const followingCount = followStats?.following ?? 0;
+  if (loading && !owner) {
+    return (
+      <main className="profile-page">
+        <div className="profile-container">
+          <p>Загружаем профиль…</p>
+        </div>
+      </main>
+    );
+  }
 
-  const isOwnProfile = me && owner && me.id === owner.id;
+  if (!owner) {
+    return (
+      <main className="profile-page">
+        <div className="profile-container">
+          <p>{error ?? "Профиль пользователя не найден."}</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="profile-page">
@@ -234,23 +268,23 @@ export default function UserProfile() {
         {/* Шапка профиля */}
         <section className="profile-header">
           <div className="profile-avatar">
-            {owner?.avatarUrl ? (
-              <img src={owner.avatarUrl} alt={owner.username} />
+            {owner.avatarUrl ? (
+              <img src={owner.avatarUrl} alt={ownerName} />
             ) : (
-              <span>
-                {owner?.username ? owner.username.charAt(0).toUpperCase() : "U"}
-              </span>
+              <span>{ownerName.charAt(0).toUpperCase()}</span>
             )}
           </div>
 
           <div className="profile-header-main">
-            <h1 className="profile-username">{owner?.username ?? "User"}</h1>
+            <h1 className="profile-username">{ownerName}</h1>
+            {ownerHandle && <div className="profile-handle">{ownerHandle}</div>}
 
             <div className="profile-stats">
               <div className="profile-stat">
                 <span className="profile-stat-number">{postsCount}</span>
                 <span className="profile-stat-label">posts</span>
               </div>
+
               <div className="profile-stat">
                 <span className="profile-stat-number">{totalLikes}</span>
                 <span className="profile-stat-label">likes</span>
@@ -296,7 +330,7 @@ export default function UserProfile() {
           </div>
         </section>
 
-        <div className="profile-bottom-line"></div>
+        <div className="profile-bottom-line" />
 
         {error && <div className="feed-error">{error}</div>}
 
@@ -369,20 +403,24 @@ export default function UserProfile() {
 
             {!followersLoading && followersList.length > 0 && (
               <ul className="followers-list">
-                {followersList.map((u) => (
-                  <li key={u.id} className="followers-item">
-                    <Link to={`/users/${u.id}`} onClick={closeFollowersModal}>
-                      <div className="followers-avatar">
-                        {u.avatarUrl ? (
-                          <img src={u.avatarUrl} alt={u.username} />
-                        ) : (
-                          <span>{u.username.charAt(0).toUpperCase()}</span>
-                        )}
-                      </div>
-                      <span className="followers-username">{u.username}</span>
-                    </Link>
-                  </li>
-                ))}
+                {followersList.map((u) => {
+                  const name = u.displayName || u.username || "User";
+
+                  return (
+                    <li key={u.id} className="followers-item">
+                      <Link to={`/users/${u.id}`} onClick={closeFollowersModal}>
+                        <div className="followers-avatar">
+                          {u.avatarUrl ? (
+                            <img src={u.avatarUrl} alt={name} />
+                          ) : (
+                            <span>{name.charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <span className="followers-username">{name}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

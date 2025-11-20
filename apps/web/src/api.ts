@@ -125,7 +125,8 @@ export function submitPasswordReset(token: string, newPassword: string) {
 // ----------------------------------------------------
 export interface ApiUserSummary {
   id: string;
-  username: string;
+  username: string; // slug для @упоминаний (без пробелов, lowercase)
+  displayName?: string | null; // красивый ник, как ввёл пользователь
   avatarUrl?: string | null;
 }
 
