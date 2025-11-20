@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchFeed, toggleLike, type Post } from "../api";
-import { FaHeart, FaRegHeart } from "react-icons/fa";
-import { getUser } from "../lib/auth"; // 🆕 кто залогинен
+import { FaHeart, FaRegHeart, FaRegCommentDots } from "react-icons/fa";
+import { getUser } from "../lib/auth"; // кто залогинен
+import PostCommentsModal from "../components/PostCommentsModal";
 import "../styles/pages/feed.css";
 
 export default function Feed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // для модалки комментариев
+  const [commentsPost, setCommentsPost] = useState<Post | null>(null);
 
   // текущий залогиненный пользователь
   const me = getUser();
@@ -82,6 +86,25 @@ export default function Feed() {
     }
   };
 
+  // открыть модалку с комментариями
+  const openComments = (post: Post) => {
+    setCommentsPost(post);
+  };
+
+  // закрыть модалку
+  const closeComments = () => {
+    setCommentsPost(null);
+  };
+
+  // обновить счётчик комментариев в списке постов
+  const handleCommentAdded = (postId: string) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, commentsCount: p.commentsCount + 1 } : p
+      )
+    );
+  };
+
   return (
     <main className="su-main">
       <div className="container feed-container">
@@ -152,7 +175,7 @@ export default function Feed() {
                 {/* Подпись */}
                 {post.caption && <p className="feed-caption">{post.caption}</p>}
 
-                {/* Лайки */}
+                {/* Лайки + комментарии */}
                 <div className="feed-footer">
                   <button
                     className={`like-btn ${post.likedByMe ? "liked" : ""}`}
@@ -163,9 +186,15 @@ export default function Feed() {
                     ) : (
                       <FaRegHeart className="like-icon" />
                     )}
-
-                    {/* просто число */}
                     <span className="like-count">{post.likesCount}</span>
+                  </button>
+
+                  <button
+                    className="comment-btn"
+                    onClick={() => openComments(post)}
+                  >
+                    <FaRegCommentDots className="comment-icon" />
+                    <span className="comment-count">{post.commentsCount}</span>
                   </button>
                 </div>
               </article>
@@ -173,6 +202,18 @@ export default function Feed() {
           })}
         </div>
       </div>
+
+      {/* Модалка комментариев */}
+      <PostCommentsModal
+        post={commentsPost}
+        isOpen={commentsPost !== null}
+        onClose={closeComments}
+        onCommentAdded={() => {
+          if (commentsPost) {
+            handleCommentAdded(commentsPost.id);
+          }
+        }}
+      />
     </main>
   );
 }

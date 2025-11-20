@@ -1,0 +1,436 @@
+/* фон с блюром */
+.pcm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 0, 20, 0.7);
+  backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+/* основной контейнер модалки */
+.pcm-modal {
+  width: 100%;
+  max-width: 1120px;
+  max-height: 90vh;
+  border-radius: 28px;
+  overflow: hidden;
+  display: flex;
+  background: linear-gradient(
+    135deg,
+    var(--bg-1, #1f1a2e),
+    var(--bg-2, #2a1630)
+  );
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+}
+
+/* левая часть — медиа */
+.pcm-media-pane {
+  flex: 0 0 58%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pcm-media-pane img,
+.pcm-media-pane video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* правая часть — инфо + комментарии */
+.pcm-side-pane {
+  flex: 0 0 42%;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(
+      circle at top left,
+      rgba(246, 196, 73, 0.06),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(219, 165, 30, 0.06),
+      transparent 55%
+    );
+}
+
+/* header справа */
+.pcm-header {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pcm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pcm-header-icon {
+  font-size: 18px;
+  color: var(--gold, #f6c449);
+}
+
+.pcm-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pcm-post-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pcm-post-meta {
+  font-size: 12px;
+  color: var(--muted, #c8bfdc);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.pcm-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+/* содержимое справа */
+.pcm-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* блок комментариев */
+.pcm-comments-block {
+  padding: 12px 18px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.pcm-status {
+  font-size: 14px;
+  color: var(--muted, #c8bfdc);
+}
+
+.pcm-status.pcm-error {
+  color: #ff6b81;
+}
+
+.pcm-status.pcm-empty {
+  opacity: 0.9;
+}
+
+.pcm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Корневой комментарий + его ответы */
+.pcm-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+
+  /* 📌 Более мягкий фон */
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+
+  /* 📌 Очень мягкий бордер */
+  border: 1px solid rgba(255, 255, 255, 0.04);
+
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+/* При наведении — чуть ярче, но всё ещё спокойно */
+.pcm-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Отступ между тредами */
+.pcm-item + .pcm-item {
+  margin-top: 8px;
+}
+
+.pcm-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.pcm-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pcm-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pcm-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pcm-meta {
+  font-size: 12px;
+  color: var(--muted, #c8bfdc);
+  margin-bottom: 2px;
+}
+
+.pcm-username {
+  font-weight: 600;
+  color: #fff;
+}
+
+.pcm-text {
+  font-size: 14px;
+}
+
+/* низ: форма + лайки */
+.pcm-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pcm-form {
+  display: flex;
+  gap: 8px;
+}
+
+.pcm-form input {
+  flex: 1;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 8px 14px;
+  background: rgba(10, 0, 40, 0.72);
+  color: inherit;
+  outline: none;
+}
+
+.pcm-form input:focus {
+  border-color: var(--gold, #f6c449);
+}
+
+.pcm-form button {
+  border-radius: 999px;
+  border: none;
+  padding: 0 16px;
+  background: linear-gradient(
+    90deg,
+    var(--gold, #f6c449),
+    var(--gold-2, #dba51e)
+  );
+  color: #1b1029;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pcm-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ряд лайков под формой */
+.pcm-likes-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.pcm-like-icon {
+  font-size: 16px;
+  color: #ffffffa0;
+}
+
+.pcm-like-icon--active {
+  color: var(--gold, #f6c449);
+}
+
+.pcm-likes-count {
+  font-weight: 500;
+}
+
+.pcm-reply-btn {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.pcm-reply-btn:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* блок "Ответ на @username" над полем */
+.pcm-replying-to {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted, #c8bfdc);
+  margin-bottom: 4px;
+}
+
+.pcm-replying-cancel {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* список ответов (внутри карточки коммента) */
+.pcm-replies {
+  margin-top: 6px;
+  padding-left: 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* сами ответы — прозрачные, чтобы не было второй рамки */
+.pcm-item-reply {
+  margin-top: 6px;
+  background: transparent;
+  border: none;
+  padding: 4px 0;
+  opacity: 0.9;
+}
+
+/* аватар ответа поменьше */
+.pcm-avatar-reply {
+  width: 26px;
+  height: 26px;
+}
+
+/* подсветка @упоминаний */
+.pcm-text .mention {
+  color: #7abaff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pcm-text .mention:hover {
+  text-decoration: underline;
+}
+
+.pcm-author-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+
+  background: rgba(246, 196, 73, 0.12); /* более мягкий фон */
+  border: 1px solid rgba(246, 196, 73, 0.45);
+  color: var(--gold, #f6c449);
+}
+
+/* ============================= */
+/*        АДАПТИВ ДЛЯ МОБИЛЫ     */
+/* ============================= */
+
+@media (max-width: 900px) {
+  .pcm-modal {
+    flex-direction: column;
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .pcm-media-pane {
+    flex: 0 0 auto;
+    max-height: 55vh; /* видео чуть меньше, чтобы снизу влезли комменты */
+  }
+
+  .pcm-media-pane img,
+  .pcm-media-pane video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .pcm-side-pane {
+    flex: 1;
+  }
+
+  .pcm-header {
+    padding: 10px 14px;
+  }
+
+  .pcm-comments-block {
+    padding: 8px 14px;
+  }
+
+  .pcm-bottom {
+    padding: 8px 14px 12px;
+  }
+}
+
+/* ещё чуть компактнее на совсем узких экранах */
+@media (max-width: 600px) {
+  .pcm-header-text {
+    max-width: 70%;
+  }
+
+  .pcm-post-title {
+    font-size: 13px;
+  }
+
+  .pcm-post-meta {
+    font-size: 11px;
+  }
+
+  .pcm-form input {
+    padding: 7px 12px;
+  }
+
+  .pcm-form button {
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .pcm-comments-block {
+    max-height: 30vh; /* чтобы список не залезал обратно на видео */
+  }
+}

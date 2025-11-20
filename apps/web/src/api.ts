@@ -4,7 +4,7 @@ import {
   setAccessToken,
   clearAccessToken,
 } from "./lib/accessToken";
-import { clearAuth } from "./lib/auth"; // 👈 добавили
+import { clearAuth } from "./lib/auth";
 
 // ------------------------
 // Базовый клиент
@@ -87,14 +87,14 @@ api.interceptors.response.use(
         } else {
           // ❌ refresh невалиден → полная очистка сессии
           clearAccessToken();
-          clearAuth(); // 👈 выкидываем пользователя из состояния
+          clearAuth();
           onRefreshed(null);
           return Promise.reject(error);
         }
       } catch (e) {
         // ❌ ошибка / 401 на /auth/refresh → тоже Logout
         clearAccessToken();
-        clearAuth(); // 👈 важно
+        clearAuth();
         onRefreshed(null);
         return Promise.reject(e);
       } finally {
@@ -141,9 +141,20 @@ export interface Post {
   mediaUrl?: string | null;
   mediaLocalPath?: string | null;
 
-  // 🆕 лайки
+  // лайки
   likesCount: number;
-  likedByMe?: boolean | null;
+  likedByMe: boolean;
+
+  // 🆕 комментарии
+  commentsCount: number;
+}
+
+export interface PostComment {
+  id: string;
+  text: string;
+  createdAt: string;
+  author: ApiUserSummary;
+  parentId?: string | null;
 }
 
 // 🆕 Статистика подписок
@@ -185,11 +196,36 @@ export function createPost(caption: string, media?: File | null) {
   return api.post<{ ok: boolean; post: Post }>("/posts", { caption: trimmed });
 }
 
-// 🆕 Лайк / Unlike (toggle)
+// Лайк / Unlike (toggle)
 export function toggleLike(postId: string) {
   return api.post<{ ok: boolean; liked: boolean; likesCount: number }>(
     `/posts/${postId}/like`
   );
+}
+
+// ----------------------------------------------------
+// 🆕 Comments
+// ----------------------------------------------------
+export async function fetchComments(postId: string): Promise<PostComment[]> {
+  const { data } = await api.get<{ ok: boolean; comments: PostComment[] }>(
+    `/posts/${postId}/comments`
+  );
+  return data.comments ?? [];
+}
+
+export async function addComment(
+  postId: string,
+  text: string,
+  parentId?: string
+): Promise<PostComment> {
+  const payload: { text: string; parentId?: string } = { text };
+  if (parentId) payload.parentId = parentId;
+
+  const { data } = await api.post<{ ok: boolean; comment: PostComment }>(
+    `/posts/${postId}/comments`,
+    payload
+  );
+  return data.comment;
 }
 
 // ----------------------------------------------------

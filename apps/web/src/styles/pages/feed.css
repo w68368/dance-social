@@ -148,7 +148,7 @@
 
 /* liked */
 .like-btn.liked .like-icon {
-  color: var(--gold); /* или замените на red если хочешь */
+  color: var(--gold);
   transform: scale(1.15);
   opacity: 1;
 }
@@ -156,4 +156,41 @@
 .like-btn.liked .like-count {
   font-weight: 600;
   opacity: 1;
+}
+
+/* ============================= */
+/*      💬 Comment button        */
+/* ============================= */
+
+.comment-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: 0.15s ease;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.comment-icon {
+  font-size: 24px; /* почти как сердце, чуть меньше */
+  color: rgba(255, 255, 255, 0.45);
+  transition: 0.2s ease;
+}
+
+.comment-count {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.comment-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.comment-btn:hover .comment-icon {
+  color: rgba(255, 255, 255, 0.9);
 }

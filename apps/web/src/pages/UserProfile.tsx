@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
-  api,
   fetchUserPosts,
   fetchFollowStats,
   followUser,
@@ -15,9 +14,9 @@ import {
 } from "../api";
 
 import "../styles/pages/profile.css";
-import "../styles/pages/feed.css"; // стили лайков
-import { FaHeart, FaRegHeart } from "react-icons/fa";
-import { getUser } from "../lib/auth"; // кто залогинен
+import "../styles/pages/feed.css";
+import { getUser } from "../lib/auth";
+import PostCommentsModal from "../components/PostCommentsModal";
 
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
@@ -131,35 +130,6 @@ export default function UserProfile() {
     [posts]
   );
 
-  // Лайки поста
-  async function handleToggleLike(post: Post) {
-    try {
-      const { data } = await api.post<{
-        ok: boolean;
-        liked: boolean;
-        likesCount: number;
-      }>(`/posts/${post.id}/like`);
-
-      if (!data?.ok) return;
-
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === post.id
-            ? { ...p, likedByMe: data.liked, likesCount: data.likesCount }
-            : p
-        )
-      );
-
-      setSelectedPost((prev) =>
-        prev && prev.id === post.id
-          ? { ...prev, likedByMe: data.liked, likesCount: data.likesCount }
-          : prev
-      );
-    } catch (err) {
-      console.error("Toggle like error", err);
-    }
-  }
-
   // Подписка / отписка
   async function handleFollowToggle() {
     if (!userId || !followStats || followLoading) return;
@@ -227,6 +197,21 @@ export default function UserProfile() {
   function closePostModal() {
     setSelectedPost(null);
   }
+
+  // когда добавили комментарий в модалке — обновляем счётчики
+  const handleCommentAdded = (postId: string) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, commentsCount: p.commentsCount + 1 } : p
+      )
+    );
+
+    setSelectedPost((prev) =>
+      prev && prev.id === postId
+        ? { ...prev, commentsCount: prev.commentsCount + 1 }
+        : prev
+    );
+  };
 
   if (!userId) {
     return (
@@ -347,77 +332,17 @@ export default function UserProfile() {
         )}
       </div>
 
-      {/* Оверлей с выбранным постом */}
-      {selectedPost && (
-        <div className="post-modal-backdrop" onClick={closePostModal}>
-          <div
-            className="post-modal"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <div className="post-modal-media">
-              {selectedPost.mediaType === "video" ? (
-                <video
-                  src={
-                    selectedPost.mediaUrl ?? selectedPost.mediaLocalPath ?? ""
-                  }
-                  controls
-                  autoPlay
-                />
-              ) : (
-                <img
-                  src={
-                    selectedPost.mediaUrl ?? selectedPost.mediaLocalPath ?? ""
-                  }
-                  alt={selectedPost.caption}
-                />
-              )}
-            </div>
-
-            <div className="post-modal-side">
-              <div className="post-modal-header">
-                <div>
-                  <div className="post-modal-username">
-                    {owner?.username ?? "User"}
-                  </div>
-                  <div className="profile-meta">
-                    <span>
-                      {new Date(selectedPost.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="post-modal-close"
-                  onClick={closePostModal}
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="post-modal-caption">{selectedPost.caption}</div>
-
-              <div className="post-modal-actions">
-                <button
-                  type="button"
-                  className={
-                    "like-btn" + (selectedPost.likedByMe ? " liked" : "")
-                  }
-                  onClick={() => handleToggleLike(selectedPost)}
-                >
-                  {selectedPost.likedByMe ? (
-                    <FaHeart className="like-icon" />
-                  ) : (
-                    <FaRegHeart className="like-icon" />
-                  )}
-                  <span className="like-count">{selectedPost.likesCount}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Модалка выбранного поста — такая же, как в Feed/Profile */}
+      <PostCommentsModal
+        post={selectedPost}
+        isOpen={selectedPost !== null}
+        onClose={closePostModal}
+        onCommentAdded={() => {
+          if (selectedPost) {
+            handleCommentAdded(selectedPost.id);
+          }
+        }}
+      />
 
       {/* Модалка списка фолловеров */}
       {followersOpen && (

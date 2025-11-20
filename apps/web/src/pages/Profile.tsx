@@ -14,7 +14,8 @@ import { getUser, setUser } from "../lib/auth";
 
 import "../styles/pages/profile.css";
 import "../styles/pages/feed.css";
-import { FaHeart, FaRegHeart } from "react-icons/fa";
+
+import PostCommentsModal from "../components/PostCommentsModal";
 
 export default function Profile() {
   const [me, setMe] = useState<PublicUser | null>(getUser());
@@ -28,7 +29,7 @@ export default function Profile() {
     null
   );
 
-  // 🆕 модалка подписчиков
+  // модалка подписчиков
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followersList, setFollowersList] = useState<ApiUserSummary[]>([]);
   const [followersLoading, setFollowersLoading] = useState(false);
@@ -102,41 +103,26 @@ export default function Profile() {
   const followersCount = followStats?.followers ?? 0;
   const followingCount = followStats?.following ?? 0;
 
-  async function handleToggleLike(post: Post) {
-    try {
-      const { data } = await api.post<{
-        ok: boolean;
-        liked: boolean;
-        likesCount: number;
-      }>(`/posts/${post.id}/like`);
-
-      if (!data?.ok) return;
-
-      // обновляем список в сетке
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === post.id
-            ? { ...p, likedByMe: data.liked, likesCount: data.likesCount }
-            : p
-        )
-      );
-
-      // и выбранный пост в модалке
-      setSelectedPost((prev) =>
-        prev && prev.id === post.id
-          ? { ...prev, likedByMe: data.liked, likesCount: data.likesCount }
-          : prev
-      );
-    } catch (err) {
-      console.error("Toggle like error", err);
-    }
-  }
-
   function closePostModal() {
     setSelectedPost(null);
   }
 
-  // 🆕 открыть модалку подписчиков
+  // когда добавили комментарий в модалке — обновляем счётчики
+  const handleCommentAdded = (postId: string) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, commentsCount: p.commentsCount + 1 } : p
+      )
+    );
+
+    setSelectedPost((prev) =>
+      prev && prev.id === postId
+        ? { ...prev, commentsCount: prev.commentsCount + 1 }
+        : prev
+    );
+  };
+
+  // открыть модалку подписчиков
   async function openFollowersModal() {
     if (!me) return;
 
@@ -205,7 +191,7 @@ export default function Profile() {
                 <span className="profile-stat-label">likes</span>
               </div>
 
-              {/* 🆕 кликабельный followers → модалка */}
+              {/* кликабельный followers → модалка */}
               <button
                 type="button"
                 className="profile-stat profile-stat-clickable"
@@ -274,77 +260,19 @@ export default function Profile() {
         )}
       </div>
 
-      {/* Оверлей с выбранным постом */}
-      {selectedPost && (
-        <div className="post-modal-backdrop" onClick={closePostModal}>
-          <div
-            className="post-modal"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <div className="post-modal-media">
-              {selectedPost.mediaType === "video" ? (
-                <video
-                  src={
-                    selectedPost.mediaUrl ?? selectedPost.mediaLocalPath ?? ""
-                  }
-                  controls
-                  autoPlay
-                />
-              ) : (
-                <img
-                  src={
-                    selectedPost.mediaUrl ?? selectedPost.mediaLocalPath ?? ""
-                  }
-                  alt={selectedPost.caption}
-                />
-              )}
-            </div>
+      {/* Модалка выбранного поста — такая же, как в Feed */}
+      <PostCommentsModal
+        post={selectedPost}
+        isOpen={selectedPost !== null}
+        onClose={closePostModal}
+        onCommentAdded={() => {
+          if (selectedPost) {
+            handleCommentAdded(selectedPost.id);
+          }
+        }}
+      />
 
-            <div className="post-modal-side">
-              <div className="post-modal-header">
-                <div>
-                  <div className="post-modal-username">{me.username}</div>
-                  <div className="profile-meta">
-                    <span>
-                      {new Date(selectedPost.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="post-modal-close"
-                  onClick={closePostModal}
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="post-modal-caption">{selectedPost.caption}</div>
-
-              <div className="post-modal-actions">
-                <button
-                  type="button"
-                  className={
-                    "like-btn" + (selectedPost.likedByMe ? " liked" : "")
-                  }
-                  onClick={() => handleToggleLike(selectedPost)}
-                >
-                  {selectedPost.likedByMe ? (
-                    <FaHeart className="like-icon" />
-                  ) : (
-                    <FaRegHeart className="like-icon" />
-                  )}
-                  <span className="like-count">{selectedPost.likesCount}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 🆕 модалка списка подписчиков */}
+      {/* модалка списка подписчиков */}
       {followersOpen && (
         <div className="post-modal-backdrop" onClick={closeFollowersModal}>
           <div className="followers-modal" onClick={(e) => e.stopPropagation()}>
@@ -371,10 +299,7 @@ export default function Profile() {
               <ul className="followers-list">
                 {followersList.map((u) => (
                   <li key={u.id} className="followers-item">
-                    <Link
-                      to={`/users/${u.id}`} // 👈 переход на UserProfile
-                      onClick={closeFollowersModal}
-                    >
+                    <Link to={`/users/${u.id}`} onClick={closeFollowersModal}>
                       <div className="followers-avatar">
                         {u.avatarUrl ? (
                           <img src={u.avatarUrl} alt={u.username} />
