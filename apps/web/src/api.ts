@@ -47,7 +47,6 @@ api.interceptors.response.use(
     const original = error.config || {};
     const status = error?.response?.status;
 
-    // Не рефрешим /auth/refresh → иначе будет цикл
     const isRefreshCall =
       typeof original?.url === "string" &&
       original.url.replace(BASE_URL, "").includes("/auth/refresh");
@@ -55,7 +54,6 @@ api.interceptors.response.use(
     if (status === 401 && !original._retry && !isRefreshCall) {
       original._retry = true;
 
-      // Если refresh уже выполняется — ждём его завершения
       if (isRefreshing) {
         return new Promise((resolve) => {
           waiting.push((token) => {
@@ -77,7 +75,6 @@ api.interceptors.response.use(
         );
 
         if (data?.ok && data?.accessToken) {
-          // ✅ refresh успешен
           setAccessToken(data.accessToken);
           onRefreshed(data.accessToken);
 
@@ -85,14 +82,12 @@ api.interceptors.response.use(
           original.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(original);
         } else {
-          // ❌ refresh невалиден → полная очистка сессии
           clearAccessToken();
           clearAuth();
           onRefreshed(null);
           return Promise.reject(error);
         }
       } catch (e) {
-        // ❌ ошибка / 401 на /auth/refresh → тоже Logout
         clearAccessToken();
         clearAuth();
         onRefreshed(null);
@@ -171,6 +166,9 @@ export interface CommentsPage {
   nextCursor: string | null;
 }
 
+// режимы сортировки комментариев
+export type CommentSortMode = "best" | "new" | "old";
+
 // Статистика подписок
 export interface FollowStatsResponse {
   ok: boolean;
@@ -235,13 +233,17 @@ export function togglePinComment(postId: string, commentId: string) {
   );
 }
 
-// Получить страницу комментариев с пагинацией
+// Получить страницу комментариев с пагинацией и сортировкой
 export async function fetchComments(
   postId: string,
   cursor?: string | null,
-  limit = 20
+  limit = 20,
+  sort: CommentSortMode = "best"
 ): Promise<CommentsPage> {
-  const params: Record<string, string | number> = { limit };
+  const params: Record<string, string | number> = {
+    limit,
+    sort,
+  };
   if (cursor) params.cursor = cursor;
 
   const { data } = await api.get<{

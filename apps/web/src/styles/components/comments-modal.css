@@ -213,6 +213,47 @@
   opacity: 0.9;
 }
 
+/* панель сортировки комментариев */
+.pcm-sort {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.pcm-sort-button {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 4px 10px;
+  background: rgba(10, 0, 40, 0.55);
+  color: var(--muted, #c8bfdc);
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: 0.15s ease;
+}
+
+.pcm-sort-button:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(20, 8, 60, 0.9);
+  color: #ffffff;
+}
+
+.pcm-sort-button.active {
+  background: linear-gradient(
+    90deg,
+    var(--gold, #f6c449),
+    var(--gold-2, #dba51e)
+  );
+  color: #1b1029;
+  border-color: var(--gold, #f6c449);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.6);
+}
+
+.pcm-sort-button.active:hover {
+  transform: translateY(-1px);
+}
+
 /* === ОБЁРТКА ДЛЯ СПИСКА КОММЕНТОВ + ГРАДИЕНТ === */
 
 .comments-list-wrapper {
@@ -302,6 +343,8 @@
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.04);
   transition: background 0.2s ease, border-color 0.2s ease;
+  max-width: 100%;
+  overflow: hidden; /* 👉 ничего не вылезает за карточку */
 }
 
 /* При наведении — чуть ярче, но всё ещё спокойно */
@@ -343,7 +386,7 @@
 
 .pcm-body {
   flex: 1;
-  min-width: 0;
+  min-width: 0; /* 👉 текст и инпуты учитывают ширину */
 }
 
 /* верхняя строка коммента: имя + бейджи слева, лайк — справа */
@@ -686,10 +729,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-width: 100%; /* 👉 блок не шире карточки */
 }
 
 .pcm-edit-input {
   width: 100%;
+  max-width: 100%; /* 👉 инпут не шире родителя */
+  box-sizing: border-box; /* 👉 учитываем padding в ширине */
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   padding: 6px 10px;
@@ -707,6 +753,7 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  flex-wrap: wrap; /* 👉 на узких экранах кнопки могут перенестись */
 }
 
 .pcm-edit-save,
@@ -725,6 +772,8 @@
   background: var(--gold, #f6c449);
   color: #1b1029;
   font-weight: 600;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .pcm-edit-save:disabled {
@@ -734,6 +783,8 @@
 
 .pcm-edit-cancel {
   color: var(--muted, #c8bfdc);
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .pcm-edit-btn {
@@ -835,7 +886,7 @@
   }
 
   .pcm-media-pane {
-    flex: 0 0 auto;
+    flex: 0 0 авто;
     max-height: 48vh;
   }
 
@@ -866,7 +917,14 @@
   }
 
   .comments-list {
-    max-height: 260px;
+    max-height: calc(100vh - 260px);
+    overflow-y: auto;
+    overflow-x: hidden; /* 👉 отключаем горизонтальный скролл */
+    padding-right: 8px;
+  }
+
+  .pcm-sort {
+    justify-content: flex-start;
   }
 }
 
@@ -896,5 +954,9 @@
   /* на телефонах список меньше, чтобы форма не обрезалась */
   .comments-list {
     max-height: 200px;
+  }
+
+  .pcm-sort {
+    flex-wrap: wrap;
   }
 }

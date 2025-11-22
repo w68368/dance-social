@@ -127,7 +127,6 @@ router.post(
         },
       });
 
-      // Для только что созданного поста лайков и комментариев ещё нет
       const responsePost = {
         ...post,
         likesCount: 0,
@@ -166,7 +165,6 @@ router.post("/:id/like", requireAuth, async (req: AuthedRequest, res) => {
   const postId = req.params.id;
 
   try {
-    // Проверяем, есть ли уже лайк
     const existing = await prisma.postLike.findUnique({
       where: {
         userId_postId: {
@@ -179,13 +177,11 @@ router.post("/:id/like", requireAuth, async (req: AuthedRequest, res) => {
     let liked: boolean;
 
     if (existing) {
-      // Уже лайкнул → убираем лайк
       await prisma.postLike.delete({
         where: { id: existing.id },
       });
       liked = false;
     } else {
-      // Лайка не было → создаём
       await prisma.postLike.create({
         data: {
           userId: req.userId,
@@ -195,7 +191,6 @@ router.post("/:id/like", requireAuth, async (req: AuthedRequest, res) => {
       liked = true;
     }
 
-    // Пересчитываем количество лайков
     const likesCount = await prisma.postLike.count({
       where: { postId },
     });
@@ -290,7 +285,6 @@ router.patch("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
   }
 
   try {
-    // Проверяем, что комментарий существует и принадлежит пользователю
     const existing = await prisma.postComment.findUnique({
       where: { id: commentId },
       select: {
@@ -415,7 +409,6 @@ router.post(
     const { postId, commentId } = req.params;
 
     try {
-      // найдём пост и проверим, что текущий юзер — автор
       const post = await prisma.post.findUnique({
         where: { id: postId },
         select: { authorId: true },
@@ -427,7 +420,6 @@ router.post(
           .json({ ok: false, message: "Недостаточно прав" });
       }
 
-      // проверим, что комментарий принадлежит этому посту
       const comment = await prisma.postComment.findUnique({
         where: { id: commentId },
         select: { id: true, postId: true, isPinned: true },
@@ -442,14 +434,12 @@ router.post(
       let pinnedCommentId: string | null = null;
 
       if (comment.isPinned) {
-        // уже закреплён → открепляем
         await prisma.postComment.update({
           where: { id: commentId },
           data: { isPinned: false },
         });
         pinnedCommentId = null;
       } else {
-        // закрепляем этот, остальные снимаем
         await prisma.$transaction([
           prisma.postComment.updateMany({
             where: { postId, isPinned: true },
@@ -503,7 +493,6 @@ router.post(
     }
 
     try {
-      // если это ответ — проверим, что parent принадлежит тому же посту
       if (parentId) {
         const parent = await prisma.postComment.findUnique({
           where: { id: parentId },
@@ -561,23 +550,36 @@ router.post(
 
 // -----------------------------
 // GET /api/posts/:id/comments
-// Получить комментарии поста (flat-список с parentId + лайки)
+// Получить комментарии поста с сортировкой и пагинацией
 // -----------------------------
 router.get("/:id/comments", optionalAuth, async (req, res) => {
-  // даём TS саму вывести тип Request
   const { userId } = req as AuthedRequest;
   const postId = req.params.id;
 
-  const rawLimit = parseInt((req.query.limit as string) ?? "20", 10);
-  const limit = Number.isNaN(rawLimit) ? 20 : Math.min(rawLimit, 50);
+  const rawLimit = Number(req.query.limit) || 20;
+  const limit = Math.min(rawLimit, 50);
+  const cursor = typeof req.query.cursor === "string" ? req.query.cursor : null;
 
-  const cursor = req.query.cursor as string | undefined;
+  type CommentSortMode = "best" | "new" | "old";
+  const rawSort = typeof req.query.sort === "string" ? req.query.sort : "best";
+  const sort: CommentSortMode =
+    rawSort === "new" || rawSort === "old" ? rawSort : "best";
+
+  const orderBy: any[] = [{ isPinned: "desc" }];
+
+  if (sort === "best") {
+    orderBy.push({ likes: { _count: "desc" } }, { createdAt: "desc" });
+  } else if (sort === "new") {
+    orderBy.push({ createdAt: "desc" });
+  } else {
+    orderBy.push({ createdAt: "asc" });
+  }
 
   try {
     const comments = await prisma.postComment.findMany({
       where: { postId },
-      orderBy: [{ isPinned: "desc" }, { createdAt: "asc" }],
-      take: cursor ? limit + 1 : limit,
+      orderBy,
+      take: limit + 1,
       ...(cursor
         ? {
             skip: 1,
@@ -608,17 +610,12 @@ router.get("/:id/comments", optionalAuth, async (req, res) => {
     let nextCursor: string | null = null;
     let items = comments;
 
-    if (cursor && comments.length > limit) {
-      const nextItem = comments[comments.length - 1];
-      nextCursor = nextItem.id;
-      items = comments.slice(0, limit);
+    if (items.length > limit) {
+      const last = items.pop();
+      nextCursor = last ? last.id : null;
     }
 
-    if (!cursor && comments.length === limit) {
-      nextCursor = comments[comments.length - 1].id;
-    }
-
-    const result = items.map((c) => ({
+    const result = items.map((c: any) => ({
       id: c.id,
       text: c.text,
       postId: c.postId,
@@ -628,7 +625,9 @@ router.get("/:id/comments", optionalAuth, async (req, res) => {
       updatedAt: c.updatedAt,
       author: c.author,
       likesCount: c._count.likes,
-      likedByMe: userId ? c.likes.some((l) => l.userId === userId) : false,
+      likedByMe: userId
+        ? !!c.likes?.some((l: any) => l.userId === userId)
+        : false,
     }));
 
     return res.json({
@@ -647,8 +646,7 @@ router.get("/:id/comments", optionalAuth, async (req, res) => {
 
 // -----------------------------
 // GET /api/posts
-// Лента постов с количеством лайков и комментариев
-// + признак likedByMe для текущего пользователя
+// Лента постов
 // -----------------------------
 router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
   try {
@@ -670,18 +668,15 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
             comments: true,
           },
         },
-        // нужно, чтобы определить likedByMe
         likes: {
-          select: {
-            userId: true,
-          },
+          select: { userId: true },
         },
       },
     });
 
     const currentUserId = req.userId;
 
-    const shaped = posts.map((p) => ({
+    const shaped = posts.map((p: any) => ({
       id: p.id,
       caption: p.caption,
       mediaType: p.mediaType,
@@ -692,7 +687,7 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
       author: p.author,
       likesCount: p._count.likes,
       likedByMe: currentUserId
-        ? p.likes.some((l) => l.userId === currentUserId)
+        ? p.likes.some((l: any) => l.userId === currentUserId)
         : false,
       commentsCount: p._count.comments,
     }));
@@ -707,7 +702,6 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
 // -----------------------------
 // GET /api/posts/user/:userId
 // Посты одного пользователя (для профиля)
-// тоже с likedByMe и количеством комментариев
 // -----------------------------
 router.get("/user/:userId", optionalAuth, async (req: AuthedRequest, res) => {
   try {
@@ -732,16 +726,14 @@ router.get("/user/:userId", optionalAuth, async (req: AuthedRequest, res) => {
           },
         },
         likes: {
-          select: {
-            userId: true,
-          },
+          select: { userId: true },
         },
       },
     });
 
     const currentUserId = req.userId;
 
-    const shaped = posts.map((p) => ({
+    const shaped = posts.map((p: any) => ({
       id: p.id,
       caption: p.caption,
       mediaType: p.mediaType,
@@ -752,7 +744,7 @@ router.get("/user/:userId", optionalAuth, async (req: AuthedRequest, res) => {
       author: p.author,
       likesCount: p._count.likes,
       likedByMe: currentUserId
-        ? p.likes.some((l) => l.userId === currentUserId)
+        ? p.likes.some((l: any) => l.userId === currentUserId)
         : false,
       commentsCount: p._count.comments,
     }));
