@@ -1,5 +1,14 @@
+// apps/web/src/components/PostCommentsModal.tsx
+import type React from "react";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { FaTimes, FaRegCommentDots, FaHeart, FaRegHeart } from "react-icons/fa";
+import {
+  FaTimes,
+  FaRegCommentDots,
+  FaHeart,
+  FaRegHeart,
+  FaEdit,
+  FaTrash,
+} from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import type { Post, PostComment, ApiUserSummary } from "../api";
 import {
@@ -7,6 +16,8 @@ import {
   addComment,
   toggleCommentLike,
   togglePinComment,
+  editComment,
+  deleteComment,
 } from "../api";
 import { getUser } from "../lib/auth";
 import "../styles/components/comments-modal.css";
@@ -30,28 +41,89 @@ export default function PostCommentsModal({
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState("");
 
+  // пагинация
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   // ответ на конкретный комментарий (для подсказки + @ник)
   const [replyTo, setReplyTo] = useState<PostComment | null>(null);
   // id того комментария, к которому реально привязываем ответ (всегда root)
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
+
+  // редактирование комментария
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [editingSending, setEditingSending] = useState(false);
+
+  // какие треды (root-комменты) свёрнуты
+  const [collapsedThreads, setCollapsedThreads] = useState<
+    Record<string, boolean>
+  >({});
+
+  // 🔒 анти-флуд
+  const [lastSendAt, setLastSendAt] = useState<number | null>(null);
+  const [lastText, setLastText] = useState<string>("");
+
+  // кастомный тост
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  // кастомный диалог удаления
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteSending, setDeleteSending] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
   const me = getUser();
   const isPostOwner = !!(me && post && me.id === post.author.id);
 
-  // загрузка комментариев
+  // форматирование времени
+  const formatRelativeTime = (iso: string) => {
+    if (!iso) return "";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHours = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSec < 60) return "только что";
+    if (diffMin < 60) return `${diffMin} мин назад`;
+    if (diffHours < 24) return `${diffHours} ч назад`;
+    if (diffDays === 1) return "вчера";
+    if (diffDays < 7) return `${diffDays} дн назад`;
+    return date.toLocaleDateString();
+  };
+
+  // загрузка первой страницы комментариев
   useEffect(() => {
     if (!isOpen || !post) return;
 
     let alive = true;
     setLoading(true);
     setError(null);
+    setComments([]);
+    setNextCursor(null);
+    setReplyTo(null);
+    setReplyParentId(null);
+    setEditingId(null);
+    setEditingText("");
+    setToast(null);
+    setDeleteTargetId(null);
+    setCollapsedThreads({});
+    setLastSendAt(null);
+    setLastText("");
 
     fetchComments(post.id)
-      .then((list) => {
+      .then((page) => {
         if (!alive) return;
-        setComments(list);
+        setComments(page.comments);
+        setNextCursor(page.nextCursor);
       })
       .catch(() => {
         if (!alive) return;
@@ -66,6 +138,40 @@ export default function PostCommentsModal({
       alive = false;
     };
   }, [isOpen, post?.id]);
+
+  // авто-скрытие тоста
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 2500);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+
+  // догрузка следующей страницы
+  const handleLoadMore = async () => {
+    if (!post || !nextCursor || loadingMore) return;
+
+    setLoadingMore(true);
+    try {
+      const page = await fetchComments(post.id, nextCursor);
+
+      setComments((prev) => {
+        const existingIds = new Set(prev.map((c) => c.id));
+        const merged = [...prev];
+        for (const c of page.comments) {
+          if (!existingIds.has(c.id)) {
+            merged.push(c);
+          }
+        }
+        return merged;
+      });
+
+      setNextCursor(page.nextCursor);
+    } catch (e) {
+      console.error("Failed to load more comments", e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // фокус на поле ввода при выборе "Ответить"
   useEffect(() => {
@@ -100,7 +206,29 @@ export default function PostCommentsModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!post || !text.trim()) return;
+    if (!post) return;
+
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    // 🔒 анти-флуд: не чаще, чем раз в 4 секунды
+    const now = Date.now();
+    if (lastSendAt && now - lastSendAt < 4000) {
+      setToast({
+        type: "error",
+        message: "Слишком часто 😅 Подожди пару секунд.",
+      });
+      return;
+    }
+
+    // 🔒 анти-флуд: не спамить одним и тем же текстом подряд
+    if (lastText && trimmed === lastText) {
+      setToast({
+        type: "error",
+        message: "Точно такой же комментарий уже отправлен.",
+      });
+      return;
+    }
 
     try {
       setSending(true);
@@ -108,7 +236,7 @@ export default function PostCommentsModal({
 
       const newComment = await addComment(
         post.id,
-        text.trim(),
+        trimmed,
         replyParentId ?? undefined
       );
 
@@ -116,6 +244,8 @@ export default function PostCommentsModal({
       setText("");
       setReplyTo(null);
       setReplyParentId(null);
+      setLastSendAt(now);
+      setLastText(trimmed);
       onCommentAdded?.();
     } catch {
       setError("Не удалось отправить комментарий");
@@ -180,6 +310,88 @@ export default function PostCommentsModal({
     }
   };
 
+  // редактирование
+  const startEdit = (c: PostComment) => {
+    if (!me || c.author.id !== me.id) return;
+    setEditingId(c.id);
+    setEditingText(c.text);
+    // отменяем режим ответа, чтобы не путать UI
+    setReplyTo(null);
+    setReplyParentId(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingText("");
+    setEditingSending(false);
+  };
+
+  const submitEdit = async (commentId: string) => {
+    if (!editingText.trim()) return;
+
+    try {
+      setEditingSending(true);
+      const updated = await editComment(commentId, editingText.trim());
+
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? updated : c))
+      );
+      cancelEdit();
+      setToast({ type: "success", message: "Комментарий обновлён" });
+    } catch (e) {
+      console.error("Failed to edit comment", e);
+      setToast({
+        type: "error",
+        message: "Не удалось обновить комментарий",
+      });
+    } finally {
+      setEditingSending(false);
+    }
+  };
+
+  // открыть кастомное подтверждение удаления
+  const openDeleteConfirm = (commentId: string) => {
+    setDeleteTargetId(commentId);
+  };
+
+  const cancelDeleteConfirm = () => {
+    if (deleteSending) return;
+    setDeleteTargetId(null);
+  };
+
+  // выполняем удаление после подтверждения
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      setDeleteSending(true);
+      await deleteComment(commentId);
+
+      setComments((prev) =>
+        prev.filter((c) => c.id !== commentId && c.parentId !== commentId)
+      );
+      if (editingId === commentId) {
+        cancelEdit();
+      }
+      setToast({ type: "success", message: "Комментарий удалён" });
+    } catch (e) {
+      console.error("Failed to delete comment", e);
+      setToast({
+        type: "error",
+        message: "Не удалось удалить комментарий",
+      });
+    } finally {
+      setDeleteSending(false);
+      setDeleteTargetId(null);
+    }
+  };
+
+  // сворачивание / разворачивание треда
+  const toggleThreadCollapsed = (rootId: string) => {
+    setCollapsedThreads((prev) => ({
+      ...prev,
+      [rootId]: !prev[rootId],
+    }));
+  };
+
   if (!isOpen || !post) return null;
 
   const createdAt = new Date(post.createdAt);
@@ -204,6 +416,8 @@ export default function PostCommentsModal({
     const parentId = c.parentId ?? c.id; // root для треда
     setReplyTo(c);
     setReplyParentId(parentId);
+    setEditingId(null);
+    setEditingText("");
 
     if (!text.startsWith(`@${c.author.username}`)) {
       setText(`@${c.author.username} `);
@@ -284,6 +498,19 @@ export default function PostCommentsModal({
           </header>
 
           <div className="pcm-content">
+            {/* Тост-уведомление */}
+            {toast && (
+              <div
+                className={`pcm-toast ${
+                  toast.type === "success"
+                    ? "pcm-toast--success"
+                    : "pcm-toast--error"
+                }`}
+              >
+                {toast.message}
+              </div>
+            )}
+
             {/* Список комментариев */}
             <div className="pcm-comments-block">
               {loading ? (
@@ -295,163 +522,368 @@ export default function PostCommentsModal({
                   Пока нет комментариев — стань первым ✨
                 </div>
               ) : (
-                <ul className="pcm-list">
-                  {[...pinnedRoots, ...regularRoots].map((c) => {
-                    const replies = repliesByParent.get(c.id) ?? [];
-                    const rootAuthorName =
-                      c.author.displayName || c.author.username;
+                <div className="comments-list-wrapper">
+                  <ul className="pcm-list comments-list">
+                    {[...pinnedRoots, ...regularRoots].map((c) => {
+                      const replies = repliesByParent.get(c.id) ?? [];
+                      const rootAuthorName =
+                        c.author.displayName || c.author.username;
 
-                    return (
-                      <li
-                        key={c.id}
-                        className={
-                          "pcm-item" + (c.isPinned ? " pcm-item--pinned" : "")
-                        }
-                      >
-                        <div className="pcm-avatar">
-                          {c.author.avatarUrl ? (
-                            <img
-                              src={c.author.avatarUrl}
-                              alt={rootAuthorName}
-                            />
-                          ) : (
-                            <div className="pcm-avatar-fallback">
-                              {rootAuthorName[0]?.toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-                        <div className="pcm-body">
-                          <div className="pcm-meta">
-                            <span className="pcm-username">
-                              {rootAuthorName}
-                            </span>
-                            {isPostAuthor(c) && (
-                              <span className="pcm-author-badge">Автор</span>
-                            )}
-                            {c.isPinned && (
-                              <span className="pcm-pinned-badge">
-                                Закреплён
-                              </span>
+                      const isOwnRoot = me && c.author.id === me.id;
+                      const isCollapsed = collapsedThreads[c.id] ?? false;
+                      const isEdited =
+                        !!c.updatedAt &&
+                        c.updatedAt !== c.createdAt &&
+                        new Date(c.updatedAt).getTime() >
+                          new Date(c.createdAt).getTime();
+
+                      return (
+                        <li
+                          key={c.id}
+                          className={
+                            "pcm-item" + (c.isPinned ? " pcm-item--pinned" : "")
+                          }
+                        >
+                          <div className="pcm-avatar">
+                            {c.author.avatarUrl ? (
+                              <img
+                                src={c.author.avatarUrl}
+                                alt={rootAuthorName}
+                              />
+                            ) : (
+                              <div className="pcm-avatar-fallback">
+                                {rootAuthorName[0]?.toUpperCase()}
+                              </div>
                             )}
                           </div>
-                          <div className="pcm-text">
-                            {formatTextWithMentions(c.text)}
-                          </div>
-                          <div className="pcm-comment-actions">
-                            <button
-                              type="button"
-                              className="pcm-reply-btn"
-                              onClick={() => startReply(c)}
-                            >
-                              Ответить
-                            </button>
-                            <button
-                              type="button"
-                              className={`pcm-comment-like-btn ${
-                                c.likedByMe
-                                  ? "pcm-comment-like-btn--active"
-                                  : ""
-                              }`}
-                              onClick={() => handleToggleCommentLike(c.id)}
-                            >
-                              {c.likedByMe ? (
-                                <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
-                              ) : (
-                                <FaRegHeart className="pcm-comment-like-icon" />
-                              )}
-                              <span className="pcm-comment-like-count">
-                                {c.likesCount}
-                              </span>
-                            </button>
-
-                            {isPostOwner && !c.parentId && (
+                          <div className="pcm-body">
+                            {/* верхняя строка: имя + бейджи слева, лайк справа */}
+                            <div className="pcm-row-top">
+                              <div className="pcm-meta">
+                                <span className="pcm-username">
+                                  {rootAuthorName}
+                                </span>
+                                {isPostAuthor(c) && (
+                                  <span className="pcm-author-badge">
+                                    Автор
+                                  </span>
+                                )}
+                                {c.isPinned && (
+                                  <span className="pcm-pinned-badge">
+                                    Закреплён
+                                  </span>
+                                )}
+                              </div>
                               <button
                                 type="button"
-                                className="pcm-pin-btn"
-                                onClick={() => handleTogglePin(c.id)}
+                                className={`pcm-comment-like-btn ${
+                                  c.likedByMe
+                                    ? "pcm-comment-like-btn--active"
+                                    : ""
+                                }`}
+                                onClick={() => handleToggleCommentLike(c.id)}
                               >
-                                {c.isPinned ? "Открепить" : "Закрепить"}
+                                {c.likedByMe ? (
+                                  <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
+                                ) : (
+                                  <FaRegHeart className="pcm-comment-like-icon" />
+                                )}
+                                <span className="pcm-comment-like-count">
+                                  {c.likesCount}
+                                </span>
                               </button>
-                            )}
-                          </div>
+                            </div>
 
-                          {replies.length > 0 && (
-                            <ul className="pcm-replies">
-                              {replies.map((r) => {
-                                const replyAuthorName =
-                                  r.author.displayName || r.author.username;
-
-                                return (
-                                  <li
-                                    key={r.id}
-                                    className="pcm-item pcm-item-reply"
+                            {/* Текст или режим редактирования */}
+                            {editingId === c.id ? (
+                              <div className="pcm-edit-block">
+                                <input
+                                  className="pcm-edit-input"
+                                  type="text"
+                                  value={editingText}
+                                  maxLength={500}
+                                  onChange={(e) =>
+                                    setEditingText(e.target.value)
+                                  }
+                                  autoFocus
+                                />
+                                <div className="pcm-edit-actions">
+                                  <button
+                                    type="button"
+                                    className="pcm-edit-save"
+                                    disabled={
+                                      editingSending || !editingText.trim()
+                                    }
+                                    onClick={() => submitEdit(c.id)}
                                   >
-                                    <div className="pcm-avatar pcm-avatar-reply">
-                                      {r.author.avatarUrl ? (
-                                        <img
-                                          src={r.author.avatarUrl}
-                                          alt={replyAuthorName}
-                                        />
-                                      ) : (
-                                        <div className="pcm-avatar-fallback">
-                                          {replyAuthorName[0]?.toUpperCase()}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="pcm-body">
-                                      <div className="pcm-meta">
-                                        <span className="pcm-username">
-                                          {replyAuthorName}
-                                        </span>
-                                        {isPostAuthor(r) && (
-                                          <span className="pcm-author-badge">
-                                            Автор
-                                          </span>
+                                    Сохранить
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="pcm-edit-cancel"
+                                    onClick={cancelEdit}
+                                    disabled={editingSending}
+                                  >
+                                    Отмена
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="pcm-text">
+                                {formatTextWithMentions(c.text)}
+                              </div>
+                            )}
+
+                            {/* нижняя строка: Ответить слева, время + иконки справа */}
+                            <div className="pcm-row-bottom">
+                              <button
+                                type="button"
+                                className="pcm-reply-inline"
+                                onClick={() => startReply(c)}
+                              >
+                                Ответить
+                              </button>
+
+                              <div className="pcm-row-bottom-right">
+                                <span className="pcm-time">
+                                  {formatRelativeTime(c.createdAt)}
+                                </span>
+                                {isEdited && (
+                                  <span className="pcm-edited">· изменено</span>
+                                )}
+
+                                <div className="pcm-inline-actions">
+                                  {isOwnRoot && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="pcm-icon-btn pcm-edit-btn"
+                                        onClick={() => startEdit(c)}
+                                        aria-label="Редактировать комментарий"
+                                        title="Редактировать"
+                                      >
+                                        <FaEdit />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="pcm-icon-btn pcm-delete-btn pcm-icon-btn--danger"
+                                        onClick={() => openDeleteConfirm(c.id)}
+                                        aria-label="Удалить комментарий"
+                                        title="Удалить"
+                                      >
+                                        <FaTrash />
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {isPostOwner && !c.parentId && (
+                                    <button
+                                      type="button"
+                                      className="pcm-pin-link"
+                                      onClick={() => handleTogglePin(c.id)}
+                                    >
+                                      {c.isPinned ? "Открепить" : "Закрепить"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Тогглер треда, если есть ответы */}
+                            {replies.length > 0 && (
+                              <div className="pcm-thread-toggle-row">
+                                <button
+                                  type="button"
+                                  className="pcm-thread-toggle-btn"
+                                  onClick={() => toggleThreadCollapsed(c.id)}
+                                >
+                                  {isCollapsed
+                                    ? `Показать ответы (${replies.length})`
+                                    : `Скрыть ответы (${replies.length})`}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Ответы */}
+                            {replies.length > 0 && !isCollapsed && (
+                              <ul className="pcm-replies">
+                                {replies.map((r) => {
+                                  const replyAuthorName =
+                                    r.author.displayName || r.author.username;
+                                  const isOwnReply =
+                                    me && r.author.id === me.id;
+
+                                  const replyEdited =
+                                    !!r.updatedAt &&
+                                    r.updatedAt !== r.createdAt &&
+                                    new Date(r.updatedAt).getTime() >
+                                      new Date(r.createdAt).getTime();
+
+                                  return (
+                                    <li
+                                      key={r.id}
+                                      className="pcm-item pcm-item-reply"
+                                    >
+                                      <div className="pcm-avatar pcm-avatar-reply">
+                                        {r.author.avatarUrl ? (
+                                          <img
+                                            src={r.author.avatarUrl}
+                                            alt={replyAuthorName}
+                                          />
+                                        ) : (
+                                          <div className="pcm-avatar-fallback">
+                                            {replyAuthorName[0]?.toUpperCase()}
+                                          </div>
                                         )}
                                       </div>
-                                      <div className="pcm-text">
-                                        {formatTextWithMentions(r.text)}
+                                      <div className="pcm-body">
+                                        <div className="pcm-row-top">
+                                          <div className="pcm-meta">
+                                            <span className="pcm-username">
+                                              {replyAuthorName}
+                                            </span>
+                                            {isPostAuthor(r) && (
+                                              <span className="pcm-author-badge">
+                                                Автор
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <button
+                                            type="button"
+                                            className={`pcm-comment-like-btn ${
+                                              r.likedByMe
+                                                ? "pcm-comment-like-btn--active"
+                                                : ""
+                                            }`}
+                                            onClick={() =>
+                                              handleToggleCommentLike(r.id)
+                                            }
+                                          >
+                                            {r.likedByMe ? (
+                                              <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
+                                            ) : (
+                                              <FaRegHeart className="pcm-comment-like-icon" />
+                                            )}
+                                            <span className="pcm-comment-like-count">
+                                              {r.likesCount}
+                                            </span>
+                                          </button>
+                                        </div>
+
+                                        {editingId === r.id ? (
+                                          <div className="pcm-edit-block">
+                                            <input
+                                              className="pcm-edit-input"
+                                              type="text"
+                                              value={editingText}
+                                              maxLength={500}
+                                              onChange={(e) =>
+                                                setEditingText(e.target.value)
+                                              }
+                                              autoFocus
+                                            />
+                                            <div className="pcm-edit-actions">
+                                              <button
+                                                type="button"
+                                                className="pcm-edit-save"
+                                                disabled={
+                                                  editingSending ||
+                                                  !editingText.trim()
+                                                }
+                                                onClick={() => submitEdit(r.id)}
+                                              >
+                                                Сохранить
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className="pcm-edit-cancel"
+                                                onClick={cancelEdit}
+                                                disabled={editingSending}
+                                              >
+                                                Отмена
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="pcm-text">
+                                            {formatTextWithMentions(r.text)}
+                                          </div>
+                                        )}
+
+                                        <div className="pcm-row-bottom">
+                                          <button
+                                            type="button"
+                                            className="pcm-reply-inline"
+                                            onClick={() => startReply(r)}
+                                          >
+                                            Ответить
+                                          </button>
+
+                                          <div className="pcm-row-bottom-right">
+                                            <span className="pcm-time">
+                                              {formatRelativeTime(r.createdAt)}
+                                            </span>
+                                            {replyEdited && (
+                                              <span className="pcm-edited">
+                                                · изменено
+                                              </span>
+                                            )}
+
+                                            <div className="pcm-inline-actions">
+                                              {isOwnReply && (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    className="pcm-icon-btn pcm-edit-btn"
+                                                    onClick={() => startEdit(r)}
+                                                    aria-label="Редактировать комментарий"
+                                                    title="Редактировать"
+                                                  >
+                                                    <FaEdit />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className="pcm-icon-btn pcm-delete-btn pcm-icon-btn--danger"
+                                                    onClick={() =>
+                                                      openDeleteConfirm(r.id)
+                                                    }
+                                                    aria-label="Удалить комментарий"
+                                                    title="Удалить"
+                                                  >
+                                                    <FaTrash />
+                                                  </button>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
                                       </div>
-                                      <div className="pcm-comment-actions">
-                                        <button
-                                          type="button"
-                                          className="pcm-reply-btn"
-                                          onClick={() => startReply(r)}
-                                        >
-                                          Ответить
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={`pcm-comment-like-btn ${
-                                            r.likedByMe
-                                              ? "pcm-comment-like-btn--active"
-                                              : ""
-                                          }`}
-                                          onClick={() =>
-                                            handleToggleCommentLike(r.id)
-                                          }
-                                        >
-                                          {r.likedByMe ? (
-                                            <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
-                                          ) : (
-                                            <FaRegHeart className="pcm-comment-like-icon" />
-                                          )}
-                                          <span className="pcm-comment-like-count">
-                                            {r.likesCount}
-                                          </span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {nextCursor && (
+                    <div className="comments-more">
+                      <div className="comments-gradient-bottom" />
+                      <button
+                        type="button"
+                        className="comments-more-button"
+                        onClick={handleLoadMore}
+                        disabled={loadingMore}
+                      >
+                        {loadingMore ? "Загружаем…" : "Показать ещё"}
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -496,6 +928,36 @@ export default function PostCommentsModal({
               </div>
             </div>
           </div>
+
+          {/* Кастомный диалог подтверждения удаления */}
+          {deleteTargetId && (
+            <div className="pcm-confirm-backdrop">
+              <div className="pcm-confirm">
+                <div className="pcm-confirm-title">Удалить комментарий?</div>
+                <div className="pcm-confirm-text">
+                  Это действие нельзя отменить.
+                </div>
+                <div className="pcm-confirm-actions">
+                  <button
+                    type="button"
+                    className="pcm-confirm-delete"
+                    onClick={() => handleDeleteComment(deleteTargetId)}
+                    disabled={deleteSending}
+                  >
+                    {deleteSending ? "Удаляем…" : "Да, удалить"}
+                  </button>
+                  <button
+                    type="button"
+                    className="pcm-confirm-cancel"
+                    onClick={cancelDeleteConfirm}
+                    disabled={deleteSending}
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

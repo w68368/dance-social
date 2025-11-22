@@ -270,6 +270,137 @@ router.post(
 );
 
 // -----------------------------
+// PATCH /api/posts/comments/:id
+// Редактирование своего комментария
+// -----------------------------
+router.patch("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
+  if (!req.userId) {
+    return res.status(401).json({ ok: false, message: "Unauthorized" });
+  }
+
+  const commentId = req.params.id;
+  const rawText = typeof req.body.text === "string" ? req.body.text : "";
+  const parsed = commentSchema.safeParse(rawText);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Неверный комментарий",
+    });
+  }
+
+  try {
+    // Проверяем, что комментарий существует и принадлежит пользователю
+    const existing = await prisma.postComment.findUnique({
+      where: { id: commentId },
+      select: {
+        id: true,
+        authorId: true,
+      },
+    });
+
+    if (!existing) {
+      return res
+        .status(404)
+        .json({ ok: false, message: "Комментарий не найден" });
+    }
+
+    if (existing.authorId !== req.userId) {
+      return res.status(403).json({
+        ok: false,
+        message: "Можно редактировать только свои комментарии",
+      });
+    }
+
+    const updated = await prisma.postComment.update({
+      where: { id: commentId },
+      data: { text: parsed.data },
+      include: {
+        author: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        likes: {
+          where: { userId: req.userId },
+          select: { userId: true },
+        },
+        _count: {
+          select: { likes: true },
+        },
+      },
+    });
+
+    const shaped = {
+      id: updated.id,
+      text: updated.text,
+      postId: updated.postId,
+      parentId: updated.parentId,
+      isPinned: updated.isPinned,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+      author: updated.author,
+      likesCount: updated._count.likes,
+      likedByMe: updated.likes.length > 0,
+    };
+
+    return res.json({ ok: true, comment: shaped });
+  } catch (err) {
+    console.error("Edit comment error:", err);
+    return res
+      .status(500)
+      .json({ ok: false, message: "Не удалось обновить комментарий" });
+  }
+});
+
+// -----------------------------
+// DELETE /api/posts/comments/:id
+// Удаление своего комментария
+// -----------------------------
+router.delete("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
+  if (!req.userId) {
+    return res.status(401).json({ ok: false, message: "Unauthorized" });
+  }
+
+  const commentId = req.params.id;
+
+  try {
+    const existing = await prisma.postComment.findUnique({
+      where: { id: commentId },
+      select: {
+        id: true,
+        authorId: true,
+      },
+    });
+
+    if (!existing) {
+      return res
+        .status(404)
+        .json({ ok: false, message: "Комментарий не найден" });
+    }
+
+    if (existing.authorId !== req.userId) {
+      return res.status(403).json({
+        ok: false,
+        message: "Можно удалять только свои комментарии",
+      });
+    }
+
+    await prisma.postComment.delete({ where: { id: commentId } });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Delete comment error:", err);
+    return res
+      .status(500)
+      .json({ ok: false, message: "Не удалось удалить комментарий" });
+  }
+});
+
+// -----------------------------
 // POST /api/posts/:postId/comments/:commentId/pin
 // Автор поста закрепляет / открепляет комментарий
 // -----------------------------
@@ -432,17 +563,27 @@ router.post(
 // GET /api/posts/:id/comments
 // Получить комментарии поста (flat-список с parentId + лайки)
 // -----------------------------
-router.get("/:id/comments", optionalAuth, async (req: AuthedRequest, res) => {
+router.get("/:id/comments", optionalAuth, async (req, res) => {
+  // даём TS саму вывести тип Request
+  const { userId } = req as AuthedRequest;
   const postId = req.params.id;
-  const currentUserId = req.userId ?? null;
+
+  const rawLimit = parseInt((req.query.limit as string) ?? "20", 10);
+  const limit = Number.isNaN(rawLimit) ? 20 : Math.min(rawLimit, 50);
+
+  const cursor = req.query.cursor as string | undefined;
 
   try {
     const comments = await prisma.postComment.findMany({
       where: { postId },
-      orderBy: [
-        { isPinned: "desc" }, // 🆕 сначала закреплённые
-        { createdAt: "asc" },
-      ],
+      orderBy: [{ isPinned: "desc" }, { createdAt: "asc" }],
+      take: cursor ? limit + 1 : limit,
+      ...(cursor
+        ? {
+            skip: 1,
+            cursor: { id: cursor },
+          }
+        : {}),
       include: {
         author: {
           select: {
@@ -452,32 +593,55 @@ router.get("/:id/comments", optionalAuth, async (req: AuthedRequest, res) => {
             avatarUrl: true,
           },
         },
-        likes: true,
+        likes: userId
+          ? {
+              where: { userId },
+              select: { userId: true },
+            }
+          : false,
         _count: {
           select: { likes: true },
         },
       },
     });
 
-    const shaped = comments.map((c) => ({
+    let nextCursor: string | null = null;
+    let items = comments;
+
+    if (cursor && comments.length > limit) {
+      const nextItem = comments[comments.length - 1];
+      nextCursor = nextItem.id;
+      items = comments.slice(0, limit);
+    }
+
+    if (!cursor && comments.length === limit) {
+      nextCursor = comments[comments.length - 1].id;
+    }
+
+    const result = items.map((c) => ({
       id: c.id,
       text: c.text,
-      createdAt: c.createdAt,
-      author: c.author,
+      postId: c.postId,
       parentId: c.parentId,
-      likesCount: c._count.likes,
-      likedByMe: currentUserId
-        ? c.likes.some((l) => l.userId === currentUserId)
-        : false,
       isPinned: c.isPinned,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      author: c.author,
+      likesCount: c._count.likes,
+      likedByMe: userId ? c.likes.some((l) => l.userId === userId) : false,
     }));
 
-    res.json({ ok: true, comments: shaped });
-  } catch (err) {
-    console.error("Fetch comments error:", err);
-    res
-      .status(500)
-      .json({ ok: false, message: "Не удалось загрузить комментарии" });
+    return res.json({
+      ok: true,
+      comments: result,
+      nextCursor,
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({
+      ok: false,
+      message: "Failed to load comments",
+    });
   }
 });
 

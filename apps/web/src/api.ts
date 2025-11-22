@@ -154,6 +154,8 @@ export interface PostComment {
   id: string;
   text: string;
   createdAt: string;
+  updatedAt?: string;
+  postId: string;
   author: ApiUserSummary;
   parentId?: string | null;
 
@@ -162,6 +164,11 @@ export interface PostComment {
   likedByMe: boolean;
 
   isPinned: boolean;
+}
+
+export interface CommentsPage {
+  comments: PostComment[];
+  nextCursor: string | null;
 }
 
 // Статистика подписок
@@ -210,6 +217,10 @@ export function toggleLike(postId: string) {
   );
 }
 
+// ----------------------------------------------------
+// Comments + likes/pin/edit/delete
+// ----------------------------------------------------
+
 // Лайк / Unlike (toggle) комментария
 export function toggleCommentLike(commentId: string) {
   return api.post<{ ok: boolean; liked: boolean; likesCount: number }>(
@@ -224,16 +235,30 @@ export function togglePinComment(postId: string, commentId: string) {
   );
 }
 
-// ----------------------------------------------------
-// Comments
-// ----------------------------------------------------
-export async function fetchComments(postId: string): Promise<PostComment[]> {
-  const { data } = await api.get<{ ok: boolean; comments: PostComment[] }>(
-    `/posts/${postId}/comments`
-  );
-  return data.comments ?? [];
+// Получить страницу комментариев с пагинацией
+export async function fetchComments(
+  postId: string,
+  cursor?: string | null,
+  limit = 20
+): Promise<CommentsPage> {
+  const params: Record<string, string | number> = { limit };
+  if (cursor) params.cursor = cursor;
+
+  const { data } = await api.get<{
+    ok: boolean;
+    comments: PostComment[];
+    nextCursor: string | null;
+  }>(`/posts/${postId}/comments`, {
+    params,
+  });
+
+  return {
+    comments: data.comments ?? [],
+    nextCursor: data.nextCursor ?? null,
+  };
 }
 
+// Добавить комментарий
 export async function addComment(
   postId: string,
   text: string,
@@ -247,6 +272,23 @@ export async function addComment(
     payload
   );
   return data.comment;
+}
+
+// Редактировать свой комментарий
+export async function editComment(
+  commentId: string,
+  text: string
+): Promise<PostComment> {
+  const { data } = await api.patch<{ ok: boolean; comment: PostComment }>(
+    `/posts/comments/${commentId}`,
+    { text: text.trim() }
+  );
+  return data.comment;
+}
+
+// Удалить свой комментарий
+export function deleteComment(commentId: string) {
+  return api.delete<{ ok: boolean }>(`/posts/comments/${commentId}`);
 }
 
 // ----------------------------------------------------
