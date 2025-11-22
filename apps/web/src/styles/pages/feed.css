@@ -1,5 +1,5 @@
 .feed-container {
-  max-width: 800px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -22,15 +22,17 @@
 .feed-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
   margin-top: 16px;
 }
 
 .feed-card {
-  padding: 16px;
-  border-radius: 16px;
+  padding: 18px 18px 14px;
+  border-radius: 18px;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--ring);
+  max-width: 600px; /* 🔥 ключевое */
+  margin: 0 auto; /* центрируем */
 }
 
 /* header */
@@ -38,7 +40,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .feed-user {
@@ -84,26 +86,45 @@
 }
 
 /* media */
+/* сам элемент <video>/<img> имеет классы feed-media + feed-media-video/feed-media-image */
+/* контейнер медиа */
 .feed-media {
   width: 100%;
-  border-radius: 16px;
-  margin-top: 8px;
+  border-radius: 18px;
+  overflow: hidden;
+  margin-top: 12px;
+  background: #000;
+  display: flex;
+  justify-content: center;
+}
+
+/* видео и картинки на всю ширину карточки */
+.feed-media-video,
+.feed-media-image {
+  width: 100%;
+  height: 100%;
   display: block;
 }
 
+/* вертикальные и горизонтальные видео заполняют блок без огромных рамок */
 .feed-media-video {
-  max-height: 420px;
+  width: 100%;
+  height: auto;
+  max-height: 80vh;
+  object-fit: contain; /* 🔥 вместо cover */
+  border-radius: 18px;
 }
 
+/* изображения тоже без лишних полей */
 .feed-media-image {
-  max-height: 720px;
+  max-height: 70vh;
   object-fit: cover;
 }
 
 /* caption */
 .feed-caption {
   white-space: pre-wrap;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 /* footer */

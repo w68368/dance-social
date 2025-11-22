@@ -100,6 +100,7 @@ app.get("/api/users/:id", async (req, res) => {
       select: {
         id: true,
         username: true,
+        displayName: true, // ✅ теперь отдаем displayName
         avatarUrl: true,
       },
     });

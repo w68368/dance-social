@@ -214,6 +214,135 @@ router.post("/:id/like", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 // -----------------------------
+// POST /api/posts/comments/:commentId/like
+// Тоггл лайка на комментарий
+// -----------------------------
+router.post(
+  "/comments/:commentId/like",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    if (!req.userId) {
+      return res.status(401).json({ ok: false, message: "Unauthorized" });
+    }
+
+    const commentId = req.params.commentId;
+
+    try {
+      const existing = await prisma.commentLike.findUnique({
+        where: {
+          userId_commentId: {
+            userId: req.userId,
+            commentId,
+          },
+        },
+      });
+
+      let liked: boolean;
+
+      if (existing) {
+        await prisma.commentLike.delete({
+          where: { id: existing.id },
+        });
+        liked = false;
+      } else {
+        await prisma.commentLike.create({
+          data: {
+            userId: req.userId,
+            commentId,
+          },
+        });
+        liked = true;
+      }
+
+      const likesCount = await prisma.commentLike.count({
+        where: { commentId },
+      });
+
+      return res.json({ ok: true, liked, likesCount });
+    } catch (err) {
+      console.error("Toggle comment like error:", err);
+      return res.status(500).json({
+        ok: false,
+        message: "Не удалось обновить лайк комментария",
+      });
+    }
+  }
+);
+
+// -----------------------------
+// POST /api/posts/:postId/comments/:commentId/pin
+// Автор поста закрепляет / открепляет комментарий
+// -----------------------------
+router.post(
+  "/:postId/comments/:commentId/pin",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    if (!req.userId) {
+      return res.status(401).json({ ok: false, message: "Unauthorized" });
+    }
+
+    const { postId, commentId } = req.params;
+
+    try {
+      // найдём пост и проверим, что текущий юзер — автор
+      const post = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { authorId: true },
+      });
+
+      if (!post || post.authorId !== req.userId) {
+        return res
+          .status(403)
+          .json({ ok: false, message: "Недостаточно прав" });
+      }
+
+      // проверим, что комментарий принадлежит этому посту
+      const comment = await prisma.postComment.findUnique({
+        where: { id: commentId },
+        select: { id: true, postId: true, isPinned: true },
+      });
+
+      if (!comment || comment.postId !== postId) {
+        return res
+          .status(400)
+          .json({ ok: false, message: "Комментарий не найден у этого поста" });
+      }
+
+      let pinnedCommentId: string | null = null;
+
+      if (comment.isPinned) {
+        // уже закреплён → открепляем
+        await prisma.postComment.update({
+          where: { id: commentId },
+          data: { isPinned: false },
+        });
+        pinnedCommentId = null;
+      } else {
+        // закрепляем этот, остальные снимаем
+        await prisma.$transaction([
+          prisma.postComment.updateMany({
+            where: { postId, isPinned: true },
+            data: { isPinned: false },
+          }),
+          prisma.postComment.update({
+            where: { id: commentId },
+            data: { isPinned: true },
+          }),
+        ]);
+        pinnedCommentId = commentId;
+      }
+
+      return res.json({ ok: true, pinnedCommentId });
+    } catch (err) {
+      console.error("Pin comment error:", err);
+      return res
+        .status(500)
+        .json({ ok: false, message: "Не удалось обновить закреп комментария" });
+    }
+  }
+);
+
+// -----------------------------
 // POST /api/posts/:id/comments
 // Добавить комментарий к посту (опционально ответ на другой комментарий)
 // -----------------------------
@@ -278,7 +407,18 @@ router.post(
         },
       });
 
-      res.json({ ok: true, comment });
+      const shaped = {
+        id: comment.id,
+        text: comment.text,
+        createdAt: comment.createdAt,
+        author: comment.author,
+        parentId: comment.parentId,
+        likesCount: 0,
+        likedByMe: false,
+        isPinned: false,
+      };
+
+      res.json({ ok: true, comment: shaped });
     } catch (err) {
       console.error("Create comment error:", err);
       res
@@ -290,15 +430,19 @@ router.post(
 
 // -----------------------------
 // GET /api/posts/:id/comments
-// Получить комментарии поста (flat-список с parentId)
+// Получить комментарии поста (flat-список с parentId + лайки)
 // -----------------------------
-router.get("/:id/comments", async (req, res) => {
+router.get("/:id/comments", optionalAuth, async (req: AuthedRequest, res) => {
   const postId = req.params.id;
+  const currentUserId = req.userId ?? null;
 
   try {
     const comments = await prisma.postComment.findMany({
       where: { postId },
-      orderBy: { createdAt: "asc" },
+      orderBy: [
+        { isPinned: "desc" }, // 🆕 сначала закреплённые
+        { createdAt: "asc" },
+      ],
       include: {
         author: {
           select: {
@@ -308,10 +452,27 @@ router.get("/:id/comments", async (req, res) => {
             avatarUrl: true,
           },
         },
+        likes: true,
+        _count: {
+          select: { likes: true },
+        },
       },
     });
 
-    res.json({ ok: true, comments });
+    const shaped = comments.map((c) => ({
+      id: c.id,
+      text: c.text,
+      createdAt: c.createdAt,
+      author: c.author,
+      parentId: c.parentId,
+      likesCount: c._count.likes,
+      likedByMe: currentUserId
+        ? c.likes.some((l) => l.userId === currentUserId)
+        : false,
+      isPinned: c.isPinned,
+    }));
+
+    res.json({ ok: true, comments: shaped });
   } catch (err) {
     console.error("Fetch comments error:", err);
     res

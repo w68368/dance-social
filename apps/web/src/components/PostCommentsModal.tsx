@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { FaTimes, FaRegCommentDots, FaHeart, FaRegHeart } from "react-icons/fa";
-import type { Post, PostComment } from "../api";
-import { fetchComments, addComment } from "../api";
+import { useNavigate } from "react-router-dom";
+import type { Post, PostComment, ApiUserSummary } from "../api";
+import {
+  fetchComments,
+  addComment,
+  toggleCommentLike,
+  togglePinComment,
+} from "../api";
+import { getUser } from "../lib/auth";
 import "../styles/components/comments-modal.css";
 
 interface PostCommentsModalProps {
@@ -25,11 +32,15 @@ export default function PostCommentsModal({
 
   // ответ на конкретный комментарий (для подсказки + @ник)
   const [replyTo, setReplyTo] = useState<PostComment | null>(null);
-  // 🆕 id того комментария, к которому реально привязываем ответ (всегда root)
+  // id того комментария, к которому реально привязываем ответ (всегда root)
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const navigate = useNavigate();
+  const me = getUser();
+  const isPostOwner = !!(me && post && me.id === post.author.id);
 
+  // загрузка комментариев
   useEffect(() => {
     if (!isOpen || !post) return;
 
@@ -63,6 +74,30 @@ export default function PostCommentsModal({
     }
   }, [replyTo]);
 
+  // карта username → пользователь (для навигации по @)
+  const usersByUsername = useMemo(() => {
+    const map = new Map<string, ApiUserSummary>();
+
+    if (post?.author) {
+      map.set(post.author.username.toLowerCase(), post.author);
+    }
+
+    comments.forEach((c) => {
+      map.set(c.author.username.toLowerCase(), c.author);
+    });
+
+    if (me) {
+      map.set(me.username.toLowerCase(), {
+        id: me.id,
+        username: me.username,
+        displayName: me.displayName,
+        avatarUrl: me.avatarUrl,
+      });
+    }
+
+    return map;
+  }, [post, comments, me]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!post || !text.trim()) return;
@@ -74,7 +109,7 @@ export default function PostCommentsModal({
       const newComment = await addComment(
         post.id,
         text.trim(),
-        replyParentId ?? undefined // 🆕 всегда отправляем id root-коммента
+        replyParentId ?? undefined
       );
 
       setComments((prev) => [...prev, newComment]);
@@ -89,6 +124,62 @@ export default function PostCommentsModal({
     }
   };
 
+  const handleToggleCommentLike = async (commentId: string) => {
+    // оптимистичное обновление
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === commentId
+          ? {
+              ...c,
+              likedByMe: !c.likedByMe,
+              likesCount: c.likesCount + (c.likedByMe ? -1 : 1),
+            }
+          : c
+      )
+    );
+
+    try {
+      const { data } = await toggleCommentLike(commentId);
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? { ...c, likedByMe: data.liked, likesCount: data.likesCount }
+            : c
+        )
+      );
+    } catch {
+      // если ошибка — откатим
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                likedByMe: !c.likedByMe,
+                likesCount: c.likesCount + (c.likedByMe ? -1 : 1),
+              }
+            : c
+        )
+      );
+    }
+  };
+
+  const handleTogglePin = async (commentId: string) => {
+    if (!post || !isPostOwner) return;
+    try {
+      const { data } = await togglePinComment(post.id, commentId);
+      const pinnedId = data.pinnedCommentId;
+
+      setComments((prev) =>
+        prev.map((c) => ({
+          ...c,
+          isPinned: pinnedId ? c.id === pinnedId : false,
+        }))
+      );
+    } catch {
+      // можно добавить показ ошибки, если нужно
+    }
+  };
+
   if (!isOpen || !post) return null;
 
   const createdAt = new Date(post.createdAt);
@@ -96,6 +187,9 @@ export default function PostCommentsModal({
 
   // сгруппируем комментарии: родитель -> список ответов
   const roots = comments.filter((c) => !c.parentId);
+  const pinnedRoots = roots.filter((c) => c.isPinned);
+  const regularRoots = roots.filter((c) => !c.isPinned);
+
   const repliesByParent = new Map<string, PostComment[]>();
   comments.forEach((c) => {
     if (c.parentId) {
@@ -105,15 +199,12 @@ export default function PostCommentsModal({
     }
   });
 
-  // 🆕 старт ответа: если коммент уже ответ (есть parentId) —
-  // то родителем для нового ответа всё равно считаем root (parentId),
-  // иначе — сам комментарий
+  // старт ответа
   const startReply = (c: PostComment) => {
     const parentId = c.parentId ?? c.id; // root для треда
     setReplyTo(c);
     setReplyParentId(parentId);
 
-    // для @используем slug username (без пробелов)
     if (!text.startsWith(`@${c.author.username}`)) {
       setText(`@${c.author.username} `);
     }
@@ -124,13 +215,29 @@ export default function PostCommentsModal({
     setReplyParentId(null);
   };
 
-  // подсветка @mention в тексте
+  // подсветка и кликабельность @mention
   const formatTextWithMentions = (value: string) => {
     const parts = value.split(/(\s+)/); // сохраняем пробелы
     return parts.map((part, idx) => {
       if (part.startsWith("@") && part.trim().length > 1) {
+        const raw = part.trim();
+        const usernameSlug = raw
+          .slice(1)
+          .replace(/[^a-zA-Z0-9_.-].*$/, "")
+          .toLowerCase();
+        const user = usersByUsername.get(usernameSlug);
+
+        const handleClick = () => {
+          if (!user) return;
+          if (me && user.id === me.id) {
+            navigate("/profile");
+          } else {
+            navigate(`/users/${user.id}`);
+          }
+        };
+
         return (
-          <span key={idx} className="mention">
+          <span key={idx} className="mention" onClick={handleClick}>
             {part}
           </span>
         );
@@ -161,7 +268,9 @@ export default function PostCommentsModal({
             <div className="pcm-header-left">
               <FaRegCommentDots className="pcm-header-icon" />
               <div className="pcm-header-text">
-                <div className="pcm-post-title">{post.caption || "Post"}</div>
+                <div className="pcm-post-title">
+                  {post.caption ? formatTextWithMentions(post.caption) : "Post"}
+                </div>
                 <div className="pcm-post-meta">
                   <span>{postAuthorName}</span>
                   <span>•</span>
@@ -187,13 +296,18 @@ export default function PostCommentsModal({
                 </div>
               ) : (
                 <ul className="pcm-list">
-                  {roots.map((c) => {
+                  {[...pinnedRoots, ...regularRoots].map((c) => {
                     const replies = repliesByParent.get(c.id) ?? [];
                     const rootAuthorName =
                       c.author.displayName || c.author.username;
 
                     return (
-                      <li key={c.id} className="pcm-item">
+                      <li
+                        key={c.id}
+                        className={
+                          "pcm-item" + (c.isPinned ? " pcm-item--pinned" : "")
+                        }
+                      >
                         <div className="pcm-avatar">
                           {c.author.avatarUrl ? (
                             <img
@@ -214,17 +328,52 @@ export default function PostCommentsModal({
                             {isPostAuthor(c) && (
                               <span className="pcm-author-badge">Автор</span>
                             )}
+                            {c.isPinned && (
+                              <span className="pcm-pinned-badge">
+                                Закреплён
+                              </span>
+                            )}
                           </div>
                           <div className="pcm-text">
                             {formatTextWithMentions(c.text)}
                           </div>
-                          <button
-                            type="button"
-                            className="pcm-reply-btn"
-                            onClick={() => startReply(c)}
-                          >
-                            Ответить
-                          </button>
+                          <div className="pcm-comment-actions">
+                            <button
+                              type="button"
+                              className="pcm-reply-btn"
+                              onClick={() => startReply(c)}
+                            >
+                              Ответить
+                            </button>
+                            <button
+                              type="button"
+                              className={`pcm-comment-like-btn ${
+                                c.likedByMe
+                                  ? "pcm-comment-like-btn--active"
+                                  : ""
+                              }`}
+                              onClick={() => handleToggleCommentLike(c.id)}
+                            >
+                              {c.likedByMe ? (
+                                <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
+                              ) : (
+                                <FaRegHeart className="pcm-comment-like-icon" />
+                              )}
+                              <span className="pcm-comment-like-count">
+                                {c.likesCount}
+                              </span>
+                            </button>
+
+                            {isPostOwner && !c.parentId && (
+                              <button
+                                type="button"
+                                className="pcm-pin-btn"
+                                onClick={() => handleTogglePin(c.id)}
+                              >
+                                {c.isPinned ? "Открепить" : "Закрепить"}
+                              </button>
+                            )}
+                          </div>
 
                           {replies.length > 0 && (
                             <ul className="pcm-replies">
@@ -263,13 +412,35 @@ export default function PostCommentsModal({
                                       <div className="pcm-text">
                                         {formatTextWithMentions(r.text)}
                                       </div>
-                                      <button
-                                        type="button"
-                                        className="pcm-reply-btn"
-                                        onClick={() => startReply(r)}
-                                      >
-                                        Ответить
-                                      </button>
+                                      <div className="pcm-comment-actions">
+                                        <button
+                                          type="button"
+                                          className="pcm-reply-btn"
+                                          onClick={() => startReply(r)}
+                                        >
+                                          Ответить
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={`pcm-comment-like-btn ${
+                                            r.likedByMe
+                                              ? "pcm-comment-like-btn--active"
+                                              : ""
+                                          }`}
+                                          onClick={() =>
+                                            handleToggleCommentLike(r.id)
+                                          }
+                                        >
+                                          {r.likedByMe ? (
+                                            <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
+                                          ) : (
+                                            <FaRegHeart className="pcm-comment-like-icon" />
+                                          )}
+                                          <span className="pcm-comment-like-count">
+                                            {r.likesCount}
+                                          </span>
+                                        </button>
+                                      </div>
                                     </div>
                                   </li>
                                 );
@@ -284,7 +455,7 @@ export default function PostCommentsModal({
               )}
             </div>
 
-            {/* Форма + лайки снизу */}
+            {/* Форма + лайки поста снизу */}
             <div className="pcm-bottom">
               {replyTo && (
                 <div className="pcm-replying-to">

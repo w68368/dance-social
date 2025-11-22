@@ -40,6 +40,8 @@ model User {
   // 🆕 Лайки, поставленные пользователем
   likedPosts          PostLike[]
   comments            PostComment[]
+  // 🆕 Лайки комментариев, поставленные пользователем
+  likedComments       CommentLike[]
 
   // 🆕 Подписки
   // пользователи, которые ПОДПИСАНЫ на этого юзера
@@ -52,7 +54,6 @@ model User {
 
   @@index([lockUntil])
 }
-
 
 model RefreshToken {
   id         String   @id @default(cuid())
@@ -120,7 +121,7 @@ model Post {
 
   // 🆕 Лайки
   likes     PostLike[]
-  comments PostComment[]
+  comments  PostComment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -184,10 +185,37 @@ model PostComment {
   parentId String?
   replies  PostComment[]  @relation("CommentReplies")
 
+  // 🆕 Лайки комментария
+  likes    CommentLike[]
+
+  // 🆕 Закреплён ли комментарий у поста
+  isPinned Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([postId])
   @@index([authorId])
   @@index([parentId])
+  @@index([postId, isPinned])
+}
+
+
+//
+// 🆕 Таблица лайков комментариев
+//
+model CommentLike {
+  id        String   @id @default(cuid())
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  comment   PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId String
+
+  createdAt DateTime @default(now())
+
+  // один лайк от одного юзера на один комментарий
+  @@unique([userId, commentId])
+  @@index([commentId])
 }

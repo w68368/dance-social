@@ -146,7 +146,7 @@ export interface Post {
   likesCount: number;
   likedByMe: boolean;
 
-  // 🆕 комментарии
+  // комментарии
   commentsCount: number;
 }
 
@@ -156,9 +156,15 @@ export interface PostComment {
   createdAt: string;
   author: ApiUserSummary;
   parentId?: string | null;
+
+  // лайки комментариев
+  likesCount: number;
+  likedByMe: boolean;
+
+  isPinned: boolean;
 }
 
-// 🆕 Статистика подписок
+// Статистика подписок
 export interface FollowStatsResponse {
   ok: boolean;
   followers: number;
@@ -197,15 +203,29 @@ export function createPost(caption: string, media?: File | null) {
   return api.post<{ ok: boolean; post: Post }>("/posts", { caption: trimmed });
 }
 
-// Лайк / Unlike (toggle)
+// Лайк / Unlike (toggle) поста
 export function toggleLike(postId: string) {
   return api.post<{ ok: boolean; liked: boolean; likesCount: number }>(
     `/posts/${postId}/like`
   );
 }
 
+// Лайк / Unlike (toggle) комментария
+export function toggleCommentLike(commentId: string) {
+  return api.post<{ ok: boolean; liked: boolean; likesCount: number }>(
+    `/posts/comments/${commentId}/like`
+  );
+}
+
+// Закрепить / открепить комментарий (только автор поста)
+export function togglePinComment(postId: string, commentId: string) {
+  return api.post<{ ok: boolean; pinnedCommentId: string | null }>(
+    `/posts/${postId}/comments/${commentId}/pin`
+  );
+}
+
 // ----------------------------------------------------
-// 🆕 Comments
+// Comments
 // ----------------------------------------------------
 export async function fetchComments(postId: string): Promise<PostComment[]> {
   const { data } = await api.get<{ ok: boolean; comments: PostComment[] }>(
@@ -230,7 +250,7 @@ export async function addComment(
 }
 
 // ----------------------------------------------------
-// 🆕 Follow system
+// Follow system
 // ----------------------------------------------------
 
 // получить статистику + статус подписки на userId
