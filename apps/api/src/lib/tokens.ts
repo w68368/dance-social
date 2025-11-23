@@ -7,6 +7,32 @@ import jwt, {
 import type { CookieOptions } from "express";
 
 // ====================================================
+// ============ GLOBAL COOKIE CONFIG (ENV) ============
+// ====================================================
+
+// Общий домен для куки, например ".stepunity.com"
+// В dev можно оставить пустым
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined;
+
+// COOKIE_SAMESITE: "lax" | "strict" | "none"
+// В dev обычно "lax", в проде при разных доменах фронта/бэка — "none"
+const RAW_COOKIE_SAMESITE = (
+  process.env.COOKIE_SAMESITE || "lax"
+).toLowerCase();
+
+const COOKIE_SAMESITE: CookieOptions["sameSite"] =
+  RAW_COOKIE_SAMESITE === "none"
+    ? "none"
+    : RAW_COOKIE_SAMESITE === "strict"
+    ? "strict"
+    : "lax";
+
+// COOKIE_SECURE: true/false
+// При SameSite=None браузеры требуют secure=true
+const COOKIE_SECURE =
+  process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production";
+
+// ====================================================
 // ===================== JWT ==========================
 // ====================================================
 
@@ -48,15 +74,20 @@ export function newRefreshRaw() {
 export function refreshCookieOptions(daysOverride?: number): CookieOptions {
   const envDays = Number(process.env.REFRESH_TOKEN_DAYS ?? 30);
   const days = typeof daysOverride === "number" ? daysOverride : envDays;
-  const isProd = process.env.NODE_ENV === "production";
 
-  return {
+  const base: CookieOptions = {
     httpOnly: true,
-    secure: isProd ? true : false,
-    sameSite: "lax",
+    secure: COOKIE_SECURE,
+    sameSite: COOKIE_SAMESITE,
     path: "/api/auth",
     maxAge: days * 24 * 60 * 60 * 1000,
   };
+
+  if (COOKIE_DOMAIN) {
+    base.domain = COOKIE_DOMAIN;
+  }
+
+  return base;
 }
 
 // ====================================================

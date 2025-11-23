@@ -8,6 +8,7 @@ import {
   FaRegHeart,
   FaEdit,
   FaTrash,
+  FaEllipsisH,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import type {
@@ -82,10 +83,17 @@ export default function PostCommentsModal({
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteSending, setDeleteSending] = useState(false);
 
+  // открытое меню "три точки" для конкретного комментария
+  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
+
   const inputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
   const me = getUser();
   const isPostOwner = !!(me && post && me.id === post.author.id);
+
+  const toggleMenuFor = (commentId: string) => {
+    setOpenMenuFor((prev) => (prev === commentId ? null : commentId));
+  };
 
   // форматирование времени
   const formatRelativeTime = (iso: string) => {
@@ -126,6 +134,7 @@ export default function PostCommentsModal({
     setCollapsedThreads({});
     setLastSendAt(null);
     setLastText("");
+    setOpenMenuFor(null);
 
     fetchComments(post.id, null, 20, sortMode)
       .then((page) => {
@@ -323,15 +332,16 @@ export default function PostCommentsModal({
     if (!me || c.author.id !== me.id) return;
     setEditingId(c.id);
     setEditingText(c.text);
-    // отменяем режим ответа, чтобы не путать UI
     setReplyTo(null);
     setReplyParentId(null);
+    setOpenMenuFor(null);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditingText("");
     setEditingSending(false);
+    setOpenMenuFor(null);
   };
 
   const submitEdit = async (commentId: string) => {
@@ -360,11 +370,13 @@ export default function PostCommentsModal({
   // открыть кастомное подтверждение удаления
   const openDeleteConfirm = (commentId: string) => {
     setDeleteTargetId(commentId);
+    setOpenMenuFor(null);
   };
 
   const cancelDeleteConfirm = () => {
     if (deleteSending) return;
     setDeleteTargetId(null);
+    setOpenMenuFor(null);
   };
 
   // выполняем удаление после подтверждения
@@ -389,6 +401,7 @@ export default function PostCommentsModal({
     } finally {
       setDeleteSending(false);
       setDeleteTargetId(null);
+      setOpenMenuFor(null);
     }
   };
 
@@ -426,6 +439,7 @@ export default function PostCommentsModal({
     setReplyParentId(parentId);
     setEditingId(null);
     setEditingText("");
+    setOpenMenuFor(null);
 
     if (!text.startsWith(`@${c.author.username}`)) {
       setText(`@${c.author.username} `);
@@ -598,7 +612,7 @@ export default function PostCommentsModal({
                               )}
                             </div>
                             <div className="pcm-body">
-                              {/* верхняя строка: имя + бейджи слева, лайк справа */}
+                              {/* верхняя строка: имя + бейджи слева, время + меню справа */}
                               <div className="pcm-row-top">
                                 <div className="pcm-meta">
                                   <span className="pcm-username">
@@ -615,24 +629,53 @@ export default function PostCommentsModal({
                                     </span>
                                   )}
                                 </div>
-                                <button
-                                  type="button"
-                                  className={`pcm-comment-like-btn ${
-                                    c.likedByMe
-                                      ? "pcm-comment-like-btn--active"
-                                      : ""
-                                  }`}
-                                  onClick={() => handleToggleCommentLike(c.id)}
-                                >
-                                  {c.likedByMe ? (
-                                    <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
-                                  ) : (
-                                    <FaRegHeart className="pcm-comment-like-icon" />
-                                  )}
-                                  <span className="pcm-comment-like-count">
-                                    {c.likesCount}
+
+                                <div className="pcm-row-top-right">
+                                  <span className="pcm-time">
+                                    {formatRelativeTime(c.createdAt)}
                                   </span>
-                                </button>
+                                  {isEdited && (
+                                    <span className="pcm-edited">
+                                      · изменено
+                                    </span>
+                                  )}
+
+                                  {isOwnRoot && (
+                                    <div className="pcm-comment-menu-wrapper">
+                                      <button
+                                        type="button"
+                                        className="pcm-comment-menu-trigger"
+                                        onClick={() => toggleMenuFor(c.id)}
+                                        aria-label="Меню комментария"
+                                      >
+                                        <FaEllipsisH />
+                                      </button>
+
+                                      {openMenuFor === c.id && (
+                                        <div className="pcm-comment-menu">
+                                          <button
+                                            type="button"
+                                            className="pcm-comment-menu-item"
+                                            onClick={() => startEdit(c)}
+                                          >
+                                            <FaEdit />
+                                            <span>Редактировать</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="pcm-comment-menu-item pcm-comment-menu-item-danger"
+                                            onClick={() =>
+                                              openDeleteConfirm(c.id)
+                                            }
+                                          >
+                                            <FaTrash />
+                                            <span>Удалить</span>
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Текст или режим редактирования */}
@@ -675,7 +718,7 @@ export default function PostCommentsModal({
                                 </div>
                               )}
 
-                              {/* нижняя строка: Ответить слева, время + иконки справа */}
+                              {/* нижняя строка: Ответить слева, лайк + закрепить справа */}
                               <div className="pcm-row-bottom">
                                 <button
                                   type="button"
@@ -686,51 +729,36 @@ export default function PostCommentsModal({
                                 </button>
 
                                 <div className="pcm-row-bottom-right">
-                                  <span className="pcm-time">
-                                    {formatRelativeTime(c.createdAt)}
-                                  </span>
-                                  {isEdited && (
-                                    <span className="pcm-edited">
-                                      · изменено
+                                  <button
+                                    type="button"
+                                    className={`pcm-comment-like-btn ${
+                                      c.likedByMe
+                                        ? "pcm-comment-like-btn--active"
+                                        : ""
+                                    }`}
+                                    onClick={() =>
+                                      handleToggleCommentLike(c.id)
+                                    }
+                                  >
+                                    {c.likedByMe ? (
+                                      <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
+                                    ) : (
+                                      <FaRegHeart className="pcm-comment-like-icon" />
+                                    )}
+                                    <span className="pcm-comment-like-count">
+                                      {c.likesCount}
                                     </span>
+                                  </button>
+
+                                  {isPostOwner && !c.parentId && (
+                                    <button
+                                      type="button"
+                                      className="pcm-pin-link"
+                                      onClick={() => handleTogglePin(c.id)}
+                                    >
+                                      {c.isPinned ? "Открепить" : "Закрепить"}
+                                    </button>
                                   )}
-
-                                  <div className="pcm-inline-actions">
-                                    {isOwnRoot && (
-                                      <>
-                                        <button
-                                          type="button"
-                                          className="pcm-icon-btn pcm-edit-btn"
-                                          onClick={() => startEdit(c)}
-                                          aria-label="Редактировать комментарий"
-                                          title="Редактировать"
-                                        >
-                                          <FaEdit />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="pcm-icon-btn pcm-delete-btn pcm-icon-btn--danger"
-                                          onClick={() =>
-                                            openDeleteConfirm(c.id)
-                                          }
-                                          aria-label="Удалить комментарий"
-                                          title="Удалить"
-                                        >
-                                          <FaTrash />
-                                        </button>
-                                      </>
-                                    )}
-
-                                    {isPostOwner && !c.parentId && (
-                                      <button
-                                        type="button"
-                                        className="pcm-pin-link"
-                                        onClick={() => handleTogglePin(c.id)}
-                                      >
-                                        {c.isPinned ? "Открепить" : "Закрепить"}
-                                      </button>
-                                    )}
-                                  </div>
                                 </div>
                               </div>
 
@@ -782,6 +810,7 @@ export default function PostCommentsModal({
                                           )}
                                         </div>
                                         <div className="pcm-body">
+                                          {/* верхняя строка ответа */}
                                           <div className="pcm-row-top">
                                             <div className="pcm-meta">
                                               <span className="pcm-username">
@@ -794,28 +823,65 @@ export default function PostCommentsModal({
                                               )}
                                             </div>
 
-                                            <button
-                                              type="button"
-                                              className={`pcm-comment-like-btn ${
-                                                r.likedByMe
-                                                  ? "pcm-comment-like-btn--active"
-                                                  : ""
-                                              }`}
-                                              onClick={() =>
-                                                handleToggleCommentLike(r.id)
-                                              }
-                                            >
-                                              {r.likedByMe ? (
-                                                <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
-                                              ) : (
-                                                <FaRegHeart className="pcm-comment-like-icon" />
-                                              )}
-                                              <span className="pcm-comment-like-count">
-                                                {r.likesCount}
+                                            <div className="pcm-row-top-right">
+                                              <span className="pcm-time">
+                                                {formatRelativeTime(
+                                                  r.createdAt
+                                                )}
                                               </span>
-                                            </button>
+                                              {replyEdited && (
+                                                <span className="pcm-edited">
+                                                  · изменено
+                                                </span>
+                                              )}
+
+                                              {isOwnReply && (
+                                                <div className="pcm-comment-menu-wrapper">
+                                                  <button
+                                                    type="button"
+                                                    className="pcm-comment-menu-trigger"
+                                                    onClick={() =>
+                                                      toggleMenuFor(r.id)
+                                                    }
+                                                    aria-label="Меню комментария"
+                                                  >
+                                                    <FaEllipsisH />
+                                                  </button>
+
+                                                  {openMenuFor === r.id && (
+                                                    <div className="pcm-comment-menu">
+                                                      <button
+                                                        type="button"
+                                                        className="pcm-comment-menu-item"
+                                                        onClick={() =>
+                                                          startEdit(r)
+                                                        }
+                                                      >
+                                                        <FaEdit />
+                                                        <span>
+                                                          Редактировать
+                                                        </span>
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        className="pcm-comment-menu-item pcm-comment-menu-item-danger"
+                                                        onClick={() =>
+                                                          openDeleteConfirm(
+                                                            r.id
+                                                          )
+                                                        }
+                                                      >
+                                                        <FaTrash />
+                                                        <span>Удалить</span>
+                                                      </button>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
                                           </div>
 
+                                          {/* текст / редактирование */}
                                           {editingId === r.id ? (
                                             <div className="pcm-edit-block">
                                               <input
@@ -858,6 +924,7 @@ export default function PostCommentsModal({
                                             </div>
                                           )}
 
+                                          {/* низ ответа: Ответить + лайк справа */}
                                           <div className="pcm-row-bottom">
                                             <button
                                               type="button"
@@ -868,45 +935,26 @@ export default function PostCommentsModal({
                                             </button>
 
                                             <div className="pcm-row-bottom-right">
-                                              <span className="pcm-time">
-                                                {formatRelativeTime(
-                                                  r.createdAt
+                                              <button
+                                                type="button"
+                                                className={`pcm-comment-like-btn ${
+                                                  r.likedByMe
+                                                    ? "pcm-comment-like-btn--active"
+                                                    : ""
+                                                }`}
+                                                onClick={() =>
+                                                  handleToggleCommentLike(r.id)
+                                                }
+                                              >
+                                                {r.likedByMe ? (
+                                                  <FaHeart className="pcm-comment-like-icon pcm-comment-like-icon--active" />
+                                                ) : (
+                                                  <FaRegHeart className="pcm-comment-like-icon" />
                                                 )}
-                                              </span>
-                                              {replyEdited && (
-                                                <span className="pcm-edited">
-                                                  · изменено
+                                                <span className="pcm-comment-like-count">
+                                                  {r.likesCount}
                                                 </span>
-                                              )}
-
-                                              <div className="pcm-inline-actions">
-                                                {isOwnReply && (
-                                                  <>
-                                                    <button
-                                                      type="button"
-                                                      className="pcm-icon-btn pcm-edit-btn"
-                                                      onClick={() =>
-                                                        startEdit(r)
-                                                      }
-                                                      aria-label="Редактировать комментарий"
-                                                      title="Редактировать"
-                                                    >
-                                                      <FaEdit />
-                                                    </button>
-                                                    <button
-                                                      type="button"
-                                                      className="pcm-icon-btn pcm-delete-btn pcm-icon-btn--danger"
-                                                      onClick={() =>
-                                                        openDeleteConfirm(r.id)
-                                                      }
-                                                      aria-label="Удалить комментарий"
-                                                      title="Удалить"
-                                                    >
-                                                      <FaTrash />
-                                                    </button>
-                                                  </>
-                                                )}
-                                              </div>
+                                              </button>
                                             </div>
                                           </div>
                                         </div>

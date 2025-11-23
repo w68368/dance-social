@@ -197,7 +197,7 @@
 .pcm-comments-block {
   padding: 12px 18px;
   flex: 1;
-  overflow: visible; /* скролл внутри списка */
+  overflow: visible;
 }
 
 .pcm-status {
@@ -259,13 +259,23 @@
 .comments-list-wrapper {
   position: relative;
   margin-bottom: 16px;
-}
 
-/* НА ДЕСКТОПЕ: список почти до формы, адаптивно по высоте окна */
-.comments-list {
+  /* переносим скролл сюда, чтобы меню в .pcm-item не обрезалось */
   max-height: calc(100vh - 260px);
   overflow-y: auto;
+  overflow-x: visible;
   padding-right: 8px;
+}
+
+/* сам список — без собственного overflow */
+.comments-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: visible;
 }
 
 /* блок с градиентом и кнопкой "Показать ещё" */
@@ -323,18 +333,9 @@
   cursor: default;
 }
 
-/* список комментариев */
-.pcm-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
 /* Корневой комментарий + его ответы */
 .pcm-item {
+  position: relative; /* меню и прочее позиционируются относительно карточки */
   display: flex;
   gap: 10px;
   padding: 10px 12px;
@@ -344,7 +345,8 @@
   border: 1px solid rgba(255, 255, 255, 0.04);
   transition: background 0.2s ease, border-color 0.2s ease;
   max-width: 100%;
-  overflow: hidden; /* 👉 ничего не вылезает за карточку */
+  overflow: visible; /* меню "три точки" и прочее не обрезается */
+  z-index: 1;
 }
 
 /* При наведении — чуть ярче, но всё ещё спокойно */
@@ -389,7 +391,7 @@
   min-width: 0; /* 👉 текст и инпуты учитывают ширину */
 }
 
-/* верхняя строка коммента: имя + бейджи слева, лайк — справа */
+/* верхняя строка коммента: имя + бейджи слева, время + меню справа */
 .pcm-row-top {
   display: flex;
   align-items: center;
@@ -411,7 +413,15 @@
   color: #fff;
 }
 
-/* нижняя строка: "Ответить" слева, время/иконки/закрепить — справа */
+.pcm-row-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted, #c8bfdc);
+}
+
+/* нижняя строка: "Ответить" слева, лайк + закрепить — справа */
 .pcm-row-bottom {
   margin-top: 4px;
   display: flex;
@@ -435,7 +445,7 @@
 .pcm-row-bottom-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   font-size: 11px;
   color: var(--muted, #c8bfdc);
 }
@@ -729,13 +739,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-width: 100%; /* 👉 блок не шире карточки */
+  max-width: 100%;
 }
 
 .pcm-edit-input {
   width: 100%;
-  max-width: 100%; /* 👉 инпут не шире родителя */
-  box-sizing: border-box; /* 👉 учитываем padding в ширине */
+  max-width: 100%;
+  box-sizing: border-box;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   padding: 6px 10px;
@@ -753,7 +763,7 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  flex-wrap: wrap; /* 👉 на узких экранах кнопки могут перенестись */
+  flex-wrap: wrap;
 }
 
 .pcm-edit-save,
@@ -869,6 +879,83 @@
   text-decoration: underline;
 }
 
+/* ====== МЕНЮ "ТРИ ТОЧКИ" У КОММЕНТАРИЯ ====== */
+
+.pcm-comment-menu-wrapper {
+  position: relative;
+}
+
+.pcm-comment-menu-trigger {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted, #c8bfdc);
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.pcm-comment-menu-trigger:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.pcm-comment-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  padding: 6px 0;
+  min-width: 150px;
+  border-radius: 12px;
+  background: radial-gradient(
+      circle at top left,
+      rgba(246, 196, 73, 0.12),
+      transparent 55%
+    ),
+    rgba(13, 6, 32, 0.98);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 15;
+}
+
+.pcm-comment-menu-item {
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #e7e0ff;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pcm-comment-menu-item svg {
+  font-size: 13px;
+}
+
+.pcm-comment-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pcm-comment-menu-item-danger {
+  color: #ff98aa;
+}
+
+.pcm-comment-menu-item-danger:hover {
+  background: rgba(255, 107, 129, 0.12);
+  color: #ffd0da;
+}
+
 /* ============================= */
 /*        АДАПТИВ ДЛЯ МОБИЛЫ     */
 /* ============================= */
@@ -881,12 +968,11 @@
     width: 100%;
     height: 100vh;
     border-radius: 0;
-    /* главная мысль: пусть вся модалка скроллится */
     overflow-y: auto;
   }
 
   .pcm-media-pane {
-    flex: 0 0 авто;
+    flex: 0 0 auto;
     max-height: 48vh;
   }
 
@@ -916,10 +1002,10 @@
     padding: 8px 14px 12px;
   }
 
-  .comments-list {
+  .comments-list-wrapper {
     max-height: calc(100vh - 260px);
     overflow-y: auto;
-    overflow-x: hidden; /* 👉 отключаем горизонтальный скролл */
+    overflow-x: hidden;
     padding-right: 8px;
   }
 
@@ -951,8 +1037,7 @@
     font-size: 13px;
   }
 
-  /* на телефонах список меньше, чтобы форма не обрезалась */
-  .comments-list {
+  .comments-list-wrapper {
     max-height: 200px;
   }
 
