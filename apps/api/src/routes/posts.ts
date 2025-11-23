@@ -16,6 +16,18 @@ import {
 
 const router = Router();
 
+// ----------------------------------
+// Конфиг реакций
+// ----------------------------------
+const REACTION_TYPES = ["LIKE", "FIRE", "WOW", "CUTE", "CLAP"] as const;
+type ReactionType = (typeof REACTION_TYPES)[number];
+
+type PostReactionsSummary = {
+  postId: string;
+  counts: Record<ReactionType, number>;
+  myReaction: ReactionType | null;
+};
+
 // -----------------------------
 // Настройка папок
 // -----------------------------
@@ -53,6 +65,11 @@ const commentSchema = z
   .min(1, "Комментарий не может быть пустым")
   .max(500, "Слишком длинный комментарий")
   .transform((v) => v.trim());
+
+// тело для реакций
+const reactSchema = z.object({
+  type: z.enum(["LIKE", "FIRE", "WOW", "CUTE", "CLAP"]),
+});
 
 // -----------------------------
 // POST /api/posts
@@ -129,8 +146,9 @@ router.post(
 
       const responsePost = {
         ...post,
-        likesCount: 0,
+        likesCount: 0, // суммарные реакции (пока 0)
         likedByMe: false,
+        myReaction: null as ReactionType | null,
         commentsCount: 0,
       };
 
@@ -154,57 +172,152 @@ router.post(
 );
 
 // -----------------------------
-// POST /api/posts/:id/like
-// Тоггл лайка для текущего пользователя
+// 🆕 POST /api/posts/:id/react
+// Поставить / изменить / снять реакцию
 // -----------------------------
-router.post("/:id/like", requireAuth, async (req: AuthedRequest, res) => {
+router.post("/:id/react", requireAuth, async (req: AuthedRequest, res) => {
   if (!req.userId) {
     return res.status(401).json({ ok: false, message: "Unauthorized" });
   }
 
   const postId = req.params.id;
+  const parsed = reactSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ ok: false, message: "Invalid reaction type" });
+  }
+
+  const { type } = parsed.data;
 
   try {
-    const existing = await prisma.postLike.findUnique({
+    const existing = await prisma.postReaction.findUnique({
       where: {
-        userId_postId: {
-          userId: req.userId,
+        postId_userId: {
           postId,
+          userId: req.userId,
         },
       },
     });
 
-    let liked: boolean;
+    let myReaction: ReactionType | null = null;
 
-    if (existing) {
-      await prisma.postLike.delete({
+    if (existing && existing.type === type) {
+      // Нажали ту же реакцию -> удалить
+      await prisma.postReaction.delete({
         where: { id: existing.id },
       });
-      liked = false;
+      myReaction = null;
+    } else if (existing) {
+      // Поменять тип реакции
+      const updated = await prisma.postReaction.update({
+        where: { id: existing.id },
+        data: { type },
+      });
+      myReaction = updated.type as ReactionType;
     } else {
-      await prisma.postLike.create({
+      // Создать новую реакцию
+      const created = await prisma.postReaction.create({
         data: {
-          userId: req.userId,
           postId,
+          userId: req.userId,
+          type,
         },
       });
-      liked = true;
+      myReaction = created.type as ReactionType;
     }
 
-    const likesCount = await prisma.postLike.count({
+    const grouped = await prisma.postReaction.groupBy({
       where: { postId },
+      by: ["type"],
+      _count: { _all: true },
     });
 
-    return res.json({
-      ok: true,
-      liked,
-      likesCount,
-    });
+    const counts: Record<ReactionType, number> = {
+      LIKE: 0,
+      FIRE: 0,
+      WOW: 0,
+      CUTE: 0,
+      CLAP: 0,
+    };
+
+    for (const g of grouped) {
+      counts[g.type as ReactionType] = g._count._all;
+    }
+
+    const summary: PostReactionsSummary = {
+      postId,
+      counts,
+      myReaction,
+    };
+
+    return res.json({ ok: true, reactions: summary });
   } catch (err) {
-    console.error("Toggle like error:", err);
+    console.error("React to post error:", err);
     return res
       .status(500)
-      .json({ ok: false, message: "Не удалось обновить лайк" });
+      .json({ ok: false, message: "Не удалось обновить реакцию" });
+  }
+});
+
+// -----------------------------
+// 🆕 GET /api/posts/:id/reactions
+// Получить сводку реакций поста
+// -----------------------------
+router.get("/:id/reactions", optionalAuth, async (req: AuthedRequest, res) => {
+  const postId = req.params.id;
+  const userId = req.userId ?? null;
+
+  try {
+    const grouped = await prisma.postReaction.groupBy({
+      where: { postId },
+      by: ["type"],
+      _count: { _all: true },
+    });
+
+    const counts: Record<ReactionType, number> = {
+      LIKE: 0,
+      FIRE: 0,
+      WOW: 0,
+      CUTE: 0,
+      CLAP: 0,
+    };
+
+    for (const g of grouped) {
+      counts[g.type as ReactionType] = g._count._all;
+    }
+
+    let myReaction: ReactionType | null = null;
+
+    if (userId) {
+      const mine = await prisma.postReaction.findUnique({
+        where: {
+          postId_userId: {
+            postId,
+            userId,
+          },
+        },
+        select: { type: true },
+      });
+
+      if (mine) {
+        myReaction = mine.type as ReactionType;
+      }
+    }
+
+    const summary: PostReactionsSummary = {
+      postId,
+      counts,
+      myReaction,
+    };
+
+    return res.json({ ok: true, reactions: summary });
+  } catch (e) {
+    console.error("Get post reactions error:", e);
+    return res
+      .status(500)
+      .json({ ok: false, message: "Не удалось загрузить реакции" });
   }
 });
 
@@ -456,9 +569,10 @@ router.post(
       return res.json({ ok: true, pinnedCommentId });
     } catch (err) {
       console.error("Pin comment error:", err);
-      return res
-        .status(500)
-        .json({ ok: false, message: "Не удалось обновить закреп комментария" });
+      return res.status(500).json({
+        ok: false,
+        message: "Не удалось обновить закреп комментария",
+      });
     }
   }
 );
@@ -650,6 +764,8 @@ router.get("/:id/comments", optionalAuth, async (req, res) => {
 // -----------------------------
 router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
   try {
+    const currentUserId = req.userId ?? null;
+
     const posts = await prisma.post.findMany({
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -664,33 +780,40 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
         },
         _count: {
           select: {
-            likes: true,
+            reactions: true,
             comments: true,
           },
         },
-        likes: {
-          select: { userId: true },
-        },
+        reactions: currentUserId
+          ? {
+              where: { userId: currentUserId },
+              select: { type: true },
+            }
+          : false,
       },
     });
 
-    const currentUserId = req.userId;
+    const shaped = posts.map((p: any) => {
+      const myReaction: ReactionType | null =
+        currentUserId && Array.isArray(p.reactions) && p.reactions.length > 0
+          ? (p.reactions[0].type as ReactionType)
+          : null;
 
-    const shaped = posts.map((p: any) => ({
-      id: p.id,
-      caption: p.caption,
-      mediaType: p.mediaType,
-      mediaUrl: p.mediaUrl,
-      mediaLocalPath: p.mediaLocalPath,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-      author: p.author,
-      likesCount: p._count.likes,
-      likedByMe: currentUserId
-        ? p.likes.some((l: any) => l.userId === currentUserId)
-        : false,
-      commentsCount: p._count.comments,
-    }));
+      return {
+        id: p.id,
+        caption: p.caption,
+        mediaType: p.mediaType,
+        mediaUrl: p.mediaUrl,
+        mediaLocalPath: p.mediaLocalPath,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        author: p.author,
+        likesCount: p._count.reactions, // суммарное число реакций
+        likedByMe: !!myReaction, // для старого UI
+        myReaction,
+        commentsCount: p._count.comments,
+      };
+    });
 
     res.json({ ok: true, posts: shaped });
   } catch (err) {
@@ -706,6 +829,7 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
 router.get("/user/:userId", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const { userId } = req.params;
+    const currentUserId = req.userId ?? null;
 
     const posts = await prisma.post.findMany({
       where: { authorId: userId },
@@ -721,33 +845,40 @@ router.get("/user/:userId", optionalAuth, async (req: AuthedRequest, res) => {
         },
         _count: {
           select: {
-            likes: true,
+            reactions: true,
             comments: true,
           },
         },
-        likes: {
-          select: { userId: true },
-        },
+        reactions: currentUserId
+          ? {
+              where: { userId: currentUserId },
+              select: { type: true },
+            }
+          : false,
       },
     });
 
-    const currentUserId = req.userId;
+    const shaped = posts.map((p: any) => {
+      const myReaction: ReactionType | null =
+        currentUserId && Array.isArray(p.reactions) && p.reactions.length > 0
+          ? (p.reactions[0].type as ReactionType)
+          : null;
 
-    const shaped = posts.map((p: any) => ({
-      id: p.id,
-      caption: p.caption,
-      mediaType: p.mediaType,
-      mediaUrl: p.mediaUrl,
-      mediaLocalPath: p.mediaLocalPath,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-      author: p.author,
-      likesCount: p._count.likes,
-      likedByMe: currentUserId
-        ? p.likes.some((l: any) => l.userId === currentUserId)
-        : false,
-      commentsCount: p._count.comments,
-    }));
+      return {
+        id: p.id,
+        caption: p.caption,
+        mediaType: p.mediaType,
+        mediaUrl: p.mediaUrl,
+        mediaLocalPath: p.mediaLocalPath,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        author: p.author,
+        likesCount: p._count.reactions,
+        likedByMe: !!myReaction,
+        myReaction,
+        commentsCount: p._count.comments,
+      };
+    });
 
     res.json({ ok: true, posts: shaped });
   } catch (err) {
