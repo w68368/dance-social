@@ -9,13 +9,18 @@ import {
   FaEdit,
   FaTrash,
   FaEllipsisH,
+  FaFire,
+  FaStar,
 } from "react-icons/fa";
+import { FaFaceSmileBeam, FaHandsClapping } from "react-icons/fa6";
 import { useNavigate } from "react-router-dom";
 import type {
   Post,
   PostComment,
   ApiUserSummary,
   CommentSortMode,
+  ReactionType,
+  PostReactionsSummary,
 } from "../api";
 import {
   fetchComments,
@@ -24,6 +29,7 @@ import {
   togglePinComment,
   editComment,
   deleteComment,
+  fetchPostReactions,
 } from "../api";
 import { getUser } from "../lib/auth";
 import "../styles/components/comments-modal.css";
@@ -34,6 +40,19 @@ interface PostCommentsModalProps {
   onClose: () => void;
   onCommentAdded?: () => void;
 }
+
+// конфиг реакций поста для нижнего блока
+const POST_REACTIONS: {
+  type: ReactionType;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  { type: "LIKE", label: "Like", icon: <FaHeart /> },
+  { type: "FIRE", label: "Fire", icon: <FaFire /> },
+  { type: "WOW", label: "Wow", icon: <FaStar /> },
+  { type: "CUTE", label: "Cute", icon: <FaFaceSmileBeam /> },
+  { type: "CLAP", label: "Clap", icon: <FaHandsClapping /> },
+];
 
 export default function PostCommentsModal({
   post,
@@ -85,6 +104,11 @@ export default function PostCommentsModal({
 
   // открытое меню "три точки" для конкретного комментария
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
+
+  // сводка реакций поста (для нижнего блока)
+  const [reactionsSummary, setReactionsSummary] =
+    useState<PostReactionsSummary | null>(null);
+  const [reactionsLoading, setReactionsLoading] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
@@ -155,6 +179,36 @@ export default function PostCommentsModal({
       alive = false;
     };
   }, [isOpen, post?.id, sortMode]);
+
+  // загрузка сводки реакций поста для нижнего блока
+  useEffect(() => {
+    if (!isOpen || !post) {
+      setReactionsSummary(null);
+      setReactionsLoading(false);
+      return;
+    }
+
+    let alive = true;
+    setReactionsLoading(true);
+    setReactionsSummary(null);
+
+    fetchPostReactions(post.id)
+      .then((summary) => {
+        if (!alive) return;
+        setReactionsSummary(summary);
+      })
+      .catch((e) => {
+        console.error("Failed to load post reactions", e);
+      })
+      .finally(() => {
+        if (!alive) return;
+        setReactionsLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [isOpen, post?.id]);
 
   // авто-скрытие тоста
   useEffect(() => {
@@ -431,6 +485,43 @@ export default function PostCommentsModal({
       repliesByParent.set(c.parentId, list);
     }
   });
+
+  // сводка реакций для нижнего блока
+  const counts = reactionsSummary?.counts;
+  const myReaction =
+    reactionsSummary?.myReaction ?? (post.likedByMe ? "LIKE" : null);
+  const totalLikes = counts
+    ? counts.LIKE + counts.FIRE + counts.WOW + counts.CUTE + counts.CLAP
+    : post.likesCount;
+
+  const renderPostMainIcon = () => {
+    if (!myReaction) {
+      return post.likedByMe ? (
+        <FaHeart className="pcm-like-icon pcm-like-icon--active" />
+      ) : (
+        <FaRegHeart className="pcm-like-icon" />
+      );
+    }
+
+    switch (myReaction) {
+      case "LIKE":
+        return <FaHeart className="pcm-like-icon pcm-like-icon--active" />;
+      case "FIRE":
+        return <FaFire className="pcm-like-icon pcm-like-icon--active" />;
+      case "WOW":
+        return <FaStar className="pcm-like-icon pcm-like-icon--active" />;
+      case "CUTE":
+        return (
+          <FaFaceSmileBeam className="pcm-like-icon pcm-like-icon--active" />
+        );
+      case "CLAP":
+        return (
+          <FaHandsClapping className="pcm-like-icon pcm-like-icon--active" />
+        );
+      default:
+        return <FaHeart className="pcm-like-icon pcm-like-icon--active" />;
+    }
+  };
 
   // старт ответа
   const startReply = (c: PostComment) => {
@@ -1018,13 +1109,26 @@ export default function PostCommentsModal({
                 </button>
               </form>
 
+              {/* 🔥 Лайки поста + разбор реакций */}
               <div className="pcm-likes-row">
-                {post.likedByMe ? (
-                  <FaHeart className="pcm-like-icon pcm-like-icon--active" />
-                ) : (
-                  <FaRegHeart className="pcm-like-icon" />
-                )}
-                <span className="pcm-likes-count">{post.likesCount}</span>
+                {renderPostMainIcon()}
+                <span className="pcm-likes-count">{totalLikes}</span>
+
+                <div className="pcm-likes-breakdown">
+                  {POST_REACTIONS.map((r) => {
+                    const count = counts?.[r.type] ?? 0;
+                    if (!count) return null;
+                    return (
+                      <span key={r.type} className="pcm-likes-chip">
+                        <span className="pcm-likes-chip-icon">{r.icon}</span>
+                        <span className="pcm-likes-chip-count">{count}</span>
+                      </span>
+                    );
+                  })}
+                  {reactionsLoading && !counts && (
+                    <span className="pcm-likes-loading">…</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

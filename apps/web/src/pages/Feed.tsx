@@ -1,20 +1,77 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { fetchFeed, toggleLike, type Post } from "../api";
-import { FaHeart, FaRegHeart, FaRegCommentDots } from "react-icons/fa";
-import { getUser } from "../lib/auth"; // кто залогинен
+import {
+  fetchFeed,
+  toggleLike,
+  reactToPost,
+  fetchPostReactions,
+  type Post,
+  type ReactionType,
+  type PostReactionsSummary,
+} from "../api";
+import {
+  FaHeart,
+  FaRegHeart,
+  FaRegCommentDots,
+  FaFire,
+  FaStar,
+} from "react-icons/fa";
+import { FaFaceSmileBeam, FaHandsClapping } from "react-icons/fa6";
+import { getUser } from "../lib/auth";
 import PostCommentsModal from "../components/PostCommentsModal";
 import "../styles/pages/feed.css";
+
+// конфиг реакций для поповера
+const REACTIONS: { type: ReactionType; icon: ReactNode; label: string }[] = [
+  { type: "LIKE", icon: <FaHeart />, label: "Like" },
+  { type: "FIRE", icon: <FaFire />, label: "Fire" },
+  { type: "WOW", icon: <FaStar />, label: "Wow" },
+  { type: "CUTE", icon: <FaFaceSmileBeam />, label: "Cute" },
+  { type: "CLAP", icon: <FaHandsClapping />, label: "Clap" },
+];
+
+// иконка, которая показывается на основной кнопке
+function getMainReactionIcon(
+  myReaction: ReactionType | null | undefined,
+  likedByMe: boolean
+) {
+  if (!myReaction) {
+    return likedByMe ? (
+      <FaHeart className="like-icon" />
+    ) : (
+      <FaRegHeart className="like-icon" />
+    );
+  }
+
+  switch (myReaction) {
+    case "LIKE":
+      return <FaHeart className="like-icon" />;
+    case "FIRE":
+      return <FaFire className="like-icon" />;
+    case "WOW":
+      return <FaStar className="like-icon" />;
+    case "CUTE":
+      return <FaFaceSmileBeam className="like-icon" />;
+    case "CLAP":
+      return <FaHandsClapping className="like-icon" />;
+    default:
+      return <FaHeart className="like-icon" />;
+  }
+}
 
 export default function Feed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // для модалки комментариев
+  // модалка комментариев
   const [commentsPost, setCommentsPost] = useState<Post | null>(null);
 
-  // текущий залогиненный пользователь
+  // сводка реакций по постам: postId -> summary
+  const [reactionsMap, setReactionsMap] = useState<
+    Record<string, PostReactionsSummary>
+  >({});
+
   const me = getUser();
 
   useEffect(() => {
@@ -45,8 +102,50 @@ export default function Feed() {
     };
   }, []);
 
+  // общая функция: применяем summary к посту + кладём его в reactionsMap
+  const applyReactionsSummary = (
+    postId: string,
+    summary: PostReactionsSummary
+  ) => {
+    const total =
+      summary.counts.LIKE +
+      summary.counts.FIRE +
+      summary.counts.WOW +
+      summary.counts.CUTE +
+      summary.counts.CLAP;
+
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId
+          ? {
+              ...p,
+              likesCount: total,
+              likedByMe: !!summary.myReaction,
+              myReaction: summary.myReaction,
+            }
+          : p
+      )
+    );
+
+    setReactionsMap((prev) => ({
+      ...prev,
+      [postId]: summary,
+    }));
+  };
+
+  // лениво подгружаем сводку реакций при первом наведении
+  const ensureReactionsLoaded = async (postId: string) => {
+    if (reactionsMap[postId]) return;
+    try {
+      const summary = await fetchPostReactions(postId);
+      applyReactionsSummary(postId, summary);
+    } catch (err) {
+      console.error("Failed to load reactions", err);
+    }
+  };
+
+  // быстрый лайк по кнопке (LIKE)
   const handleToggleLike = async (postId: string) => {
-    // оптимистичное обновление
     setPosts((prev) =>
       prev.map((p) =>
         p.id === postId
@@ -54,24 +153,18 @@ export default function Feed() {
               ...p,
               likesCount: p.likesCount + (p.likedByMe ? -1 : 1),
               likedByMe: !p.likedByMe,
+              myReaction: p.likedByMe ? null : "LIKE",
             }
           : p
       )
     );
 
     try {
-      const res = await toggleLike(postId);
-      if (res.data.ok) {
-        const { likesCount, liked } = res.data;
-        setPosts((prev) =>
-          prev.map((p) =>
-            p.id === postId ? { ...p, likesCount, likedByMe: liked } : p
-          )
-        );
-      }
+      const summary = await toggleLike(postId);
+      applyReactionsSummary(postId, summary);
     } catch (err) {
       console.error(err);
-      // откат, если ошибка
+      // откат
       setPosts((prev) =>
         prev.map((p) =>
           p.id === postId
@@ -79,6 +172,7 @@ export default function Feed() {
                 ...p,
                 likesCount: p.likesCount + (p.likedByMe ? -1 : 1),
                 likedByMe: !p.likedByMe,
+                myReaction: p.likedByMe ? null : "LIKE",
               }
             : p
         )
@@ -86,17 +180,19 @@ export default function Feed() {
     }
   };
 
-  // открыть модалку с комментариями
-  const openComments = (post: Post) => {
-    setCommentsPost(post);
+  // выбор конкретной реакции из поповера
+  const handleReact = async (postId: string, type: ReactionType) => {
+    try {
+      const summary = await reactToPost(postId, type);
+      applyReactionsSummary(postId, summary);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  // закрыть модалку
-  const closeComments = () => {
-    setCommentsPost(null);
-  };
+  const openComments = (post: Post) => setCommentsPost(post);
+  const closeComments = () => setCommentsPost(null);
 
-  // обновить счётчик комментариев в списке постов
   const handleCommentAdded = (postId: string) => {
     setPosts((prev) =>
       prev.map((p) =>
@@ -126,9 +222,15 @@ export default function Feed() {
             const profileLink = isMe ? "/profile" : `/users/${post.author.id}`;
             const authorName = post.author.displayName || post.author.username;
 
+            const mainIcon = getMainReactionIcon(
+              post.myReaction ?? null,
+              post.likedByMe
+            );
+
+            const summary = reactionsMap[post.id];
+
             return (
               <article key={post.id} className="feed-card">
-                {/* Header: автор → клик на профиль */}
                 <header className="feed-card-header">
                   <Link to={profileLink} className="feed-user-link">
                     <div className="feed-user">
@@ -154,7 +256,6 @@ export default function Feed() {
                   </Link>
                 </header>
 
-                {/* Media сверху */}
                 {post.mediaUrl && post.mediaType === "image" && (
                   <img
                     src={post.mediaUrl}
@@ -171,22 +272,49 @@ export default function Feed() {
                   />
                 )}
 
-                {/* Подпись */}
                 {post.caption && <p className="feed-caption">{post.caption}</p>}
 
-                {/* Лайки + комментарии */}
                 <div className="feed-footer">
-                  <button
-                    className={`like-btn ${post.likedByMe ? "liked" : ""}`}
-                    onClick={() => handleToggleLike(post.id)}
+                  <div
+                    className="feed-like-wrapper"
+                    onMouseEnter={() => ensureReactionsLoaded(post.id)}
                   >
-                    {post.likedByMe ? (
-                      <FaHeart className="like-icon" />
-                    ) : (
-                      <FaRegHeart className="like-icon" />
-                    )}
-                    <span className="like-count">{post.likesCount}</span>
-                  </button>
+                    <div className="feed-reactions-popover">
+                      {REACTIONS.map((r) => {
+                        const isActive = post.myReaction === r.type;
+                        const count = summary?.counts[r.type] ?? 0;
+
+                        return (
+                          <button
+                            key={r.type}
+                            className={`reaction-chip ${
+                              isActive ? "reaction-chip--active" : ""
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReact(post.id, r.type);
+                            }}
+                            title={r.label}
+                          >
+                            <span className="reaction-chip-icon">{r.icon}</span>
+                            {count > 0 && (
+                              <span className="reaction-chip-count">
+                                {count}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      className={`like-btn ${post.likedByMe ? "liked" : ""}`}
+                      onClick={() => handleToggleLike(post.id)}
+                    >
+                      {mainIcon}
+                      <span className="like-count">{post.likesCount}</span>
+                    </button>
+                  </div>
 
                   <button
                     className="comment-btn"
@@ -202,7 +330,6 @@ export default function Feed() {
         </div>
       </div>
 
-      {/* Модалка комментариев */}
       <PostCommentsModal
         post={commentsPost}
         isOpen={commentsPost !== null}

@@ -215,3 +215,107 @@
 .comment-btn:hover .comment-icon {
   color: rgba(255, 255, 255, 0.9);
 }
+
+/* ======================================== */
+/*  🔥 REACTIONS POPOVER (мини-модалка)    */
+/* ======================================== */
+
+.feed-like-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+
+  /* немного зоны вокруг, чтобы было легче попасть */
+  padding: 4px 8px;
+}
+
+/* пузырь с реакциями */
+.feed-reactions-popover {
+  position: absolute;
+  left: 50%;
+  /* центр поповера будет над сердцем, с лёгким оверлапом */
+  bottom: 50%;
+  transform: translate(-50%, 40%);
+
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: radial-gradient(
+      circle at top left,
+      rgba(246, 196, 73, 0.16),
+      transparent 55%
+    ),
+    rgba(15, 8, 40, 0.98);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.9);
+  display: flex;
+  gap: 8px;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  z-index: 20;
+  white-space: nowrap;
+}
+
+/* показываем поповер при ховере или фокусе внутри обёртки */
+.feed-like-wrapper:hover .feed-reactions-popover,
+.feed-like-wrapper:focus-within .feed-reactions-popover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.reaction-chip {
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 6px;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px; /* ← чтобы иконка и цифра не слипались */
+}
+
+/* маленькая цифра рядом с эмодзи */
+.reaction-chip-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  min-width: 14px;
+  text-align: center;
+}
+
+/* иконки — золотые */
+.reaction-chip-icon svg {
+  font-size: 18px;
+  color: var(--gold, #f6c449);
+  transition: 0.15s ease;
+}
+
+.reaction-chip:hover {
+  opacity: 1;
+  background: rgba(246, 196, 73, 0.22);
+  box-shadow: 0 0 16px rgba(246, 196, 73, 0.4);
+}
+
+.reaction-chip:hover .reaction-chip-icon svg {
+  transform: scale(1.1);
+  color: #ffe08a;
+}
+
+/* выбранная реакция */
+.reaction-chip--active {
+  background: rgba(246, 196, 73, 0.3);
+  box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.75);
+}
+
+/* на мобиле можно чуть упростить */
+@media (max-width: 600px) {
+  .feed-reactions-popover {
+    padding: 4px 6px;
+  }
+
+  .reaction-chip-icon svg {
+    font-size: 16px;
+  }
+}

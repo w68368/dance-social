@@ -1,11 +1,11 @@
 .add-post-container {
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px 24px 40px;
 }
 
 .add-post-title {
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .add-post-subtitle {
@@ -16,8 +16,152 @@
 .add-post-form {
   display: flex;
   flex-direction: column;
+  gap: 20px;
+}
+
+/* ===========================
+   WIZARD / PROGRESS BAR
+   =========================== */
+
+.post-wizard {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
+
+.post-wizard-steps {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: radial-gradient(
+      circle at top left,
+      rgba(246, 196, 73, 0.12),
+      transparent 55%
+    ),
+    rgba(8, 2, 30, 0.9);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+/* линия прогресса под шагами */
+.post-wizard-progress {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--gold, #f6c449),
+    var(--gold-2, #dba51e)
+  );
+  transform-origin: left center;
+  transition: width 0.25s ease;
+}
+
+/* кнопки-шаги */
+.post-wizard-step {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.post-wizard-step .dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  background: rgba(4, 0, 20, 0.9);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+.post-wizard-step .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* активный шаг */
+.post-wizard-step.active {
+  color: #fff;
+}
+
+.post-wizard-step.active .dot {
+  border-color: var(--gold, #f6c449);
+  background: radial-gradient(
+      circle at top left,
+      rgba(246, 196, 73, 0.35),
+      transparent 55%
+    ),
+    #190825;
+}
+
+/* уже пройденные шаги */
+.post-wizard-step.done {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.post-wizard-step.done .dot {
+  border-color: var(--gold, #f6c449);
+  background: var(--gold, #f6c449);
+}
+
+/* контент шагов */
+.post-wizard-content {
+  margin-top: 4px;
+}
+
+/* карточка шага */
+.step-card {
+  border-radius: 20px;
+  padding: 18px 18px 16px;
+  background: radial-gradient(
+      circle at top left,
+      rgba(246, 196, 73, 0.08),
+      transparent 55%
+    ),
+    rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.6);
+}
+
+.step-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.step-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+/* нижняя панель шагов (Назад / Далее / Опубликовать) */
+.step-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ===========================
+   БАЗОВЫЕ ПОЛЯ
+   =========================== */
 
 .add-post-label {
   display: flex;
@@ -36,7 +180,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--ring);
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.25);
   color: var(--text);
   font: inherit;
 }
@@ -60,8 +204,12 @@
   border: 1px dashed rgba(255, 255, 255, 0.18);
   background: rgba(0, 0, 0, 0.25);
   min-height: 220px;
+  max-height: 480px; /* 🔥 ограничиваем высоту превью */
   cursor: pointer;
   overflow: hidden;
+  display: flex; /* чтобы центрировать содержимое */
+  align-items: center;
+  justify-content: center;
   transition: border-color 0.15s ease, background 0.15s ease,
     transform 0.1s ease;
 }
@@ -109,15 +257,28 @@
 /* Превью внутри карточки */
 .add-post-media-preview {
   width: 100%;
-  height: 100%;
+  max-height: 480px; /* совпадает с карточкой */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
 }
 
+/* и картинка, и видео — вписываются с сохранением пропорций */
 .add-post-media-preview-image,
 .add-post-media-preview-video {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  max-height: 480px;
+  object-fit: contain; /* 🔥 больше не растягиваем до краёв */
   display: block;
+}
+
+/* компактное превью для шага "Предпросмотр" */
+.add-post-media-preview--compact {
+  max-height: 260px;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 /* Хэштеги */
@@ -146,6 +307,27 @@
   font-size: 13px;
 }
 
+/* Хэштеги в превью */
+.preview-hashtags {
+  margin-top: 8px;
+}
+
+/* карточка превью поста на последнем шаге */
+.preview-card {
+  border-radius: 16px;
+  padding: 12px 12px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-caption {
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
 .add-post-error {
   margin-top: 4px;
 }
@@ -153,4 +335,247 @@
 .add-post-submit {
   align-self: flex-start;
   min-width: 160px;
+}
+
+/* ============================= */
+/*   Доп. стили для MediaStep    */
+/* ============================= */
+
+/* Карточка в состоянии "есть файл" */
+.add-post-media-card--filled {
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: radial-gradient(
+      circle at top left,
+      rgba(246, 196, 73, 0.1),
+      transparent 55%
+    ),
+    rgba(0, 0, 0, 0.4);
+}
+
+/* Состояние drag & drop поверх карточки */
+.add-post-media-card--drag-over {
+  border-color: var(--gold);
+  background: radial-gradient(
+    circle at center,
+    rgba(246, 196, 73, 0.18),
+    rgba(12, 6, 38, 0.95)
+  );
+  box-shadow: 0 0 0 1px rgba(246, 196, 73, 0.4), 0 18px 40px rgba(0, 0, 0, 0.8);
+}
+
+/* Верхняя строка над превью (тип медиа, подсказка) */
+.add-post-media-top-row {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none; /* чтобы не мешало клику по карточке */
+}
+
+.add-post-media-type-pill {
+  pointer-events: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid rgba(246, 196, 73, 0.7);
+  background: rgba(10, 0, 40, 0.9);
+  color: var(--gold);
+}
+
+/* маленькая подсказка справа сверху */
+.add-post-media-dnd-hint {
+  pointer-events: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Нижняя строка под превью — размер, длительность, "изменить" */
+.add-post-media-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  /* 🔥 отступы от краёв карточки */
+  margin-top: 14px;
+  margin-left: 4px;
+  margin-right: 4px;
+
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 14px;
+  backdrop-filter: blur(8px);
+}
+
+/* слева — разные "пилюли": размер, длительность и т.п. */
+.add-post-media-meta-left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* справа — кнопки действий (заменить / удалить) */
+.add-post-media-actions,
+.add-post-media-meta-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Универсальная пилюля с информацией (вес файла, длительность и т.д.) */
+.add-post-media-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(246, 196, 73, 0.18);
+  border: 1px solid rgba(246, 196, 73, 0.45);
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Имя файла */
+.add-post-media-filename {
+  opacity: 0.85;
+  font-size: 14px;
+}
+
+.add-post-media-pill-emoji {
+  font-size: 12px;
+}
+
+/* Кнопка "Изменить файл" / "Выбрать другой" */
+.add-post-media-change-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--gold);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: 0.15s ease;
+}
+
+.add-post-media-change-btn:hover {
+  background: rgba(246, 196, 73, 0.16);
+  box-shadow: 0 0 0 1px rgba(246, 196, 73, 0.4);
+}
+
+/* кнопка "Удалить" — аккуратная красная пилюля */
+.add-post-media-remove-btn {
+  border: none;
+  background: rgba(255, 80, 80, 0.16);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  color: #ff6b81;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: 0.15s ease;
+}
+
+.add-post-media-remove-btn:hover {
+  background: rgba(255, 80, 80, 0.28);
+  color: #ff8fa0;
+}
+
+/* мини-кнопка "очистить" рядом с change-btn (если используешь) */
+.add-post-media-clear-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.6);
+  transition: 0.15s ease;
+}
+
+.add-post-media-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+/* Для маленькой иконки внутри change / clear */
+.add-post-media-icon {
+  font-size: 12px;
+}
+
+/* чуть ужимаем всё на мобиле (мета-строка) */
+@media (max-width: 600px) {
+  .add-post-media-meta-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .add-post-media-actions,
+  .add-post-media-meta-right {
+    margin-left: 0;
+    align-self: stretch;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .add-post-media-pill {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  .add-post-media-change-btn,
+  .add-post-media-remove-btn {
+    font-size: 11px;
+  }
+}
+
+/* Адаптив общий */
+@media (max-width: 600px) {
+  .add-post-container {
+    max-width: 100%;
+    padding: 16px 14px 28px;
+  }
+
+  .post-wizard-steps {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    padding: 8px 10px 12px;
+  }
+
+  .post-wizard-step {
+    flex: 1 1 100px;
+    justify-content: flex-start;
+    font-size: 12px;
+  }
+
+  .step-card {
+    padding: 14px 14px 12px;
+  }
+
+  .step-title {
+    font-size: 16px;
+  }
+
+  .step-subtitle {
+    font-size: 12px;
+  }
+
+  .preview-card {
+    padding: 10px;
+  }
 }

@@ -197,7 +197,9 @@
 .pcm-comments-block {
   padding: 12px 18px;
   flex: 1;
-  overflow: visible;
+  position: relative;
+  overflow-y: auto; /* общий скролл для комментариев */
+  overflow-x: hidden;
 }
 
 .pcm-status {
@@ -259,12 +261,8 @@
 .comments-list-wrapper {
   position: relative;
   margin-bottom: 16px;
-
-  /* переносим скролл сюда, чтобы меню в .pcm-item не обрезалось */
-  max-height: calc(100vh - 260px);
-  overflow-y: auto;
-  overflow-x: visible;
-  padding-right: 8px;
+  overflow: visible; /* меню не обрезается */
+  padding-right: 0; /* убираем отступ под внутренний скролл */
 }
 
 /* сам список — без собственного overflow */
@@ -575,6 +573,40 @@
 
 .pcm-likes-count {
   font-weight: 500;
+}
+
+/* разбор реакций поста: чипы справа от общего числа */
+.pcm-likes-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  font-size: 12px;
+  color: var(--muted, #c8bfdc);
+}
+
+.pcm-likes-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pcm-likes-chip-icon svg {
+  font-size: 14px;
+  color: var(--gold, #f6c449);
+}
+
+.pcm-likes-chip-count {
+  min-width: 10px;
+  text-align: center;
+}
+
+.pcm-likes-loading {
+  font-size: 12px;
+  opacity: 0.7;
 }
 
 /* старая кнопка "Ответить" (если где-то ещё используется) */
@@ -921,7 +953,7 @@
     rgba(13, 6, 32, 0.98);
   box-shadow: 0 14px 35px rgba(0, 0, 0, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  z-index: 15;
+  z-index: 50; /* чтобы точно быть поверх списка */
 }
 
 .pcm-comment-menu-item {
@@ -996,17 +1028,18 @@
   .pcm-comments-block {
     padding: 8px 14px;
     flex: 0 0 auto;
+    overflow: visible; /* прокрутка идёт по модалке */
   }
 
   .pcm-bottom {
     padding: 8px 14px 12px;
   }
 
+  /* убираем внутренний скролл у списка и на мобиле */
   .comments-list-wrapper {
-    max-height: calc(100vh - 260px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 8px;
+    margin-bottom: 16px;
+    overflow: visible;
+    padding-right: 0;
   }
 
   .pcm-sort {
@@ -1037,8 +1070,11 @@
     font-size: 13px;
   }
 
+  /* не ограничиваем по высоте, чтобы не резать меню */
   .comments-list-wrapper {
-    max-height: 200px;
+    margin-bottom: 16px;
+    overflow: visible;
+    padding-right: 0;
   }
 
   .pcm-sort {

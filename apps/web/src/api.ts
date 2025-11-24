@@ -125,6 +125,15 @@ export interface ApiUserSummary {
   avatarUrl?: string | null;
 }
 
+// 🔥 Типы реакций на пост
+export type ReactionType = "LIKE" | "FIRE" | "WOW" | "CUTE" | "CLAP";
+
+export interface PostReactionsSummary {
+  postId: string;
+  counts: Record<ReactionType, number>;
+  myReaction: ReactionType | null;
+}
+
 export interface Post {
   id: string;
   caption: string;
@@ -137,9 +146,10 @@ export interface Post {
   mediaUrl?: string | null;
   mediaLocalPath?: string | null;
 
-  // лайки
+  // реакции (likesCount = общее число реакций)
   likesCount: number;
-  likedByMe: boolean;
+  likedByMe: boolean; // true, если есть любая реакция
+  myReaction?: ReactionType | null;
 
   // комментарии
   commentsCount: number;
@@ -208,11 +218,31 @@ export function createPost(caption: string, media?: File | null) {
   return api.post<{ ok: boolean; post: Post }>("/posts", { caption: trimmed });
 }
 
-// Лайк / Unlike (toggle) поста
+// 🆕 Поставить / изменить реакцию на пост
+export async function reactToPost(postId: string, type: ReactionType) {
+  const { data } = await api.post<{
+    ok: boolean;
+    reactions: PostReactionsSummary;
+  }>(`/posts/${postId}/react`, { type });
+
+  return data.reactions;
+}
+
+// 🆕 Получить сводку реакций по посту
+export async function fetchPostReactions(
+  postId: string
+): Promise<PostReactionsSummary> {
+  const { data } = await api.get<{
+    ok: boolean;
+    reactions: PostReactionsSummary;
+  }>(`/posts/${postId}/reactions`);
+
+  return data.reactions;
+}
+
+// Лайк / Unlike (toggle) поста — через реакцию LIKE
 export function toggleLike(postId: string) {
-  return api.post<{ ok: boolean; liked: boolean; likesCount: number }>(
-    `/posts/${postId}/like`
-  );
+  return reactToPost(postId, "LIKE");
 }
 
 // ----------------------------------------------------
