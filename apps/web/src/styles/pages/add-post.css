@@ -176,6 +176,8 @@
 
 /* Текстовое поле подписи */
 .add-post-textarea {
+  width: 100%; /* 🔥 чтобы поле не было укороченным */
+  min-height: 120px; /* 🔥 примерно как было по высоте */
   resize: vertical;
   padding: 10px 12px;
   border-radius: 10px;
@@ -404,7 +406,6 @@
   align-items: center;
   gap: 12px;
 
-  /* 🔥 отступы от краёв карточки */
   margin-top: 14px;
   margin-left: 4px;
   margin-right: 4px;
@@ -467,7 +468,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: 0.15s ease;
+  transition: 0.15s ease; /* ✅ исправлено */
 }
 
 .add-post-media-change-btn:hover {
@@ -516,6 +517,141 @@
 /* Для маленькой иконки внутри change / clear */
 .add-post-media-icon {
   font-size: 12px;
+}
+
+.add-post-caption-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.add-post-char-counter {
+  opacity: 0.8;
+}
+
+.add-post-char-counter--too-long {
+  font-weight: 600;
+}
+
+.add-post-char-warning {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.add-post-char-error {
+  font-size: 12px;
+  color: var(--danger, #ff6b6b);
+}
+
+/* ===========================
+   @mentions
+   =========================== */
+
+.add-post-label--with-mentions {
+  position: relative;
+}
+
+.add-post-textarea {
+  width: 100%;
+  box-sizing: border-box; /* чтобы padding не делал шире */
+}
+
+/* Выпадающий список под textarea */
+.mention-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: rgba(10, 7, 25, 0.98);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  z-index: 50;
+}
+
+.mention-dropdown-item {
+  width: 100%;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--muted); /* 🔥 сероватый текст по умолчанию */
+}
+
+.mention-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mention-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.mention-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.mention-username {
+  font-size: 13px;
+  font-weight: 600;
+  color: #d0d0d0; /* 🔥 светло-серый логин */
+}
+
+.mention-display-name {
+  font-size: 12px;
+  opacity: 0.8;
+  color: var(--muted); /* 🔥 ещё более приглушённый */
+}
+
+/* Обёртка для подсветки упоминаний */
+.mention-area-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* Подсветка, копия текста позади textarea */
+.mention-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  color: transparent; /* текст скрыт, но занимает место */
+  pointer-events: none;
+  font: inherit;
+  line-height: 1.4;
+}
+
+/* Синие упоминания */
+.mention-colored {
+  color: #4ea3ff;
+  font-weight: 600;
+}
+
+/* Прозрачная textarea поверх подсветки */
+.mention-textarea {
+  background: transparent !important;
+  position: relative;
+  color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
+  z-index: 2;
 }
 
 /* чуть ужимаем всё на мобиле (мета-строка) */

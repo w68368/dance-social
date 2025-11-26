@@ -2,10 +2,12 @@
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createPost } from "../api";
+import { createPost, searchUsers, type ApiUserSummary } from "../api";
 import "../styles/pages/add-post.css";
 
 const MAX_FILE_MB = 100; // держим в уме серверный лимит
+const CAPTION_MAX_LENGTH = 1000; // должен совпадать с CAPTION_MAX_LENGTH на бэке
+const CAPTION_SOFT_WARNING = 500; // после этого значения подсвечиваем "длинный" текст
 
 const STEP_LABELS = ["Медиа", "Подпись", "Предпросмотр"];
 
@@ -16,16 +18,28 @@ export default function AddVideo() {
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
 
+  const captionLength = caption.length;
+  const isCaptionTooLong = captionLength > CAPTION_MAX_LENGTH;
+  const isCaptionLongButOk =
+    captionLength > CAPTION_SOFT_WARNING && !isCaptionTooLong;
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // wizard
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // drag&drop highlight
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // состояние для @упоминаний
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionResults, setMentionResults] = useState<ApiUserSummary[]>([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const mentionSearchTimeoutRef = useRef<number | null>(null);
 
   // Хэштеги из подписи
   const hashtags = useMemo(() => {
@@ -45,6 +59,34 @@ export default function AddVideo() {
       URL.revokeObjectURL(url);
     };
   }, [mediaFile]);
+
+  // Поиск пользователей для @упоминаний с небольшим дебаунсом
+  useEffect(() => {
+    if (mentionSearchTimeoutRef.current !== null) {
+      window.clearTimeout(mentionSearchTimeoutRef.current);
+    }
+
+    if (!mentionQuery || mentionQuery.length < 2) {
+      setMentionResults([]);
+      return;
+    }
+
+    mentionSearchTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        const users = await searchUsers(mentionQuery);
+        setMentionResults(users);
+      } catch (e) {
+        console.error("searchUsers error", e);
+        setMentionResults([]);
+      }
+    }, 300);
+
+    return () => {
+      if (mentionSearchTimeoutRef.current !== null) {
+        window.clearTimeout(mentionSearchTimeoutRef.current);
+      }
+    };
+  }, [mentionQuery]);
 
   // универсальный обработчик выбранного файла (и из input, и из drop)
   const handleFileSelect = (file: File | null) => {
@@ -89,7 +131,6 @@ export default function AddVideo() {
   const handleDragLeave: React.DragEventHandler<HTMLDivElement> = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // чтобы не мигало при уходе внутрь потомка — проверяем relatedTarget
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsDragOver(false);
     }
@@ -133,16 +174,88 @@ export default function AddVideo() {
   const progressWidth =
     totalSteps <= 1 ? "0%" : `${((currentStep - 1) / (totalSteps - 1)) * 100}%`;
 
+  // детекция, что сейчас вводится @упоминание
+  const detectMentionAtCursor = (value: string) => {
+    if (!textareaRef.current) {
+      setShowMentionDropdown(false);
+      setMentionQuery("");
+      return;
+    }
+
+    const el = textareaRef.current;
+    const cursorPos = el.selectionEnd ?? value.length;
+
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/(^|\s)@([\w.]{1,20})$/);
+
+    if (match) {
+      const query = match[2];
+      setMentionQuery(query);
+      setShowMentionDropdown(true);
+    } else {
+      setMentionQuery("");
+      setShowMentionDropdown(false);
+    }
+  };
+
+  const handleCaptionChange: React.ChangeEventHandler<HTMLTextAreaElement> = (
+    e
+  ) => {
+    const value = e.target.value;
+    setCaption(value);
+    detectMentionAtCursor(value);
+  };
+
+  const handleMentionSelect = (user: ApiUserSummary) => {
+    if (!textareaRef.current) return;
+
+    const el = textareaRef.current;
+    const cursorPos = el.selectionEnd ?? caption.length;
+    const textBeforeCursor = caption.slice(0, cursorPos);
+    const textAfterCursor = caption.slice(cursorPos);
+
+    const match = textBeforeCursor.match(/(^|\s)@([\w.]{0,20})$/);
+    if (!match || match.index === undefined) {
+      return;
+    }
+
+    const prefix = textBeforeCursor.slice(0, match.index);
+    const spaceOrStart = match[1];
+
+    const mentionText = "@" + user.username;
+    const newBefore = prefix + spaceOrStart + mentionText + " ";
+    const newCaption = newBefore + textAfterCursor;
+
+    setCaption(newCaption);
+    setShowMentionDropdown(false);
+    setMentionQuery("");
+    setMentionResults([]);
+
+    requestAnimationFrame(() => {
+      const pos = newBefore.length;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
     const trimmed = caption.trim();
 
-    // Разрешаем пост: текст ИЛИ медиа (или вместе)
     if (!trimmed && !mediaFile) {
       setError("Добавь текст или прикрепи фото/видео к посту 🙂");
-      // если человек пытается публиковать с последнего шага — вернём его на шаг с полями
       if (currentStep !== 1) {
         setCurrentStep(1);
+      }
+      return;
+    }
+
+    if (captionLength > CAPTION_MAX_LENGTH) {
+      setError(
+        `Подпись длиннее ${CAPTION_MAX_LENGTH} символов. Пожалуйста, сократи текст.`
+      );
+      if (currentStep !== 2) {
+        setCurrentStep(2);
       }
       return;
     }
@@ -166,7 +279,7 @@ export default function AddVideo() {
   const isPhoto = mediaFile && mediaFile.type.startsWith("image/");
   const isVideo = mediaFile && mediaFile.type.startsWith("video/");
 
-  const canGoNextFromMedia = !!mediaFile || caption.trim().length > 0; // можно без медиа, если уже есть текст
+  const canGoNextFromMedia = !!mediaFile || caption.trim().length > 0;
 
   return (
     <main className="su-main">
@@ -223,7 +336,6 @@ export default function AddVideo() {
                       Медиа (фото или видео):
                     </span>
 
-                    {/* Скрытый инпут, кликаем по карточке */}
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -282,7 +394,6 @@ export default function AddVideo() {
                       )}
                     </div>
 
-                    {/* инфо о выбранном файле + действия */}
                     {mediaFile && (
                       <div className="add-post-media-meta-row">
                         <div className="add-post-media-meta-main">
@@ -325,7 +436,7 @@ export default function AddVideo() {
                 </section>
               )}
 
-              {/* ===== ШАГ 2: ПОДПИСЬ / ХЭШТЕГИ ===== */}
+              {/* ===== ШАГ 2: ПОДПИСЬ / ХЭШТЕГИ + @упоминания ===== */}
               {currentStep === 2 && (
                 <section className="step-card">
                   <h2 className="step-title">Шаг 2. Подпись</h2>
@@ -334,18 +445,88 @@ export default function AddVideo() {
                     друзей через @username.
                   </p>
 
-                  <label className="add-post-label">
+                  <label className="add-post-label add-post-label--with-mentions">
                     <span className="add-post-label-text">
                       Подпись / описание:
                     </span>
-                    <textarea
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value)}
-                      rows={4}
-                      placeholder="Добавь подпись, отметь стиль и хэштеги..."
-                      className="add-post-textarea"
-                    />
+                    <div className="add-post-textarea-wrapper">
+                      <textarea
+                        ref={textareaRef}
+                        value={caption}
+                        onChange={handleCaptionChange}
+                        rows={4}
+                        placeholder="Добавь подпись, отметь стиль, хэштеги и упоминания через @username..."
+                        className="add-post-textarea"
+                        onBlur={() => {
+                          setTimeout(() => {
+                            setShowMentionDropdown(false);
+                          }, 150);
+                        }}
+                        onFocus={() => {
+                          if (mentionQuery) {
+                            setShowMentionDropdown(true);
+                          }
+                        }}
+                      />
+
+                      {showMentionDropdown && mentionResults.length > 0 && (
+                        <div className="mention-dropdown">
+                          {mentionResults.map((user) => (
+                            <button
+                              key={user.id}
+                              type="button"
+                              className="mention-dropdown-item"
+                              onClick={() => handleMentionSelect(user)}
+                            >
+                              {user.avatarUrl && (
+                                <img
+                                  src={user.avatarUrl}
+                                  alt={user.username}
+                                  className="mention-avatar"
+                                />
+                              )}
+                              <div className="mention-text">
+                                <div className="mention-username">
+                                  @{user.username}
+                                </div>
+                                {user.displayName && (
+                                  <div className="mention-display-name">
+                                    {user.displayName}
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </label>
+
+                  <div className="add-post-caption-meta">
+                    <span
+                      className={
+                        "add-post-char-counter" +
+                        (isCaptionTooLong
+                          ? " add-post-char-counter--too-long"
+                          : "")
+                      }
+                    >
+                      {captionLength} / {CAPTION_MAX_LENGTH}
+                    </span>
+
+                    {isCaptionTooLong && (
+                      <span className="add-post-char-error">
+                        Текст длиннее допустимого лимита — сократи подпись.
+                      </span>
+                    )}
+
+                    {!isCaptionTooLong && isCaptionLongButOk && (
+                      <span className="add-post-char-warning">
+                        Подпись довольно длинная — подумай, не разбить ли её на
+                        абзацы 😊
+                      </span>
+                    )}
+                  </div>
 
                   {hashtags.length > 0 && (
                     <div className="add-post-hashtags">
@@ -450,7 +631,7 @@ export default function AddVideo() {
               ) : (
                 <button
                   type="submit"
-                  className="su-btn su-btn--accent add-post-submit"
+                  className="su-btn су-btn--accent add-post-submit"
                   disabled={loading}
                 >
                   {loading ? "Публикуем..." : "Publish post"}

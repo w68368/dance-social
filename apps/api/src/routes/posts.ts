@@ -55,9 +55,11 @@ const upload = multer({
 // -----------------------------
 // Валидация текста
 // -----------------------------
+const CAPTION_MAX_LENGTH = 1000; // лимит для подписи, должен совпадать с фронтом
+
 const captionSchema = z
   .string()
-  .max(1000, "Слишком длинный текст")
+  .max(CAPTION_MAX_LENGTH, "Слишком длинный текст")
   .transform((v) => v.trim());
 
 const commentSchema = z
@@ -87,8 +89,20 @@ router.post(
     const file = req.file ?? undefined;
     const rawCaption =
       typeof req.body.caption === "string" ? req.body.caption : "";
+
     const parsedCaption = captionSchema.safeParse(rawCaption);
-    const caption = parsedCaption.success ? parsedCaption.data : "";
+
+    if (!parsedCaption.success) {
+      // тут аккуратно достаём первую ошибку zod
+      const firstIssue = parsedCaption.error.issues[0];
+      const msg = firstIssue?.message || "Некорректный текст подписи";
+      return res.status(400).json({
+        ok: false,
+        message: msg,
+      });
+    }
+
+    const caption = parsedCaption.data;
 
     if (!caption && !file) {
       return res.status(400).json({

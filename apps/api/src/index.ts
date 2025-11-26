@@ -92,6 +92,59 @@ app.get("/api/users", async (_req, res) => {
   res.json(users);
 });
 
+// -----------------------
+// USERS SEARCH (для @упоминаний и поиска людей)
+// -----------------------
+app.get("/api/users/search", async (req, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+  if (!q) {
+    return res.status(400).json({
+      ok: false,
+      message: "Пустой поисковый запрос",
+    });
+  }
+
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          {
+            username: {
+              contains: q,
+              mode: "insensitive",
+            },
+          },
+          {
+            displayName: {
+              contains: q,
+              mode: "insensitive",
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+      },
+      take: 10,
+    });
+
+    return res.json({
+      ok: true,
+      users,
+    });
+  } catch (err) {
+    console.error("Users search error", err);
+    return res.status(500).json({
+      ok: false,
+      message: "Не удалось выполнить поиск пользователей",
+    });
+  }
+});
+
 // 🆕 Один пользователь по id (для UserProfile)
 app.get("/api/users/:id", async (req, res) => {
   try {

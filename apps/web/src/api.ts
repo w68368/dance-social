@@ -349,6 +349,22 @@ export function fetchFollowers(userId: string) {
   );
 }
 
+// 🆕 поиск пользователей по username / displayName (для @упоминаний и поиска)
+export async function searchUsers(query: string): Promise<ApiUserSummary[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const { data } = await api.get<{
+    ok: boolean;
+    users: ApiUserSummary[];
+  }>("/users/search", {
+    params: { q },
+  });
+
+  if (!data?.ok) return [];
+  return data.users ?? [];
+}
+
 // получить публичную инфу пользователя по id
 export function fetchUserPublic(userId: string) {
   return api.get<{ ok: boolean; user: ApiUserSummary }>(`/users/${userId}`);
