@@ -158,6 +158,37 @@ router.post(
         },
       });
 
+      // =====================================
+      //    ХЭШТЕГИ — полностью рабочая версия
+      // =====================================
+
+      // Ищем #теги в подписи
+      const rawTags = caption.match(/#[\wа-яА-ЯёЁ]+/g) ?? [];
+
+      // Убираем #, приводим к lowercase, удаляем дубли
+      const cleanedTags = [
+        ...new Set(rawTags.map((t) => t.substring(1).toLowerCase())),
+      ];
+
+      if (cleanedTags.length > 0) {
+        for (const tag of cleanedTags) {
+          // создаём или берём существующий тег
+          const hashtag = await prisma.hashtag.upsert({
+            where: { tag },
+            update: {},
+            create: { tag },
+          });
+
+          // создаём связь пост ↔ тег
+          await prisma.postHashtag.create({
+            data: {
+              postId: post.id,
+              hashtagId: hashtag.id,
+            },
+          });
+        }
+      }
+
       const responsePost = {
         ...post,
         likesCount: 0, // суммарные реакции (пока 0)

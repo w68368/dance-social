@@ -187,6 +187,17 @@ export interface FollowStatsResponse {
   isFollowing: boolean;
 }
 
+// 🆕 Тип для подсказок хэштегов
+export interface HashtagSuggestion {
+  id: string;
+  tag: string; // без #, в нижнем регистре
+}
+
+export interface HashtagDto {
+  id: string;
+  tag: string; // без #
+}
+
 // ----------------------------------------------------
 // Posts
 // ----------------------------------------------------
@@ -363,6 +374,34 @@ export async function searchUsers(query: string): Promise<ApiUserSummary[]> {
 
   if (!data?.ok) return [];
   return data.users ?? [];
+}
+
+// 🆕 поиск хэштегов для автодополнения (#tag)
+export async function searchTags(query: string): Promise<HashtagSuggestion[]> {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const { data } = await api.get<HashtagSuggestion[]>("/tags/search", {
+    params: { q },
+  });
+
+  return data ?? [];
+}
+
+// 🆕 поиск хэштегов по префиксу (для автодополнения)
+export async function searchHashtags(query: string): Promise<HashtagDto[]> {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const { data } = await api.get<{
+    ok: boolean;
+    hashtags: HashtagDto[];
+  }>("/tags/search", {
+    params: { q },
+  });
+
+  if (!data?.ok) return [];
+  return data.hashtags ?? [];
 }
 
 // получить публичную инфу пользователя по id

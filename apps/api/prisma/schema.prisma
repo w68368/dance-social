@@ -132,6 +132,8 @@ model Post {
   // 🆕 Реакции
   reactions PostReaction[]
   comments  PostComment[]
+    // 🆕 связь с хэштегами
+  hashtags  PostHashtag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -191,7 +193,6 @@ model PostComment {
   @@index([postId, isPinned])
 }
 
-
 //
 // 🆕 Таблица лайков комментариев
 //
@@ -232,3 +233,33 @@ model PostReaction {
   @@index([postId])
   @@index([userId])
 }
+
+// 🆕 Таблица хэштегов для автодополнения и аналитики
+model Hashtag {
+  id        String        @id @default(cuid())
+  tag       String        @unique  // текст без #, в нижнем регистре, например "hiphop"
+  createdAt DateTime      @default(now())
+
+  // связи постов с этим тегом
+  posts     PostHashtag[]
+
+  @@index([tag])
+}
+
+// 🆕 Связующая таблица "пост ↔ хэштег"
+model PostHashtag {
+  id        String   @id @default(cuid())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+
+  hashtag   Hashtag  @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+  hashtagId String
+
+  // один и тот же тег не может быть дважды привязан к одному посту
+  @@unique([postId, hashtagId])
+
+  @@index([postId])
+  @@index([hashtagId])
+}
+

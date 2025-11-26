@@ -145,6 +145,50 @@ app.get("/api/users/search", async (req, res) => {
   }
 });
 
+// -----------------------
+// TAGS SEARCH (для автодополнения #хэштегов)
+// -----------------------
+app.get("/api/tags/search", async (req, res) => {
+  const qRaw = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const q = qRaw.toLowerCase();
+
+  if (!q || q.length < 1) {
+    // для пустой строки просто отдаём пустой список
+    return res.json({ ok: true, hashtags: [] });
+  }
+
+  try {
+    const tags = await prisma.hashtag.findMany({
+      where: {
+        tag: {
+          startsWith: q,
+          mode: "insensitive",
+        },
+      },
+      select: {
+        id: true,
+        tag: true,
+      },
+      orderBy: {
+        tag: "asc",
+      },
+      take: 10,
+    });
+
+    // фронт (searchHashtags) ожидает объект { ok, hashtags: [...] }
+    return res.json({
+      ok: true,
+      hashtags: tags,
+    });
+  } catch (err) {
+    console.error("Tags search error", err);
+    return res.status(500).json({
+      ok: false,
+      message: "Не удалось выполнить поиск хэштегов",
+    });
+  }
+});
+
 // 🆕 Один пользователь по id (для UserProfile)
 app.get("/api/users/:id", async (req, res) => {
   try {

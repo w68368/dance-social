@@ -2,12 +2,18 @@
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createPost, searchUsers, type ApiUserSummary } from "../api";
+import {
+  createPost,
+  searchUsers,
+  searchHashtags,
+  type ApiUserSummary,
+  type HashtagDto,
+} from "../api";
 import "../styles/pages/add-post.css";
 
-const MAX_FILE_MB = 100; // держим в уме серверный лимит
-const CAPTION_MAX_LENGTH = 1000; // должен совпадать с CAPTION_MAX_LENGTH на бэке
-const CAPTION_SOFT_WARNING = 500; // после этого значения подсвечиваем "длинный" текст
+const MAX_FILE_MB = 100;
+const CAPTION_MAX_LENGTH = 1000;
+const CAPTION_SOFT_WARNING = 500;
 
 const STEP_LABELS = ["Медиа", "Подпись", "Предпросмотр"];
 
@@ -41,7 +47,13 @@ export default function AddVideo() {
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const mentionSearchTimeoutRef = useRef<number | null>(null);
 
-  // Хэштеги из подписи
+  // состояние для #хэштегов
+  const [hashtagQuery, setHashtagQuery] = useState("");
+  const [hashtagResults, setHashtagResults] = useState<HashtagDto[]>([]);
+  const [showHashtagDropdown, setShowHashtagDropdown] = useState(false);
+  const hashtagSearchTimeoutRef = useRef<number | null>(null);
+
+  // Хэштеги, которые уже есть в подписи (для блока ниже textarea)
   const hashtags = useMemo(() => {
     const matches = caption.match(/#[^\s#]+/g);
     return matches ?? [];
@@ -60,7 +72,7 @@ export default function AddVideo() {
     };
   }, [mediaFile]);
 
-  // Поиск пользователей для @упоминаний с небольшим дебаунсом
+  // Поиск пользователей для @упоминаний с дебаунсом
   useEffect(() => {
     if (mentionSearchTimeoutRef.current !== null) {
       window.clearTimeout(mentionSearchTimeoutRef.current);
@@ -88,7 +100,37 @@ export default function AddVideo() {
     };
   }, [mentionQuery]);
 
-  // универсальный обработчик выбранного файла (и из input, и из drop)
+  // Поиск хэштегов с дебаунсом
+  useEffect(() => {
+    if (hashtagSearchTimeoutRef.current !== null) {
+      window.clearTimeout(hashtagSearchTimeoutRef.current);
+    }
+
+    if (!hashtagQuery || hashtagQuery.length < 2) {
+      setHashtagResults([]);
+      return;
+    }
+
+    hashtagSearchTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        const tags = await searchHashtags(hashtagQuery);
+        setHashtagResults(tags);
+      } catch (e) {
+        console.error("searchHashtags error", e);
+        setHashtagResults([]);
+      }
+    }, 300);
+
+    return () => {
+      if (hashtagSearchTimeoutRef.current !== null) {
+        window.clearTimeout(hashtagSearchTimeoutRef.current);
+      }
+    };
+  }, [hashtagQuery]);
+
+  // -----------------------------
+  // Файл
+  // -----------------------------
   const handleFileSelect = (file: File | null) => {
     if (!file) {
       setMediaFile(null);
@@ -155,7 +197,9 @@ export default function AddVideo() {
     }
   };
 
-  // навигация по шагам
+  // -----------------------------
+  // Навигация по шагам
+  // -----------------------------
   const totalSteps = STEP_LABELS.length;
 
   const goToStep = (step: number) => {
@@ -174,7 +218,9 @@ export default function AddVideo() {
   const progressWidth =
     totalSteps <= 1 ? "0%" : `${((currentStep - 1) / (totalSteps - 1)) * 100}%`;
 
-  // детекция, что сейчас вводится @упоминание
+  // -----------------------------
+  // Детекция @ и # под курсором
+  // -----------------------------
   const detectMentionAtCursor = (value: string) => {
     if (!textareaRef.current) {
       setShowMentionDropdown(false);
@@ -198,12 +244,36 @@ export default function AddVideo() {
     }
   };
 
+  const detectHashtagAtCursor = (value: string) => {
+    if (!textareaRef.current) {
+      setShowHashtagDropdown(false);
+      setHashtagQuery("");
+      return;
+    }
+
+    const el = textareaRef.current;
+    const cursorPos = el.selectionEnd ?? value.length;
+
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/(^|\s)#([^\s#]{1,30})$/);
+
+    if (match) {
+      const query = match[2];
+      setHashtagQuery(query);
+      setShowHashtagDropdown(true);
+    } else {
+      setHashtagQuery("");
+      setShowHashtagDropdown(false);
+    }
+  };
+
   const handleCaptionChange: React.ChangeEventHandler<HTMLTextAreaElement> = (
     e
   ) => {
     const value = e.target.value;
     setCaption(value);
     detectMentionAtCursor(value);
+    detectHashtagAtCursor(value);
   };
 
   const handleMentionSelect = (user: ApiUserSummary) => {
@@ -238,6 +308,41 @@ export default function AddVideo() {
     });
   };
 
+  const handleHashtagSelect = (tag: HashtagDto) => {
+    if (!textareaRef.current) return;
+
+    const el = textareaRef.current;
+    const cursorPos = el.selectionEnd ?? caption.length;
+    const textBeforeCursor = caption.slice(0, cursorPos);
+    const textAfterCursor = caption.slice(cursorPos);
+
+    const match = textBeforeCursor.match(/(^|\s)#([^\s#]{0,30})$/);
+    if (!match || match.index === undefined) {
+      return;
+    }
+
+    const prefix = textBeforeCursor.slice(0, match.index);
+    const spaceOrStart = match[1];
+
+    const hashtagText = "#" + tag.tag;
+    const newBefore = prefix + spaceOrStart + hashtagText + " ";
+    const newCaption = newBefore + textAfterCursor;
+
+    setCaption(newCaption);
+    setShowHashtagDropdown(false);
+    setHashtagQuery("");
+    setHashtagResults([]);
+
+    requestAnimationFrame(() => {
+      const pos = newBefore.length;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  // -----------------------------
+  // Сабмит
+  // -----------------------------
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
     const trimmed = caption.trim();
@@ -291,7 +396,6 @@ export default function AddVideo() {
         </p>
 
         <form onSubmit={handleSubmit} className="add-post-form">
-          {/* WIZARD STEPS + PROGRESS */}
           <div className="post-wizard">
             <div className="post-wizard-steps">
               {STEP_LABELS.map((label, idx) => {
@@ -321,7 +425,7 @@ export default function AddVideo() {
             </div>
 
             <div className="post-wizard-content">
-              {/* ===== ШАГ 1: МЕДИА ===== */}
+              {/* ===== ШАГ 1 ===== */}
               {currentStep === 1 && (
                 <section className="step-card">
                   <h2 className="step-title">Шаг 1. Медиа</h2>
@@ -436,7 +540,7 @@ export default function AddVideo() {
                 </section>
               )}
 
-              {/* ===== ШАГ 2: ПОДПИСЬ / ХЭШТЕГИ + @упоминания ===== */}
+              {/* ===== ШАГ 2 ===== */}
               {currentStep === 2 && (
                 <section className="step-card">
                   <h2 className="step-title">Шаг 2. Подпись</h2>
@@ -458,17 +562,19 @@ export default function AddVideo() {
                         placeholder="Добавь подпись, отметь стиль, хэштеги и упоминания через @username..."
                         className="add-post-textarea"
                         onBlur={() => {
+                          // небольшая задержка, чтобы успеть кликнуть по дропдаунам
                           setTimeout(() => {
                             setShowMentionDropdown(false);
+                            setShowHashtagDropdown(false);
                           }, 150);
                         }}
                         onFocus={() => {
-                          if (mentionQuery) {
-                            setShowMentionDropdown(true);
-                          }
+                          if (mentionQuery) setShowMentionDropdown(true);
+                          if (hashtagQuery) setShowHashtagDropdown(true);
                         }}
                       />
 
+                      {/* dropdown упоминаний */}
                       {showMentionDropdown && mentionResults.length > 0 && (
                         <div className="mention-dropdown">
                           {mentionResults.map((user) => (
@@ -494,6 +600,26 @@ export default function AddVideo() {
                                     {user.displayName}
                                   </div>
                                 )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* dropdown хэштегов */}
+                      {showHashtagDropdown && hashtagResults.length > 0 && (
+                        <div className="mention-dropdown">
+                          {hashtagResults.map((tag) => (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              className="mention-dropdown-item"
+                              onClick={() => handleHashtagSelect(tag)}
+                            >
+                              <div className="mention-text">
+                                <div className="mention-username">
+                                  #{tag.tag}
+                                </div>
                               </div>
                             </button>
                           ))}
@@ -545,7 +671,7 @@ export default function AddVideo() {
                 </section>
               )}
 
-              {/* ===== ШАГ 3: ПРЕДПРОСМОТР ===== */}
+              {/* ===== ШАГ 3 ===== */}
               {currentStep === 3 && (
                 <section className="step-card">
                   <h2 className="step-title">Шаг 3. Предпросмотр</h2>
@@ -631,7 +757,7 @@ export default function AddVideo() {
               ) : (
                 <button
                   type="submit"
-                  className="su-btn су-btn--accent add-post-submit"
+                  className="su-btn su-btn--accent add-post-submit"
                   disabled={loading}
                 >
                   {loading ? "Публикуем..." : "Publish post"}

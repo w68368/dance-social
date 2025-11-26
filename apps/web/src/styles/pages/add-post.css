@@ -174,10 +174,19 @@
   color: var(--muted);
 }
 
-/* Текстовое поле подписи */
+/* ===== Текстовое поле подписи ===== */
+
+.add-post-label--with-mentions {
+  position: relative;
+}
+
+.add-post-textarea-wrapper {
+  position: relative;
+}
+
 .add-post-textarea {
-  width: 100%; /* 🔥 чтобы поле не было укороченным */
-  min-height: 120px; /* 🔥 примерно как было по высоте */
+  width: 100%;
+  min-height: 120px;
   resize: vertical;
   padding: 10px 12px;
   border-radius: 10px;
@@ -185,6 +194,7 @@
   background: rgba(0, 0, 0, 0.25);
   color: var(--text);
   font: inherit;
+  box-sizing: border-box;
 }
 
 /* Блок медиа */
@@ -206,10 +216,10 @@
   border: 1px dashed rgba(255, 255, 255, 0.18);
   background: rgba(0, 0, 0, 0.25);
   min-height: 220px;
-  max-height: 480px; /* 🔥 ограничиваем высоту превью */
+  max-height: 480px;
   cursor: pointer;
   overflow: hidden;
-  display: flex; /* чтобы центрировать содержимое */
+  display: flex;
   align-items: center;
   justify-content: center;
   transition: border-color 0.15s ease, background 0.15s ease,
@@ -259,7 +269,7 @@
 /* Превью внутри карточки */
 .add-post-media-preview {
   width: 100%;
-  max-height: 480px; /* совпадает с карточкой */
+  max-height: 480px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -272,7 +282,7 @@
   width: 100%;
   height: auto;
   max-height: 480px;
-  object-fit: contain; /* 🔥 больше не растягиваем до краёв */
+  object-fit: contain;
   display: block;
 }
 
@@ -375,7 +385,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  pointer-events: none; /* чтобы не мешало клику по карточке */
+  pointer-events: none;
 }
 
 .add-post-media-type-pill {
@@ -468,7 +478,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: 0.15s ease; /* ✅ исправлено */
+  transition: 0.15s ease;
 }
 
 .add-post-media-change-btn:hover {
@@ -549,19 +559,9 @@
 }
 
 /* ===========================
-   @mentions
+   @mentions dropdown
    =========================== */
 
-.add-post-label--with-mentions {
-  position: relative;
-}
-
-.add-post-textarea {
-  width: 100%;
-  box-sizing: border-box; /* чтобы padding не делал шире */
-}
-
-/* Выпадающий список под textarea */
 .mention-dropdown {
   position: absolute;
   left: 0;
@@ -587,7 +587,7 @@
   border: none;
   cursor: pointer;
   text-align: left;
-  color: var(--muted); /* 🔥 сероватый текст по умолчанию */
+  color: var(--muted);
 }
 
 .mention-dropdown-item:hover {
@@ -609,49 +609,13 @@
 .mention-username {
   font-size: 13px;
   font-weight: 600;
-  color: #d0d0d0; /* 🔥 светло-серый логин */
+  color: #d0d0d0;
 }
 
 .mention-display-name {
   font-size: 12px;
   opacity: 0.8;
-  color: var(--muted); /* 🔥 ещё более приглушённый */
-}
-
-/* Обёртка для подсветки упоминаний */
-.mention-area-wrapper {
-  position: relative;
-  width: 100%;
-}
-
-/* Подсветка, копия текста позади textarea */
-.mention-highlight {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  padding: 10px 12px;
-  white-space: pre-wrap;
-  color: transparent; /* текст скрыт, но занимает место */
-  pointer-events: none;
-  font: inherit;
-  line-height: 1.4;
-}
-
-/* Синие упоминания */
-.mention-colored {
-  color: #4ea3ff;
-  font-weight: 600;
-}
-
-/* Прозрачная textarea поверх подсветки */
-.mention-textarea {
-  background: transparent !important;
-  position: relative;
-  color: var(--text);
-  width: 100%;
-  box-sizing: border-box;
-  z-index: 2;
+  color: var(--muted);
 }
 
 /* чуть ужимаем всё на мобиле (мета-строка) */
