@@ -15,8 +15,6 @@ Platforma Społecznościowa dla Tancerzy
 **StepUnity** to profesjonalna platforma społecznościowa nowej generacji, zaprojektowana dla tancerzy.  
 Łączy szybki frontend, bezpieczny backend oraz zaawansowany system tworzenia treści — w stylu nowoczesnych aplikacji startupowych.
 
-Wersja Premium Tech/Startup prezentuje projekt jak produkt SaaS typu „next-gen creative platform”.
-
 ---
 
 # 🌌 Highlights
@@ -44,6 +42,73 @@ Wersja Premium Tech/Startup prezentuje projekt jak produkt SaaS typu „next-gen
 - Docker-ready,
 - czysty podział: `apps/api`, `apps/web`, `packages/shared`,
 - automatyczne migracje Prisma, seed, studio.
+
+---
+
+# 🧩 Systemy dostępne w projekcie
+
+## 🔐 System Autoryzacji i Bezpieczeństwa
+- rejestracja z kodem e-mail (6 cyfr),  
+- logowanie + refresh token rotation,  
+- blokada konta przy złych próbach,  
+- reset hasła e-mail,  
+- sprawdzanie haseł w wyciekach (HIBP),  
+- zxcvbn analiza siły hasła,  
+- reCAPTCHA v2,  
+- HttpOnly Secure Cookies.
+
+---
+
+## 📸 System Postów (Wideo & Zdjęcia)
+- upload plików (lokalnie / Cloudinary),  
+- generowanie miniatur,  
+- opisy, hashtagi, mentions,  
+- limit rozmiaru, walidacja,  
+- paginacja feedu,  
+- pełny AddPost Wizard z live preview.
+
+---
+
+## 💬 System Komentarzy
+- komentarze pierwszego poziomu,  
+- odpowiedzi (threading),  
+- modalny interfejs z przewijaniem,  
+- polubienia komentarzy,  
+- przypinanie komentarza przez autora posta.
+
+---
+
+## ❤️ System Lajków
+- lajkowanie postów,  
+- lajkowanie komentarzy,  
+- synchronizacja stanu likedByMe,  
+- automatyczne aktualizowanie liczników.
+
+---
+
+## 👤 System Profili
+- slug użytkownika,  
+- własny grid postów,  
+- modalny podgląd posta,  
+- statystyki followów,  
+- własny avatar + upload + kompresja,  
+- edycja profilu (planowane w kolejnych iteracjach).
+
+---
+
+## 🔔 System Follow
+- follow / unfollow,  
+- liczniki followers / following,  
+- pobieranie statystyk profilu,  
+- filtrowanie feedu (planowane).
+
+---
+
+## 🧵 System Feed
+- pobieranie postów stronami,  
+- sortowanie chrono,  
+- stan ładowania i infinite scroll (frontend-ready),  
+- lekkie API do strumieniowania postów.
 
 ---
 
@@ -84,15 +149,13 @@ dance-social/
 - progress bar  
 - obsługa błędów i retry  
 
-> Jest to kompletny, nowoczesny kreator mediów na poziomie aplikacji takich jak Instagram/Reels/TikTok.
-
 ---
 
 # 🔐 Security Stack
 
 | Feature | Status |
 |--------|--------|
-| Email verification (6‑digit code) | ✅ |
+| Email verification (6-digit code) | ✅ |
 | reCAPTCHA v2 | ✅ |
 | Reset password (email link) | ✅ |
 | Disposable email detection | ✅ |
@@ -101,7 +164,6 @@ dance-social/
 | Account lockout | ✅ |
 | HttpOnly Secure Refresh Cookies | ✅ |
 | Refresh Token Rotation | ✅ |
-| Planned: 2FA | 🔜 |
 
 ---
 
@@ -156,8 +218,6 @@ docker-compose up -d
 cd apps/api
 ```
 
-Wypełnij klucze SMTP, recaptcha, JWT…
-
 ### 5️⃣ Migracje Prisma
 ```
 pnpm --filter @app/api prisma:generate
@@ -174,18 +234,6 @@ Frontend:
 ```
 pnpm dev:web
 ```
-
----
-
-# 🌱 Roadmap 2025
-
-- 📡 Real-time comments (WebSockets)
-- 🔔 Powiadomienia push
-- 🎧 Dodanie muzyki do postów
-- 🎟 System challengów tanecznych
-- 🏆 Ranking tygodniowy
-- ✨ 2FA
-- 🎨 Tryb ciemny / jasny
 
 ---
 
