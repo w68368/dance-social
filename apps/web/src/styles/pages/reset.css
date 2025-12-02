@@ -1,4 +1,4 @@
-/* Доп-стили именно для страницы Reset password */
+/* Additional styles specifically for the Reset password page */
 
 .reset-card h2 {
   margin: 0 0 8px;
@@ -8,13 +8,13 @@
   margin-bottom: 22px;
 }
 
-/* Кнопка во всю ширину карточки, как на регистрации */
+/* Full-width button inside the card, same as on the registration page */
 .reset-submit-btn {
   width: 100%;
   margin-top: 4px;
 }
 
-/* На всякий случай — чтобы поле пароля имело нужный z-index над overlay */
+/* Just in case — ensures the password field stays above the overlay */
 .reset-card .field--password {
   position: relative;
   z-index: 20;

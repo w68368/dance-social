@@ -21,7 +21,7 @@ import { getUser } from "../lib/auth";
 import PostCommentsModal from "../components/PostCommentsModal";
 import "../styles/pages/feed.css";
 
-// конфиг реакций для поповера
+// reactions config for the popover
 const REACTIONS: { type: ReactionType; icon: ReactNode; label: string }[] = [
   { type: "LIKE", icon: <FaHeart />, label: "Like" },
   { type: "FIRE", icon: <FaFire />, label: "Fire" },
@@ -30,7 +30,7 @@ const REACTIONS: { type: ReactionType; icon: ReactNode; label: string }[] = [
   { type: "CLAP", icon: <FaHandsClapping />, label: "Clap" },
 ];
 
-// иконка, которая показывается на основной кнопке
+// icon to show on the main like button
 function getMainReactionIcon(
   myReaction: ReactionType | null | undefined,
   likedByMe: boolean
@@ -64,10 +64,10 @@ export default function Feed() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // модалка комментариев
+  // comments modal
   const [commentsPost, setCommentsPost] = useState<Post | null>(null);
 
-  // сводка реакций по постам: postId -> summary
+  // reactions summary per post: postId -> summary
   const [reactionsMap, setReactionsMap] = useState<
     Record<string, PostReactionsSummary>
   >({});
@@ -88,7 +88,7 @@ export default function Feed() {
         console.error(err);
         if (!cancelled) {
           setError(
-            err?.response?.data?.message || "Не удалось загрузить ленту."
+            err?.response?.data?.message || "Failed to load the feed."
           );
         }
       } finally {
@@ -102,7 +102,7 @@ export default function Feed() {
     };
   }, []);
 
-  // общая функция: применяем summary к посту + кладём его в reactionsMap
+  // helper: apply reactions summary to a post + store it in reactionsMap
   const applyReactionsSummary = (
     postId: string,
     summary: PostReactionsSummary
@@ -133,7 +133,7 @@ export default function Feed() {
     }));
   };
 
-  // лениво подгружаем сводку реакций при первом наведении
+  // lazily load reactions summary on first hover
   const ensureReactionsLoaded = async (postId: string) => {
     if (reactionsMap[postId]) return;
     try {
@@ -144,8 +144,9 @@ export default function Feed() {
     }
   };
 
-  // быстрый лайк по кнопке (LIKE)
+  // quick like (LIKE) via main button
   const handleToggleLike = async (postId: string) => {
+    // optimistic update
     setPosts((prev) =>
       prev.map((p) =>
         p.id === postId
@@ -164,7 +165,7 @@ export default function Feed() {
       applyReactionsSummary(postId, summary);
     } catch (err) {
       console.error(err);
-      // откат
+      // rollback on error
       setPosts((prev) =>
         prev.map((p) =>
           p.id === postId
@@ -180,7 +181,7 @@ export default function Feed() {
     }
   };
 
-  // выбор конкретной реакции из поповера
+  // choose a specific reaction from the popover
   const handleReact = async (postId: string, type: ReactionType) => {
     try {
       const summary = await reactToPost(postId, type);
@@ -206,12 +207,12 @@ export default function Feed() {
       <div className="container feed-container">
         <h1 className="page-title feed-title">Feed</h1>
 
-        {loading && <p className="feed-info">Загружаем посты...</p>}
+        {loading && <p className="feed-info">Loading posts…</p>}
         {error && <p className="feed-error">{error}</p>}
 
         {!loading && !error && posts.length === 0 && (
           <p className="feed-empty">
-            В ленте пока нет постов. Попробуй опубликовать что-нибудь через{" "}
+            There are no posts in the feed yet. Try publishing something via{" "}
             <strong>Add post</strong>.
           </p>
         )}
@@ -321,7 +322,9 @@ export default function Feed() {
                     onClick={() => openComments(post)}
                   >
                     <FaRegCommentDots className="comment-icon" />
-                    <span className="comment-count">{post.commentsCount}</span>
+                    <span className="comment-count">
+                      {post.commentsCount}
+                    </span>
                   </button>
                 </div>
               </article>

@@ -46,7 +46,7 @@
   overflow: hidden;
 }
 
-/* линия прогресса под шагами */
+/* progress line under the steps */
 .post-wizard-progress {
   position: absolute;
   left: 12px;
@@ -63,7 +63,7 @@
   transition: width 0.25s ease;
 }
 
-/* кнопки-шаги */
+/* step buttons */
 .post-wizard-step {
   position: relative;
   z-index: 1;
@@ -95,7 +95,7 @@
   text-overflow: ellipsis;
 }
 
-/* активный шаг */
+/* active step */
 .post-wizard-step.active {
   color: #fff;
 }
@@ -110,7 +110,7 @@
     #190825;
 }
 
-/* уже пройденные шаги */
+/* steps already taken */
 .post-wizard-step.done {
   color: rgba(255, 255, 255, 0.85);
 }
@@ -120,12 +120,12 @@
   background: var(--gold, #f6c449);
 }
 
-/* контент шагов */
+/* content of steps */
 .post-wizard-content {
   margin-top: 4px;
 }
 
-/* карточка шага */
+/* step card */
 .step-card {
   border-radius: 20px;
   padding: 18px 18px 16px;
@@ -151,7 +151,7 @@
   margin-bottom: 14px;
 }
 
-/* нижняя панель шагов (Назад / Далее / Опубликовать) */
+/* Bottom Steps Bar (Previous / Next / Publish) */
 .step-actions {
   display: flex;
   justify-content: space-between;
@@ -160,7 +160,7 @@
 }
 
 /* ===========================
-   БАЗОВЫЕ ПОЛЯ
+   BASIC FIELDS
    =========================== */
 
 .add-post-label {
@@ -174,7 +174,7 @@
   color: var(--muted);
 }
 
-/* ===== Текстовое поле подписи ===== */
+/* ===== Signature text field ===== */
 
 .add-post-label--with-mentions {
   position: relative;
@@ -197,19 +197,19 @@
   box-sizing: border-box;
 }
 
-/* Блок медиа */
+/* Media block */
 .add-post-media-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* Скрытый input[type=file] */
+/* Hidden input[type=file] */
 .add-post-media-input-hidden {
   display: none;
 }
 
-/* Карточка выбора/превью медиа */
+/* Selection Card/Media Preview */
 .add-post-media-card {
   position: relative;
   border-radius: 16px;
@@ -266,7 +266,7 @@
   color: var(--muted);
 }
 
-/* Превью внутри карточки */
+/* Preview inside the card */
 .add-post-media-preview {
   width: 100%;
   max-height: 480px;
@@ -276,7 +276,7 @@
   background: #000;
 }
 
-/* и картинка, и видео — вписываются с сохранением пропорций */
+/* Both the image and the video fit in while maintaining their proportions */
 .add-post-media-preview-image,
 .add-post-media-preview-video {
   width: 100%;
@@ -286,14 +286,14 @@
   display: block;
 }
 
-/* компактное превью для шага "Предпросмотр" */
+/* compact preview for the "Preview" step */
 .add-post-media-preview--compact {
   max-height: 260px;
   border-radius: 16px;
   overflow: hidden;
 }
 
-/* Хэштеги */
+/* Hashtags */
 .add-post-hashtags {
   padding: 8px 12px;
   border-radius: 10px;
@@ -319,12 +319,12 @@
   font-size: 13px;
 }
 
-/* Хэштеги в превью */
+/* Hashtags in preview */
 .preview-hashtags {
   margin-top: 8px;
 }
 
-/* карточка превью поста на последнем шаге */
+/* post preview card on the last step */
 .preview-card {
   border-radius: 16px;
   padding: 12px 12px 10px;
@@ -350,10 +350,10 @@
 }
 
 /* ============================= */
-/*   Доп. стили для MediaStep    */
+/*   Add. styles for MediaStep    */
 /* ============================= */
 
-/* Карточка в состоянии "есть файл" */
+/* Card in the "file available" state */
 .add-post-media-card--filled {
   border-style: solid;
   border-color: rgba(255, 255, 255, 0.22);
@@ -365,7 +365,7 @@
     rgba(0, 0, 0, 0.4);
 }
 
-/* Состояние drag & drop поверх карточки */
+/* Drag & drop state over card */
 .add-post-media-card--drag-over {
   border-color: var(--gold);
   background: radial-gradient(
@@ -376,7 +376,7 @@
   box-shadow: 0 0 0 1px rgba(246, 196, 73, 0.4), 0 18px 40px rgba(0, 0, 0, 0.8);
 }
 
-/* Верхняя строка над превью (тип медиа, подсказка) */
+/* Top line above preview (media type, tooltip) */
 .add-post-media-top-row {
   position: absolute;
   top: 10px;
@@ -400,7 +400,7 @@
   color: var(--gold);
 }
 
-/* маленькая подсказка справа сверху */
+/* small tooltip on the top right */
 .add-post-media-dnd-hint {
   pointer-events: auto;
   padding: 3px 9px;
@@ -410,7 +410,7 @@
   background: rgba(0, 0, 0, 0.45);
 }
 
-/* Нижняя строка под превью — размер, длительность, "изменить" */
+/* small tooltip on the top right */
 .add-post-media-meta-row {
   display: flex;
   align-items: center;
@@ -428,14 +428,14 @@
   backdrop-filter: blur(8px);
 }
 
-/* слева — разные "пилюли": размер, длительность и т.п. */
+/* on the left — various “pills”: size, duration, etc. */
 .add-post-media-meta-left {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-/* справа — кнопки действий (заменить / удалить) */
+/* on the right — action buttons (change / delete) */
 .add-post-media-actions,
 .add-post-media-meta-right {
   margin-left: auto;
@@ -444,7 +444,7 @@
   gap: 8px;
 }
 
-/* Универсальная пилюля с информацией (вес файла, длительность и т.д.) */
+/* Generic info pill (file size, duration, etc.) */
 .add-post-media-pill {
   padding: 4px 10px;
   border-radius: 999px;
@@ -455,7 +455,7 @@
   font-weight: 600;
 }
 
-/* Имя файла */
+/* File name */
 .add-post-media-filename {
   opacity: 0.85;
   font-size: 14px;
@@ -465,7 +465,7 @@
   font-size: 12px;
 }
 
-/* Кнопка "Изменить файл" / "Выбрать другой" */
+/* “Change file” / “Choose another” button */
 .add-post-media-change-btn {
   border: none;
   background: transparent;
@@ -486,7 +486,7 @@
   box-shadow: 0 0 0 1px rgba(246, 196, 73, 0.4);
 }
 
-/* кнопка "Удалить" — аккуратная красная пилюля */
+/* “Delete” button — soft red pill */
 .add-post-media-remove-btn {
   border: none;
   background: rgba(255, 80, 80, 0.16);
@@ -507,7 +507,7 @@
   color: #ff8fa0;
 }
 
-/* мини-кнопка "очистить" рядом с change-btn (если используешь) */
+/* mini “clear” button next to change-btn (if you use it) */
 .add-post-media-clear-btn {
   border: none;
   background: transparent;
@@ -524,7 +524,7 @@
   color: #ffffff;
 }
 
-/* Для маленькой иконки внутри change / clear */
+/* small icon inside change / clear */
 .add-post-media-icon {
   font-size: 12px;
 }
@@ -618,7 +618,7 @@
   color: var(--muted);
 }
 
-/* чуть ужимаем всё на мобиле (мета-строка) */
+/* slightly compress meta-row on mobile */
 @media (max-width: 600px) {
   .add-post-media-meta-row {
     flex-direction: column;
@@ -644,7 +644,7 @@
   }
 }
 
-/* Адаптив общий */
+/* General responsive tweaks */
 @media (max-width: 600px) {
   .add-post-container {
     max-width: 100%;

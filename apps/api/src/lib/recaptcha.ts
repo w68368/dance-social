@@ -14,7 +14,6 @@ export async function verifyRecaptcha(
   token?: string,
   remoteIp?: string | null
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  // Если выключено — пропускаем
   if (!RECAPTCHA_ENABLED) {
     console.warn("[reCAPTCHA] Disabled — skipping check");
     return { ok: true };
@@ -43,7 +42,6 @@ export async function verifyRecaptcha(
     return { ok: false, reason: "request_failed" };
   }
 
-  // 👉 Вот здесь мы добавили тип `RecaptchaV2Response`
   const data = (await res.json()) as RecaptchaV2Response;
 
   if (data.success !== true) {

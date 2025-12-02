@@ -5,8 +5,8 @@ import path from "path";
 import cookieParser from "cookie-parser";
 
 import authRouter from "./routes/auth.js";
-import postsRouter from "./routes/posts.js"; // 🆕 роутер постов
-import followRouter from "./routes/follow.js"; // 🆕 роутер подписок
+import postsRouter from "./routes/posts.js";
+import followRouter from "./routes/follow.js";
 import { prisma } from "./lib/prisma.js";
 
 dotenv.config();
@@ -14,8 +14,8 @@ dotenv.config();
 const app = express();
 
 /**
- * Если API будет за reverse-proxy (например, nginx / render / railway),
- * это нужно для корректного req.ip и работы secure-cookie по HTTPS.
+ * If the API runs behind a reverse proxy (e.g., nginx / render / railway),
+ * this is required for correct req.ip values and for secure cookies over HTTPS.
  */
 app.set("trust proxy", 1);
 
@@ -26,22 +26,22 @@ app.use(express.json());
 app.use(cookieParser());
 
 // -----------------------
-// CORS с куками
-// НЕЛЬЗЯ использовать origin:"*" вместе с credentials:true.
-// Подставляем точный фронтенд из .env
+// CORS with cookies
+// You CANNOT use origin:"*" together with credentials:true.
+// Use the exact frontend origin from .env
 // -----------------------
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 app.use(
   cors({
     origin: FRONTEND_ORIGIN,
-    credentials: true, // чтобы браузер слал/получал HttpOnly-cookie
+    credentials: true, // allow browser to send/receive HttpOnly cookies
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 // -----------------------
-// STATIC: отдача аватарок и (позже) медиа постов
+// STATIC: serving avatars and (later) post media
 // -----------------------
 const uploadsDir = path.join(process.cwd(), "uploads");
 app.use("/uploads", express.static(uploadsDir));
@@ -68,17 +68,17 @@ app.get("/api/health", async (_req, res) => {
 });
 
 // -----------------------
-// AUTH ROUTES (login/refresh/logout/...)
+// AUTH ROUTES (login / refresh / logout / ...)
 // -----------------------
 app.use("/api/auth", authRouter);
 
 // -----------------------
-// POSTS ROUTES (feed / создание постов)
+// POSTS ROUTES (feed / post creation)
 // -----------------------
 app.use("/api/posts", postsRouter);
 
 // -----------------------
-// FOLLOW ROUTES (подписки)
+// FOLLOW ROUTES (follows)
 // -----------------------
 app.use("/api/follow", followRouter);
 
@@ -93,7 +93,7 @@ app.get("/api/users", async (_req, res) => {
 });
 
 // -----------------------
-// USERS SEARCH (для @упоминаний и поиска людей)
+// USERS SEARCH (for @mentions and user search)
 // -----------------------
 app.get("/api/users/search", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
@@ -101,7 +101,7 @@ app.get("/api/users/search", async (req, res) => {
   if (!q) {
     return res.status(400).json({
       ok: false,
-      message: "Пустой поисковый запрос",
+      message: "Empty search query",
     });
   }
 
@@ -140,20 +140,20 @@ app.get("/api/users/search", async (req, res) => {
     console.error("Users search error", err);
     return res.status(500).json({
       ok: false,
-      message: "Не удалось выполнить поиск пользователей",
+      message: "Failed to search users",
     });
   }
 });
 
 // -----------------------
-// TAGS SEARCH (для автодополнения #хэштегов)
+// TAGS SEARCH (for hashtag autocomplete)
 // -----------------------
 app.get("/api/tags/search", async (req, res) => {
   const qRaw = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const q = qRaw.toLowerCase();
 
   if (!q || q.length < 1) {
-    // для пустой строки просто отдаём пустой список
+    // for empty input return an empty list
     return res.json({ ok: true, hashtags: [] });
   }
 
@@ -175,7 +175,7 @@ app.get("/api/tags/search", async (req, res) => {
       take: 10,
     });
 
-    // фронт (searchHashtags) ожидает объект { ok, hashtags: [...] }
+    // frontend (searchHashtags) expects { ok, hashtags: [...] }
     return res.json({
       ok: true,
       hashtags: tags,
@@ -184,12 +184,12 @@ app.get("/api/tags/search", async (req, res) => {
     console.error("Tags search error", err);
     return res.status(500).json({
       ok: false,
-      message: "Не удалось выполнить поиск хэштегов",
+      message: "Failed to search hashtags",
     });
   }
 });
 
-// 🆕 Один пользователь по id (для UserProfile)
+// 🆕 Single user by id (for UserProfile)
 app.get("/api/users/:id", async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
@@ -197,7 +197,7 @@ app.get("/api/users/:id", async (req, res) => {
       select: {
         id: true,
         username: true,
-        displayName: true, // ✅ теперь отдаем displayName
+        displayName: true,
         avatarUrl: true,
       },
     });
@@ -205,7 +205,7 @@ app.get("/api/users/:id", async (req, res) => {
     if (!user) {
       return res
         .status(404)
-        .json({ ok: false, message: "Пользователь не найден" });
+        .json({ ok: false, message: "User not found" });
     }
 
     return res.json({ ok: true, user });
@@ -213,7 +213,7 @@ app.get("/api/users/:id", async (req, res) => {
     console.error("Get user by id error", err);
     return res
       .status(500)
-      .json({ ok: false, message: "Не удалось загрузить пользователя" });
+      .json({ ok: false, message: "Failed to load user" });
   }
 });
 

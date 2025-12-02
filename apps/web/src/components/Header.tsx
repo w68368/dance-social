@@ -27,7 +27,7 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [open, setOpen] = useState(false); // мобильное меню
+  const [open, setOpen] = useState(false);
   const [user, setUserState] = useState(getUser());
 
   // dropdown user-chip
@@ -76,16 +76,15 @@ export default function Header() {
     };
   }, []);
 
-  // при смене страницы закрываем мобильное меню
   useEffect(() => {
     setOpen(false);
   }, [location.pathname]);
 
   const logout = async () => {
     try {
-      await api.post("/auth/logout"); // отзываем текущий refresh на сервере
+      await api.post("/auth/logout");
     } catch {
-      // игнорим сеть, всё равно локально выходим
+     
     } finally {
       clearAccessToken();
       clearAuth();
@@ -206,7 +205,7 @@ export default function Header() {
           )}
         </div>
 
-        {/* бургер-кнопка */}
+        {/* burger button */}
         <button
           className={"su-mobile-toggle" + (open ? " is-open" : "")}
           aria-label="Toggle menu"
@@ -220,7 +219,7 @@ export default function Header() {
         </button>
       </div>
 
-      {/* мобильное меню как модалка с фоном */}
+      {/* Mobile menu as a modal with a background */}
       {open && (
         <div
           className="su-mobile-overlay"
@@ -262,7 +261,7 @@ export default function Header() {
                   <button
                     className="mobile-user-info"
                     onClick={() => {
-                      setOpen(false); // закрываем меню перед переходом
+                      setOpen(false);
                       navigate("/profile");
                     }}
                   >

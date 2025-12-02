@@ -31,7 +31,6 @@ function NeedLoginScreen({ next }: NeedLoginScreenProps) {
           We will return you here right after login.
         </p>
 
-        {/* Кнопка по центру, текст тоже по центру */}
         <Link
           to={`/login?next=${next}`}
           className="su-btn su-btn-primary"

@@ -38,7 +38,7 @@ export default function ForgotPassword() {
     }
   };
 
-  // --- экран после отправки письма ---
+  // --- screen shown after the email has been sent ---
   if (sent) {
     return (
       <div className="auth-page">
@@ -62,7 +62,7 @@ export default function ForgotPassword() {
     );
   }
 
-  // --- основной экран формы ---
+  // --- main form screen ---
   return (
     <div className="auth-page">
       <form className="register-card forgot-card" onSubmit={onSubmit}>

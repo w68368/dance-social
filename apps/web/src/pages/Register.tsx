@@ -26,10 +26,10 @@ export default function Register() {
   // reCAPTCHA
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  // === Модалка подтверждения e-mail ===
+  // === Email verification modal ===
   const [verifyOpen, setVerifyOpen] = useState(false);
 
-  // === Превью аватара ===
+  // === Avatar preview ===
   const avatarPreview = useMemo(
     () => (avatar ? URL.createObjectURL(avatar) : null),
     [avatar]
@@ -40,7 +40,7 @@ export default function Register() {
     };
   }, [avatarPreview]);
 
-  // === Фокус и позиционирование overlay под полем пароля ===
+  // === Focus and positioning of the overlay under the password field ===
   const [pwFocused, setPwFocused] = useState(false);
   const cardRef = useRef<HTMLFormElement | null>(null);
   const pwInputRef = useRef<HTMLInputElement | null>(null);
@@ -50,8 +50,8 @@ export default function Register() {
     const card = cardRef.current?.getBoundingClientRect();
     const input = pwInputRef.current?.getBoundingClientRect();
     if (card && input) {
-      const offset = input.bottom - card.top; // px от верхней границы карточки
-      setPwOverlayTop(Math.max(0, Math.round(offset) + 8)); // +8px отступ ниже инпута
+      const offset = input.bottom - card.top; // px from the top edge of the card
+      setPwOverlayTop(Math.max(0, Math.round(offset) + 8)); // +8px spacing below the input
     }
   };
 
@@ -65,13 +65,13 @@ export default function Register() {
 
   useEffect(() => {
     if (pwFocused) {
-      // при наборе пароля/валидации геометрия может меняться
+      // when typing/validating password, geometry can change
       recomputeOverlayTop();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [password, email, username, confirmPassword]);
 
-  // === Оценка сложности пароля (0..4) и свёртка в 3 уровня ===
+  // === Password strength (0..4) and collapsing into 3 levels ===
   const strength = useMemo(
     () => (password ? zxcvbn(password) : null),
     [password]
@@ -124,14 +124,14 @@ export default function Register() {
     confirmPassword.length > 0 &&
     confirmPassword !== password;
 
-  // === Общая функция старта регистрации (первая отправка и «resend code») ===
+  // === Common function to start registration (first submit & "resend code") ===
   const startRegistration = async () => {
     const fd = new FormData();
     fd.append("email", email.trim());
     fd.append("username", username.trim());
     fd.append("password", password);
     if (avatar) fd.append("avatar", avatar);
-    // reCAPTCHA токен
+    // reCAPTCHA token
     fd.append("captchaToken", captchaToken || "");
 
     const { data } = await api.post("/auth/register-start", fd, {
@@ -143,7 +143,7 @@ export default function Register() {
     }
   };
 
-  // === Сабмит формы ===
+  // === Form submit ===
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -177,9 +177,9 @@ export default function Register() {
     }
   };
 
-  // === Успешная верификация ===
+  // === Successful verification ===
   const handleVerified = (token: string, _user: any) => {
-    setAccessToken(token); // refresh-cookie ставит бэкенд, access — для UX
+    setAccessToken(token); // refresh-cookie is set by backend; access token is for UX
     setVerifyOpen(false);
     setEmail("");
     setUsername("");
@@ -190,7 +190,7 @@ export default function Register() {
     navigate("/login");
   };
 
-  // === Повторная отправка кода ===
+  // === Resend code ===
   const handleResend = async () => {
     try {
       await startRegistration();
@@ -255,7 +255,7 @@ export default function Register() {
             style={{
               position: "relative",
               zIndex: 20,
-            }} /* инпут выше overlay */
+            }} /* input above overlay */
           >
             <label>Password</label>
             <input
@@ -353,7 +353,7 @@ export default function Register() {
           {success && <p className="msg success">{success}</p>}
         </div>
 
-        {/* === Overlay: визуально над карточкой, геометрически под полем пароля === */}
+        {/* === Overlay: visually above the card, geometrically tied to the password field === */}
         {pwFocused && (
           <div
             className="pw-overlay"
@@ -389,7 +389,7 @@ export default function Register() {
         )}
       </form>
 
-      {/* Модалка подтверждения e-mail */}
+      {/* Email verification modal */}
       <EmailCodeModal
         email={email}
         open={verifyOpen}

@@ -17,7 +17,7 @@ import {
 const router = Router();
 
 // ----------------------------------
-// Конфиг реакций
+// Reactions config
 // ----------------------------------
 const REACTION_TYPES = ["LIKE", "FIRE", "WOW", "CUTE", "CLAP"] as const;
 type ReactionType = (typeof REACTION_TYPES)[number];
@@ -29,7 +29,7 @@ type PostReactionsSummary = {
 };
 
 // -----------------------------
-// Настройка папок
+// Setting up folders
 // -----------------------------
 const uploadsRoot =
   process.env.UPLOAD_DIR && process.env.UPLOAD_DIR.trim().length > 0
@@ -53,29 +53,28 @@ const upload = multer({
 });
 
 // -----------------------------
-// Валидация текста
+// Text Validation
 // -----------------------------
-const CAPTION_MAX_LENGTH = 1000; // лимит для подписи, должен совпадать с фронтом
+const CAPTION_MAX_LENGTH = 1000; // signature limit, must match the front
 
 const captionSchema = z
   .string()
-  .max(CAPTION_MAX_LENGTH, "Слишком длинный текст")
+  .max(CAPTION_MAX_LENGTH, "The text is too long")
   .transform((v) => v.trim());
 
 const commentSchema = z
   .string()
-  .min(1, "Комментарий не может быть пустым")
-  .max(500, "Слишком длинный комментарий")
+  .min(1, "Comment cannot be empty")
+  .max(500, "The comment is too long.")
   .transform((v) => v.trim());
 
-// тело для реакций
 const reactSchema = z.object({
   type: z.enum(["LIKE", "FIRE", "WOW", "CUTE", "CLAP"]),
 });
 
 // -----------------------------
 // POST /api/posts
-// Создать пост (текст + optional медиа)
+// Create a post (text + optional media)
 // -----------------------------
 router.post(
   "/",
@@ -93,9 +92,8 @@ router.post(
     const parsedCaption = captionSchema.safeParse(rawCaption);
 
     if (!parsedCaption.success) {
-      // тут аккуратно достаём первую ошибку zod
       const firstIssue = parsedCaption.error.issues[0];
-      const msg = firstIssue?.message || "Некорректный текст подписи";
+      const msg = firstIssue?.message || "Incorrect signature text";
       return res.status(400).json({
         ok: false,
         message: msg,
@@ -107,7 +105,7 @@ router.post(
     if (!caption && !file) {
       return res.status(400).json({
         ok: false,
-        message: "Добавь текст или прикрепи фото/видео к посту 🙂",
+        message: "Add text or attach a photo/video to the post",
       });
     }
 
@@ -116,7 +114,6 @@ router.post(
     let mediaLocalPath: string | null = null;
 
     try {
-      // ==== Обработка файла ====
       if (file) {
         const isImage = file.mimetype.startsWith("image/");
         const isVideo = file.mimetype.startsWith("video/");
@@ -124,7 +121,7 @@ router.post(
         if (!isImage && !isVideo) {
           return res.status(400).json({
             ok: false,
-            message: "Поддерживаются только изображения и видео",
+            message: "Only images and videos are supported",
           });
         }
 
@@ -159,27 +156,25 @@ router.post(
       });
 
       // =====================================
-      //    ХЭШТЕГИ — полностью рабочая версия
+      //    HASHTAGS - a fully working version
       // =====================================
 
-      // Ищем #теги в подписи
+      // Search for #tags in the signature
       const rawTags = caption.match(/#[\wа-яА-ЯёЁ]+/g) ?? [];
 
-      // Убираем #, приводим к lowercase, удаляем дубли
+      // Remove #, convert to lowercase, remove duplicates
       const cleanedTags = [
         ...new Set(rawTags.map((t) => t.substring(1).toLowerCase())),
       ];
 
       if (cleanedTags.length > 0) {
         for (const tag of cleanedTags) {
-          // создаём или берём существующий тег
           const hashtag = await prisma.hashtag.upsert({
             where: { tag },
             update: {},
             create: { tag },
           });
 
-          // создаём связь пост ↔ тег
           await prisma.postHashtag.create({
             data: {
               postId: post.id,
@@ -191,7 +186,7 @@ router.post(
 
       const responsePost = {
         ...post,
-        likesCount: 0, // суммарные реакции (пока 0)
+        likesCount: 0,
         likedByMe: false,
         myReaction: null as ReactionType | null,
         commentsCount: 0,
@@ -204,7 +199,7 @@ router.post(
       if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
         return res.status(400).json({
           ok: false,
-          message: `Файл слишком большой. Максимальный размер: ${maxUploadMb}MB`,
+          message: `The file is too large. Maximum size: ${maxUploadMb}MB`,
         });
       }
 
@@ -218,7 +213,7 @@ router.post(
 
 // -----------------------------
 // 🆕 POST /api/posts/:id/react
-// Поставить / изменить / снять реакцию
+// Set / change / remove reaction
 // -----------------------------
 router.post("/:id/react", requireAuth, async (req: AuthedRequest, res) => {
   if (!req.userId) {
@@ -249,20 +244,17 @@ router.post("/:id/react", requireAuth, async (req: AuthedRequest, res) => {
     let myReaction: ReactionType | null = null;
 
     if (existing && existing.type === type) {
-      // Нажали ту же реакцию -> удалить
       await prisma.postReaction.delete({
         where: { id: existing.id },
       });
       myReaction = null;
     } else if (existing) {
-      // Поменять тип реакции
       const updated = await prisma.postReaction.update({
         where: { id: existing.id },
         data: { type },
       });
       myReaction = updated.type as ReactionType;
     } else {
-      // Создать новую реакцию
       const created = await prisma.postReaction.create({
         data: {
           postId,
@@ -302,13 +294,13 @@ router.post("/:id/react", requireAuth, async (req: AuthedRequest, res) => {
     console.error("React to post error:", err);
     return res
       .status(500)
-      .json({ ok: false, message: "Не удалось обновить реакцию" });
+      .json({ ok: false, message: "Failed to update reaction" });
   }
 });
 
 // -----------------------------
 // 🆕 GET /api/posts/:id/reactions
-// Получить сводку реакций поста
+// Get a summary of post reactions
 // -----------------------------
 router.get("/:id/reactions", optionalAuth, async (req: AuthedRequest, res) => {
   const postId = req.params.id;
@@ -362,13 +354,13 @@ router.get("/:id/reactions", optionalAuth, async (req: AuthedRequest, res) => {
     console.error("Get post reactions error:", e);
     return res
       .status(500)
-      .json({ ok: false, message: "Не удалось загрузить реакции" });
+      .json({ ok: false, message: "Failed to load reactions" });
   }
 });
 
 // -----------------------------
 // POST /api/posts/comments/:commentId/like
-// Тоггл лайка на комментарий
+// Toggle like the comment
 // -----------------------------
 router.post(
   "/comments/:commentId/like",
@@ -416,7 +408,7 @@ router.post(
       console.error("Toggle comment like error:", err);
       return res.status(500).json({
         ok: false,
-        message: "Не удалось обновить лайк комментария",
+        message: "Failed to update comment like",
       });
     }
   }
@@ -424,7 +416,7 @@ router.post(
 
 // -----------------------------
 // PATCH /api/posts/comments/:id
-// Редактирование своего комментария
+// Editing your comment
 // -----------------------------
 router.patch("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
   if (!req.userId) {
@@ -438,7 +430,7 @@ router.patch("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
   if (!parsed.success) {
     return res.status(400).json({
       ok: false,
-      message: parsed.error.issues[0]?.message ?? "Неверный комментарий",
+      message: parsed.error.issues[0]?.message ?? "Invalid comment",
     });
   }
 
@@ -454,13 +446,13 @@ router.patch("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
     if (!existing) {
       return res
         .status(404)
-        .json({ ok: false, message: "Комментарий не найден" });
+        .json({ ok: false, message: "Comment not found" });
     }
 
     if (existing.authorId !== req.userId) {
       return res.status(403).json({
         ok: false,
-        message: "Можно редактировать только свои комментарии",
+        message: "You can only edit your own comments.",
       });
     }
 
@@ -504,13 +496,13 @@ router.patch("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
     console.error("Edit comment error:", err);
     return res
       .status(500)
-      .json({ ok: false, message: "Не удалось обновить комментарий" });
+      .json({ ok: false, message: "Failed to update comment" });
   }
 });
 
 // -----------------------------
 // DELETE /api/posts/comments/:id
-// Удаление своего комментария
+// Deleting your comment
 // -----------------------------
 router.delete("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
   if (!req.userId) {
@@ -531,13 +523,13 @@ router.delete("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
     if (!existing) {
       return res
         .status(404)
-        .json({ ok: false, message: "Комментарий не найден" });
+        .json({ ok: false, message: "Comment not found" });
     }
 
     if (existing.authorId !== req.userId) {
       return res.status(403).json({
         ok: false,
-        message: "Можно удалять только свои комментарии",
+        message: "You can only delete your own comments.",
       });
     }
 
@@ -548,13 +540,13 @@ router.delete("/comments/:id", requireAuth, async (req: AuthedRequest, res) => {
     console.error("Delete comment error:", err);
     return res
       .status(500)
-      .json({ ok: false, message: "Не удалось удалить комментарий" });
+      .json({ ok: false, message: "Failed to delete comment" });
   }
 });
 
 // -----------------------------
 // POST /api/posts/:postId/comments/:commentId/pin
-// Автор поста закрепляет / открепляет комментарий
+// The post author pins / unpins a comment
 // -----------------------------
 router.post(
   "/:postId/comments/:commentId/pin",
@@ -575,7 +567,7 @@ router.post(
       if (!post || post.authorId !== req.userId) {
         return res
           .status(403)
-          .json({ ok: false, message: "Недостаточно прав" });
+          .json({ ok: false, message: "Insufficient permissions" });
       }
 
       const comment = await prisma.postComment.findUnique({
@@ -586,7 +578,7 @@ router.post(
       if (!comment || comment.postId !== postId) {
         return res
           .status(400)
-          .json({ ok: false, message: "Комментарий не найден у этого поста" });
+          .json({ ok: false, message: "Comment not found on this post" });
       }
 
       let pinnedCommentId: string | null = null;
@@ -616,15 +608,16 @@ router.post(
       console.error("Pin comment error:", err);
       return res.status(500).json({
         ok: false,
-        message: "Не удалось обновить закреп комментария",
+        message: "Failed to update pinned comment",
       });
     }
   }
 );
 
+
 // -----------------------------
 // POST /api/posts/:id/comments
-// Добавить комментарий к посту (опционально ответ на другой комментарий)
+// Add a comment to a post (optionally a reply to another comment)
 // -----------------------------
 router.post(
   "/:id/comments",
@@ -646,7 +639,7 @@ router.post(
     if (!parsed.success) {
       res.status(400).json({
         ok: false,
-        message: parsed.error.issues[0]?.message ?? "Неверный комментарий",
+        message: parsed.error.issues[0]?.message ?? "Invalid comment",
       });
       return;
     }
@@ -661,7 +654,7 @@ router.post(
         if (!parent || parent.postId !== postId) {
           res.status(400).json({
             ok: false,
-            message: "Неверный родительский комментарий",
+            message: "Invalid parent comment",
           });
           return;
         }
@@ -702,14 +695,14 @@ router.post(
       console.error("Create comment error:", err);
       res
         .status(500)
-        .json({ ok: false, message: "Не удалось добавить комментарий" });
+        .json({ ok: false, message: "Failed to add comment" });
     }
   }
 );
 
 // -----------------------------
 // GET /api/posts/:id/comments
-// Получить комментарии поста с сортировкой и пагинацией
+// Get post comments with sorting and pagination
 // -----------------------------
 router.get("/:id/comments", optionalAuth, async (req, res) => {
   const { userId } = req as AuthedRequest;
@@ -805,7 +798,7 @@ router.get("/:id/comments", optionalAuth, async (req, res) => {
 
 // -----------------------------
 // GET /api/posts
-// Лента постов
+// Post feed
 // -----------------------------
 router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
   try {
@@ -853,8 +846,8 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         author: p.author,
-        likesCount: p._count.reactions, // суммарное число реакций
-        likedByMe: !!myReaction, // для старого UI
+        likesCount: p._count.reactions, 
+        likedByMe: !!myReaction,
         myReaction,
         commentsCount: p._count.comments,
       };
@@ -869,7 +862,7 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
 
 // -----------------------------
 // GET /api/posts/user/:userId
-// Посты одного пользователя (для профиля)
+// Posts by one user (for profile)
 // -----------------------------
 router.get("/user/:userId", optionalAuth, async (req: AuthedRequest, res) => {
   try {

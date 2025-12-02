@@ -17,9 +17,9 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
-  const [countdown, setCountdown] = useState(5); // таймер до редиректа
+  const [countdown, setCountdown] = useState(5); // countdown timer before redirect
 
-  // === для overlay сложности пароля ===
+  // === password strength overlay ===
   const [pwFocused, setPwFocused] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const pwFieldRef = useRef<HTMLInputElement | null>(null);
@@ -30,7 +30,7 @@ export default function ResetPassword() {
     [p1, p2, token]
   );
 
-  // пересчитать позицию overlay относительно карточки
+  // recalculate overlay position relative to the card
   const updateOverlayPos = () => {
     if (!pwFieldRef.current || !cardRef.current) return;
     const fieldRect = pwFieldRef.current.getBoundingClientRect();
@@ -51,11 +51,11 @@ export default function ResetPassword() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pwFocused]);
 
-  // эффект для таймера после успешного сброса
+  // effect for countdown after successful reset
   useEffect(() => {
     if (!ok) return;
 
-    setCountdown(5); // каждый раз при входе в состояние "ок" начинаем заново
+    setCountdown(5); // every time we enter "ok" state, start from 5 again
 
     const intervalId = window.setInterval(() => {
       setCountdown((prev) => {
@@ -153,8 +153,8 @@ export default function ResetPassword() {
         <div className="register-card reset-card">
           <h2>Password changed</h2>
           <p className="register-sub">
-            Password successfully changed. Redirecting to login via{" "}
-            <strong>{countdown}</strong> seс...
+            Password successfully changed. Redirecting to login in{" "}
+            <strong>{countdown}</strong> sec...
           </p>
 
           <div className="reset-timer">

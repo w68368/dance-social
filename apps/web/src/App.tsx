@@ -15,37 +15,37 @@ export default function App() {
 
     (async () => {
       try {
-        // 1) Пытаемся восстановить сессию из refresh-cookie
+        // 1) Attempt to restore the session using the refresh cookie
         const { data } = await api.post("/auth/refresh");
 
         if (!alive) return;
 
         if (data?.ok && data?.accessToken) {
-          // access — только в память
+          // Save access token only in memory
           setAccessToken(data.accessToken);
 
-          // 2) Подтягиваем профиль, чтобы Header/ProtectedRoute знали юзера
+          // 2) Fetch user profile so Header / ProtectedRoute know the logged-in user
           try {
             const meRes = await api.get("/auth/me");
             if (meRes?.data?.ok && meRes?.data?.user) {
-              setUser(meRes.data.user); // публичные поля в localStorage
+              setUser(meRes.data.user); // public fields saved to localStorage
             } else {
-              // если /auth/me вернуло что-то странное — считаем, что не залогинен
+              // If /auth/me returned something unexpected → treat as not logged in
               clearAccessToken();
               clearAuth();
             }
           } catch {
-            // ошибка при /auth/me → тоже вычищаем авторизацию
+            // Error during /auth/me → clear auth session as well
             clearAccessToken();
             clearAuth();
           }
         } else {
-          // refresh вернулся без accessToken → невалидная сессия
+          // refresh returned without an accessToken → invalid session
           clearAccessToken();
           clearAuth();
         }
       } catch {
-        // ❌ /auth/refresh упал (401 / нет куки / ошибка сети) → считаем гостем
+        // /auth/refresh failed (401 / missing cookie / network error) → treat as guest
         clearAccessToken();
         clearAuth();
       } finally {
@@ -60,7 +60,7 @@ export default function App() {
     };
   }, []);
 
-  // Пока проверяем сессию — ничего не рендерим, чтобы не было мигания.
+  // While the session is being checked — render nothing to avoid flickering
   if (!ready) return null;
 
   return (

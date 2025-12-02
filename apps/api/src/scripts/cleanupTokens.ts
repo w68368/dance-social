@@ -18,14 +18,14 @@ async function main() {
   );
 
   // 1) RefreshToken:
-  // - просроченные давно
-  // - отозванные давно
+  // - expired long ago
+  // - revoked long ago
   const refreshResult = await prisma.refreshToken.deleteMany({
     where: {
       OR: [
-        // истёкшие давно
+        // expired long ago
         { expiresAt: { lt: threshold } },
-        // отозванные давно
+        // revoked long ago
         {
           AND: [{ revokedAt: { not: null } }, { revokedAt: { lt: threshold } }],
         },
@@ -34,7 +34,7 @@ async function main() {
   });
 
   // 2) EmailVerification:
-  // все коды, у которых expiresAt < threshold
+  // all codes where expiresAt < threshold
   const emailVerificationResult = await prisma.emailVerification.deleteMany({
     where: {
       expiresAt: { lt: threshold },
@@ -42,8 +42,8 @@ async function main() {
   });
 
   // 3) PasswordReset:
-  // - истёкшие давно
-  // - использованные давно
+  // - expired long ago
+  // - used long ago
   const passwordResetResult = await prisma.passwordReset.deleteMany({
     where: {
       OR: [

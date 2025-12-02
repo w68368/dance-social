@@ -10,12 +10,12 @@ import type { CookieOptions } from "express";
 // ============ GLOBAL COOKIE CONFIG (ENV) ============
 // ====================================================
 
-// Общий домен для куки, например ".stepunity.com"
-// В dev можно оставить пустым
+// Common domain for cookies, such as ".stepunity.com"
+// Can be left blank in dev
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined;
 
 // COOKIE_SAMESITE: "lax" | "strict" | "none"
-// В dev обычно "lax", в проде при разных доменах фронта/бэка — "none"
+// In dev, it's usually "lax"; in production, with different front-end/back-end domains, it's "none"
 const RAW_COOKIE_SAMESITE = (
   process.env.COOKIE_SAMESITE || "lax"
 ).toLowerCase();
@@ -28,7 +28,7 @@ const COOKIE_SAMESITE: CookieOptions["sameSite"] =
     : "lax";
 
 // COOKIE_SECURE: true/false
-// При SameSite=None браузеры требуют secure=true
+// With SameSite=None, browsers require secure=true
 const COOKIE_SECURE =
   process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production";
 
@@ -36,7 +36,6 @@ const COOKIE_SECURE =
 // ===================== JWT ==========================
 // ====================================================
 
-// допустимые форматы expiresIn
 type ExpiresLike =
   | number
   | `${number}${"ms" | "s" | "m" | "h" | "d" | "w" | "y"}`;
@@ -67,7 +66,7 @@ export function sha256(input: string) {
 // ====================================================
 
 export function newRefreshRaw() {
-  // raw-строка: UUID.UUID — достаточно длинная, непредсказуемая
+  // raw string: UUID.UUID - quite long, unpredictable
   return `${randomUUID()}.${randomUUID()}`;
 }
 
@@ -95,12 +94,12 @@ export function refreshCookieOptions(daysOverride?: number): CookieOptions {
 // ====================================================
 
 /**
- * Генерируем криптографически сильный токен для сброса пароля.
- * Он:
- *  ✅ длинный (48 байт → ~64 символа base64url)
- *  ✅ не угадывается
- *  ✅ идеально подходит для одноразовых ссылок
- */
+* Generate a cryptographically strong password reset token.
+* It is:
+* long (48 bytes → ~64 characters base64url)
+* undetectable
+* ideal for one-time links
+*/
 export function generateResetToken(): string {
   return crypto.randomBytes(48).toString("base64url");
 }

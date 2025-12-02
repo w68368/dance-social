@@ -6,8 +6,8 @@ const router = Router();
 
 /**
  * GET /api/tags/search?q=hip
- * Возвращает до 10 хэштегов, начинающихся с префикса q
- * tag хранится без # и в нижнем регистре, например "hiphop"
+ * Returns up to 10 hashtags starting with prefix q
+ * tag is stored without # and in lowercase, e.g. "hiphop"
  */
 router.get("/search", async (req, res) => {
   const q =
@@ -41,7 +41,7 @@ router.get("/search", async (req, res) => {
     console.error("Hashtag search error:", err);
     return res
       .status(500)
-      .json({ ok: false, message: "Не удалось загрузить хэштеги" });
+      .json({ ok: false, message: "Failed to load hashtags" });
   }
 });
 

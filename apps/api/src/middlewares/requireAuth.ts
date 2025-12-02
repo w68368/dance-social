@@ -25,8 +25,8 @@ export function requireAuth(
   }
 }
 
-// 🆕 Необязательная авторизация: если токен есть и валиден — проставляем userId,
-// если нет/битый — просто идём дальше без 401
+// Optional authorization: if the token is present and valid, we enter the userId;
+// if not/it's broken, we simply continue without a 401
 export function optionalAuth(
   req: AuthedRequest,
   _res: Response,
@@ -39,7 +39,7 @@ export function optionalAuth(
       const payload = verifyAccess(token);
       req.userId = payload.sub;
     } catch {
-      // токен невалидный — просто игнорируем
+      // the token is invalid - just ignore it
     }
   }
   return next();

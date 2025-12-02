@@ -1,11 +1,11 @@
 import { rateLimit } from "express-rate-limit";
 
 /**
- * /auth/forgot — запрос письма для сброса пароля
- *  - до 5 запросов в час с одного IP
+ * /auth/forgot — request a password-reset email
+ *  - up to 5 requests per hour from a single IP
  */
 export const forgotLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 час
+  windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
@@ -15,12 +15,13 @@ export const forgotLimiter = rateLimit({
   },
 });
 
+
 /**
- * /auth/reset — установка нового пароля по токену
- *  - до 10 попыток в час с одного IP
+ * /auth/reset — set a new password using the reset token
+ *  - up to 10 attempts per hour from a single IP
  */
 export const resetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 час
+  windowMs: 60 * 60 * 1000, // 1 hour
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -31,12 +32,12 @@ export const resetLimiter = rateLimit({
 });
 
 /**
- * /auth/login — попытки входа
- *  - до 20 попыток за 15 минут
- * (дополняет вашу внутреннюю блокировку по счётчику)
+ * /auth/login — login attempts
+ *  - up to 20 attempts per 15 minutes
+ * (complements your internal lockout counter)
  */
 export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 минут
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
@@ -46,12 +47,13 @@ export const loginLimiter = rateLimit({
   },
 });
 
+
 /**
- * /auth/register-start — старт регистрации (отправка кода)
- *  - до 5 запросов в час
+ * /auth/register-start — start of registration (sending the code)
+ *  - up to 5 requests per hour
  */
 export const registerStartLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 час
+  windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
@@ -61,12 +63,13 @@ export const registerStartLimiter = rateLimit({
   },
 });
 
+
 /**
- * /auth/register-verify — проверка кода (ввод 6-значного кода)
- *  - до 15 попыток в час
+ * /auth/register-verify — verification of the code (entering the 6-digit code)
+ *  - up to 15 attempts per hour
  */
 export const registerVerifyLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 час
+  windowMs: 60 * 60 * 1000, // 1 hour
   max: 15,
   standardHeaders: true,
   legacyHeaders: false,

@@ -1,11 +1,11 @@
 // apps/web/src/lib/auth.ts
 
-// Храним только ПУБЛИЧНЫЕ данные пользователя (без токенов)
+// Store only PUBLIC user data (no tokens)
 export type PublicUser = {
   id: string;
   email: string;
-  username: string; // slug для @упоминаний
-  displayName?: string | null; // красивый ник, как написал пользователь
+  username: string; // slug used for @mentions
+  displayName?: string | null; // formatted nickname as written by the user
   avatarUrl?: string | null;
   createdAt: string;
 };
@@ -43,7 +43,7 @@ export function onAuthChange(cb: () => void) {
   };
 }
 
-// синхронизация между вкладками
+// sync between browser tabs
 window.addEventListener("storage", (e) => {
   if (e.key === KEY) listeners.forEach((fn) => fn());
 });

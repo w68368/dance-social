@@ -24,12 +24,12 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // статистика подписок
+  // follow stats
   const [followStats, setFollowStats] = useState<FollowStatsResponse | null>(
     null
   );
 
-  // модалка подписчиков
+  // followers modal
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followersList, setFollowersList] = useState<ApiUserSummary[]>([]);
   const [followersLoading, setFollowersLoading] = useState(false);
@@ -42,21 +42,21 @@ export default function Profile() {
         setLoading(true);
         setError(null);
 
-        // актуализируем текущего пользователя
+        // refresh current user info
         const { data } = await api.get("/auth/me");
         if (!alive) return;
 
         if (!data?.ok || !data?.user) {
-          setError("Не удалось загрузить профиль");
+          setError("Failed to load profile");
           setLoading(false);
           return;
         }
 
         const user: PublicUser = data.user;
         setMe(user);
-        setUser(user); // обновляем кэш в localStorage
+        setUser(user); // update cache in localStorage
 
-        // параллельно грузим посты и статистику подписок
+        // in parallel, load posts and follow stats
         const [postsResp, followResp] = await Promise.all([
           fetchUserPosts(user.id),
           api.get<FollowStatsResponse>(`/follow/stats/${user.id}`),
@@ -75,7 +75,7 @@ export default function Profile() {
 
         const message =
           err?.response?.data?.message ??
-          "Не удалось загрузить профиль. Попробуй ещё раз позже.";
+          "Failed to load profile. Please try again later.";
         setError(message);
       } finally {
         if (!alive) return;
@@ -107,7 +107,7 @@ export default function Profile() {
     setSelectedPost(null);
   }
 
-  // когда добавили комментарий в модалке — обновляем счётчики
+  // when a comment is added in the modal — update counters
   const handleCommentAdded = (postId: string) => {
     setPosts((prev) =>
       prev.map((p) =>
@@ -122,7 +122,7 @@ export default function Profile() {
     );
   };
 
-  // открыть модалку подписчиков
+  // open followers modal
   async function openFollowersModal() {
     if (!me) return;
 
@@ -149,7 +149,7 @@ export default function Profile() {
     return (
       <main className="profile-page">
         <div className="profile-container">
-          <p>Загружаем профиль…</p>
+          <p>Loading profile…</p>
         </div>
       </main>
     );
@@ -159,7 +159,7 @@ export default function Profile() {
     return (
       <main className="profile-page">
         <div className="profile-container">
-          <p>{error ?? "Профиль не найден."}</p>
+          <p>{error ?? "Profile not found."}</p>
         </div>
       </main>
     );
@@ -170,7 +170,7 @@ export default function Profile() {
   return (
     <main className="profile-page">
       <div className="profile-container">
-        {/* Шапка профиля */}
+        {/* Profile header */}
         <section className="profile-header">
           <div className="profile-avatar">
             {me.avatarUrl ? (
@@ -193,7 +193,7 @@ export default function Profile() {
                 <span className="profile-stat-label">likes</span>
               </div>
 
-              {/* кликабельный followers → модалка */}
+              {/* clickable followers → opens modal */}
               <button
                 type="button"
                 className="profile-stat profile-stat-clickable"
@@ -222,12 +222,13 @@ export default function Profile() {
 
         <div className="profile-bottom-line"></div>
 
-        {/* Сетка постов */}
+        {/* Posts grid */}
         {error && <div className="feed-error">{error}</div>}
 
         {posts.length === 0 && !loading && (
           <div className="profile-empty">
-            У тебя ещё нет постов. Добавь первый через кнопку “Add post”.
+            You don&apos;t have any posts yet. Add your first one using the
+            “Add post” button.
           </div>
         )}
 
@@ -248,7 +249,7 @@ export default function Profile() {
                       {post.mediaType === "video" ? (
                         <video src={src} muted preload="metadata" />
                       ) : (
-                        <img src={src} alt={post.caption} />
+                        <img src={src} alt={post.caption ?? "Post media"} />
                       )}
                     </div>
                     <div className="profile-post-overlay-info">
@@ -262,7 +263,7 @@ export default function Profile() {
         )}
       </div>
 
-      {/* Модалка выбранного поста — такая же, как в Feed */}
+      {/* Selected post modal — same as in Feed */}
       <PostCommentsModal
         post={selectedPost}
         isOpen={selectedPost !== null}
@@ -274,7 +275,7 @@ export default function Profile() {
         }}
       />
 
-      {/* модалка списка подписчиков */}
+      {/* followers list modal */}
       {followersOpen && (
         <div className="post-modal-backdrop" onClick={closeFollowersModal}>
           <div className="followers-modal" onClick={(e) => e.stopPropagation()}>
@@ -290,11 +291,11 @@ export default function Profile() {
             </div>
 
             {followersLoading && (
-              <div className="followers-empty">Загружаем подписчиков…</div>
+              <div className="followers-empty">Loading followers…</div>
             )}
 
             {!followersLoading && followersList.length === 0 && (
-              <div className="followers-empty">Пока нет подписчиков.</div>
+              <div className="followers-empty">No followers yet.</div>
             )}
 
             {!followersLoading && followersList.length > 0 && (

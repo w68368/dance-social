@@ -4,10 +4,9 @@ body,
   height: 100%;
 }
 
-/* ← ДОБАВЬ ЭТО */
 html,
 body {
-  overflow-x: hidden; /* убираем горизонтальный скролл и тёмную «полосу» сбоку */
+  overflow-x: hidden;
 }
 
 body {
@@ -84,13 +83,13 @@ p {
   box-shadow: none;
 }
 
-/* === Add video: как было (тонкий золотой контур) === */
+/* === Add video: how it was (thin gold outline) === */
 .su-header .su-btn.su-btn--accent {
-  background: transparent; /* без заливки */
+  background: transparent;
   color: var(--text);
   border: 1.5px solid var(--gold);
-  box-shadow: none; /* убираем глобальный shadow */
-  height: 38px; /* вровень с user-chip */
+  box-shadow: none;
+  height: 38px; 
   padding: 0 16px;
   border-radius: 999px;
   transition: transform 0.08s ease, box-shadow 0.2s ease, background 0.2s ease,
@@ -99,7 +98,7 @@ p {
 
 .su-header .su-btn.su-btn--accent:hover {
   transform: translateY(-1px);
-  background: rgba(246, 196, 73, 0.1); /* лёгкий подсвет на hover */
+  background: rgba(246, 196, 73, 0.1);
   border-color: var(--gold-2);
   box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.12) inset;
 }

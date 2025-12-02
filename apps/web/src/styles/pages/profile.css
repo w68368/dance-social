@@ -81,7 +81,7 @@
 .profile-stat-number {
   font-weight: 600;
   font-size: 1.1rem;
-  color: var(--text); /* светлый цвет текста */
+  color: var(--text);
 }
 
 .profile-stat-label {
@@ -105,7 +105,7 @@
   gap: 6px;
 }
 
-/* 🆕 крупнее плитки на больших экранах */
+/* larger tiles on bigger screens */
 @media (min-width: 1200px) {
   .profile-posts-grid {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -137,8 +137,7 @@
   display: block;
 }
 
-/* маленький оверлей с лайками при ховере */
-
+/* small like overlay on hover */
 .profile-post-overlay-info {
   position: absolute;
   inset: 0;
@@ -157,7 +156,7 @@
   background: rgba(0, 0, 0, 0.55);
   border-radius: 999px;
   padding: 2px 6px;
-  color: var(--gold); /* 🆕 золотой текст */
+  color: var(--gold);
   font-weight: 600;
 }
 
@@ -287,7 +286,7 @@
   text-decoration: underline;
 }
 
-/* Модалка списка фолловеров */
+/* Followers list modal */
 .followers-modal {
   width: 100%;
   max-width: 420px;
@@ -370,7 +369,7 @@
   color: var(--su-muted, #c8bfdc);
 }
 
-/* Тонкая разделительная линия под шапкой */
+/* Thin divider line under the header */
 .profile-bottom-line {
   width: 100%;
   height: 1.5px;
@@ -380,7 +379,7 @@
   opacity: 0.9;
 }
 
-/* адаптив */
+/* responsive */
 
 @media (max-width: 768px) {
   .profile-header {

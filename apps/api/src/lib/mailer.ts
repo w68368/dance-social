@@ -12,7 +12,7 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 export const mailer = nodemailer.createTransport({
   host: HOST,
   port: PORT,
-  secure: false, // Mailtrap sandbox НЕ использует SSL
+  secure: false,
   auth: {
     user: USER,
     pass: PASS,
@@ -20,19 +20,19 @@ export const mailer = nodemailer.createTransport({
 });
 
 /* =========================================================
-   ✅ Функция: отправка кода подтверждения e-mail (регистрация)
+   ✅ Function: send email verification code (registration)
    ========================================================= */
 export async function sendVerificationCode(to: string, code: string) {
-  const subject = `${APP_NAME}: Ваш код подтверждения`;
-  const text = `Ваш код подтверждения: ${code} (действителен 10 минут).`;
+  const subject = `${APP_NAME}: Your verification code`;
+  const text = `Your verification code: ${code} (valid for 10 minutes).`;
 
   const html = `
     <p style="font-size:16px;">
-      Ваш код подтверждения:
+      Your verification code:
       <b style="font-size:24px;">${code}</b>
     </p>
-    <p>Код действует 10 минут.</p>
-    <p>Если вы не делали запрос — просто игнорируйте это письмо.</p>
+    <p>The code is valid for 10 minutes.</p>
+    <p>If you did not request this — simply ignore this email.</p>
   `;
 
   console.log("[mailer] sendVerificationCode →", to);
@@ -46,29 +46,30 @@ export async function sendVerificationCode(to: string, code: string) {
   });
 }
 
+
 /* =========================================================
-   ✅ Функция: отправка письма для сброса пароля (Forgot → Reset)
+   ✅ Function: send password reset email (Forgot → Reset)
    ========================================================= */
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   const subject = `${APP_NAME}: Reset your password`;
 
   const text = [
-    `Вы запросили сброс пароля.`,
-    `Если это были не вы — просто проигнорируйте письмо.`,
+    `You requested a password reset.`,
+    `If this wasn’t you — simply ignore this email.`,
     ``,
-    `Ссылка для сброса (действует ограниченное время):`,
+    `Password reset link (valid for a limited time):`,
     resetUrl,
   ].join("\n");
 
   const html = `
-    <p>Вы запросили сброс пароля.</p>
-    <p>Если это были не вы — просто игнорируйте это письмо.</p>
+    <p>You requested a password reset.</p>
+    <p>If this wasn’t you — simply ignore this email.</p>
     <p>
       <a href="${resetUrl}" style="font-size:18px;">
-        Сбросить пароль
+        Reset password
       </a>
       <br />
-      (Ссылка действует ограниченное время)
+      (The link is valid for a limited time)
     </p>
   `;
 
@@ -83,8 +84,9 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   });
 }
 
+
 /* =========================================================
-   ✅ Проверка SMTP при старте API
+   SMTP check at API startup
    ========================================================= */
 mailer
   .verify()

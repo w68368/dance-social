@@ -7,10 +7,10 @@ interface Props {
   onClose: () => void;
   onVerified: (accessToken: string, user: any) => void;
 
-  /** Вызывает повторную отправку кода (должен дернуть /auth/register-start с формой) */
+  /** Triggers resending the code (should call /auth/register-start with the form) */
   onResend: () => Promise<void>;
 
-  /** Сколько секунд ждать до активной кнопки «отправить ещё раз» */
+  /** How many seconds to wait before the “send again” button becomes active */
   cooldownSec?: number;
 }
 
@@ -31,7 +31,7 @@ export default function EmailCodeModal({
   const [cooldown, setCooldown] = useState(cooldownSec);
   const [info, setInfo] = useState<string | null>(null);
 
-  // сбрасываем состояние при открытии
+  // reset state when modal opens
   useEffect(() => {
     if (open) {
       setCode("");
@@ -42,7 +42,7 @@ export default function EmailCodeModal({
     }
   }, [open, cooldownSec]);
 
-  // тикер для таймера
+  // ticker for countdown timer
   useEffect(() => {
     if (!open) return;
     if (cooldown <= 0) return;
@@ -59,7 +59,7 @@ export default function EmailCodeModal({
     setInfo(null);
     setLoading(true);
     try {
-      // проверка кода — фронт вызывает это снаружи (см. Register.tsx)
+      // code verification — frontend calls this from outside (see Register.tsx)
       const res = await fetch("/api/auth/register-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,14 +85,14 @@ export default function EmailCodeModal({
     setInfo(null);
     setResending(true);
     try {
-      await onResend(); // дергаем повторную отправку формы регистрации
-      setInfo("Код отправлен повторно.");
-      setCooldown(cooldownSec); // перезапуск таймера
+      await onResend(); // trigger resending the registration form
+      setInfo("Code has been resent.");
+      setCooldown(cooldownSec); // restart timer
     } catch (e: any) {
       setError(
         e?.response?.data?.error ||
           e?.message ||
-          "Не удалось отправить код. Попробуйте позже."
+          "Failed to send the code. Please try again later."
       );
     } finally {
       setResending(false);
@@ -102,9 +102,9 @@ export default function EmailCodeModal({
   return (
     <div className="modal-backdrop">
       <div className="modal">
-        <h3>Подтверждение e-mail</h3>
+        <h3>Email verification</h3>
         <p>
-          Мы отправили 6-значный код на <b>{email}</b>
+          We’ve sent a 6-digit code to <b>{email}</b>
         </p>
 
         <form className="modal-form" onSubmit={submit}>
@@ -129,14 +129,14 @@ export default function EmailCodeModal({
               onClick={onClose}
               disabled={loading}
             >
-              Отмена
+              Cancel
             </button>
             <button
               className="su-btn su-btn-primary"
               type="submit"
               disabled={loading || code.trim().length !== 6}
             >
-              {loading ? "Проверяем..." : "Подтвердить"}
+              {loading ? "Verifying..." : "Verify"}
             </button>
           </div>
 
@@ -149,8 +149,8 @@ export default function EmailCodeModal({
               aria-disabled={cooldown > 0 || resending}
             >
               {cooldown > 0
-                ? `Отправить код ещё раз (${cooldown}s)`
-                : "Отправить код ещё раз"}
+                ? `Send code again (${cooldown}s)`
+                : "Send code again"}
             </button>
           </div>
         </form>

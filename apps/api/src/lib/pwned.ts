@@ -2,10 +2,10 @@
 import crypto from "crypto";
 
 /**
- * Возвращает число найденных утечек для пароля (0 = не найден).
- * Использует k-anonymity API: отправляем только префикс SHA-1 (первые 5 символов).
- * Док: https://haveibeenpwned.com/API/v3#SearchingPwnedPasswordsByRange
- */
+* Returns the number of password leaks found (0 = not found).
+* Uses the k-anonymity API: only the SHA-1 prefix (the first 5 characters) is sent.
+* Doc: https://haveibeenpwned.com/API/v3#SearchingPwnedPasswordsByRange
+*/
 export async function pwnedCount(password: string): Promise<number> {
   const sha1 = crypto
     .createHash("sha1")
@@ -16,14 +16,14 @@ export async function pwnedCount(password: string): Promise<number> {
   const suffix = sha1.slice(5);
 
   const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
-    headers: { "Add-Padding": "true" }, // защита от корреляции размера ответа
+    headers: { "Add-Padding": "true" },
   });
   if (!res.ok) {
     throw new Error(`HIBP failed: ${res.status} ${res.statusText}`);
   }
   const text = await res.text();
 
-  // Ответ: строки формата "SUFFIX:COUNT"
+  // Answer: strings of the format "SUFFIX:COUNT"
   for (const line of text.split("\n")) {
     const [suf, countStr] = line.trim().split(":");
     if (suf === suffix) {

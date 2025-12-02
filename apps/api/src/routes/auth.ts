@@ -36,30 +36,30 @@ const SHORT_REFRESH_TTL_DAYS = Number(
   process.env.REFRESH_TOKEN_DAYS_SHORT ?? 2
 );
 
-// Для e-mail подтверждения
+// For email confirmation
 const EMAIL_CODE_TTL_MIN = Number(process.env.EMAIL_CODE_TTL_MIN ?? 10);
 const EMAIL_MAX_ATTEMPTS = Number(process.env.EMAIL_MAX_ATTEMPTS ?? 5);
 
-// Для сброса пароля
+// To reset the password
 const RESET_TOKEN_TTL_MIN = Number(process.env.RESET_TOKEN_TTL_MIN ?? 30);
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
-// Дефолтная аватарка (файл положи в apps/api/uploads/defaults/default-avatar.png)
+// Default avatar (apps/api/uploads/defaults/default-avatar.png)
 const DEFAULT_AVATAR_URL = "/uploads/defaults/default-avatar.png";
 
 const normalizeEmail = (v: string) => (v ?? "").trim().toLowerCase();
 const normalizeUsername = (v: string) => (v ?? "").trim();
 
-// делаем технический username-слуг:
-// - обрезаем пробелы по краям
-// - переводим в нижний регистр
-// - убираем пробелы внутри
-// - оставляем только латинские буквы, цифры и _
+// Creating a technical username service:
+// - trim spaces at the edges
+// - convert to lowercase
+// - remove spaces inside
+// - leave only Latin letters, numbers, and _
 const makeUsernameSlug = (v: string) =>
   normalizeUsername(v)
     .toLowerCase()
-    .replace(/\s+/g, "") // убираем все пробелы
-    .replace(/[^a-z0-9_]/g, ""); // всё лишнее выбрасываем
+    .replace(/\s+/g, "") // remove all spaces
+    .replace(/[^a-z0-9_]/g, ""); // throw away all unnecessary things
 
 const normalizePassword = (v: string) => (v ?? "").trim();
 
@@ -74,14 +74,14 @@ const random6 = () => Math.floor(100000 + Math.random() * 900000).toString();
 const sha256hex = (s: string) =>
   crypto.createHash("sha256").update(s).digest("hex");
 
-// единый ответ при неуспехе логина — не раскрываем, существует ли email
+// single response if login fails - we don't reveal whether the email exists
 const loginFail = (res: any, extra?: Record<string, unknown>) =>
   res
     .status(401)
     .json({ ok: false, message: "Invalid email or password", ...extra });
 
 /* =========================
-   Zod схемы (без gender)
+   Zod schematics (gender-free)
 ========================= */
 const registerSchema = z.object({
   email: z.string().email(),
@@ -92,10 +92,10 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6).max(200),
-  rememberMe: z.boolean().optional().default(true), // <=== NEW
+  rememberMe: z.boolean().optional().default(true),
 });
 
-// Forgot/Reset схемы
+// Forgot/Reset schemes
 const forgotSchema = z.object({
   email: z.string().email(),
 });
@@ -106,9 +106,9 @@ const resetSchema = z.object({
 });
 
 /* ============================================================
-   NEW: Двухшаговая регистрация с e-mail кодом
-   1) /register-start — присылает код и кладёт черновик
-   2) /register-verify — проверяет код, создаёт User и логинит
+  NEW: Two-step registration with email code
+  1) /register-start — sends the code and uploads a draft
+  2) /register-verify — verifies the code, creates a user, and logs in
 ============================================================ */
 
 /* =========================
@@ -150,9 +150,9 @@ router.post(
         });
       }
 
-      // displayName — как ввёл пользователь
+      // displayName — as entered by the user
       const rawUsername = normalizeUsername(parsed.data.username);
-      // slug для БД и @упоминаний
+      // slug for database and @mentions
       const usernameSlug = makeUsernameSlug(rawUsername);
 
       if (!usernameSlug || usernameSlug.length < 3) {
@@ -162,7 +162,7 @@ router.post(
         });
       }
 
-      // Уникальность
+      // Uniqueness
       const [byEmail, byUsername] = await Promise.all([
         prisma.user.findUnique({ where: { email: parsed.data.email } }),
         prisma.user.findUnique({ where: { username: usernameSlug } }),
@@ -176,7 +176,7 @@ router.post(
           .status(409)
           .json({ ok: false, error: "Username already in use" });
 
-      // Проверка пароля на утечки (HIBP)
+      // Password Leak Check (HIBP)
       const leaks = await pwnedCount(parsed.data.password);
       if (leaks > 0) {
         return res.status(400).json({
@@ -189,7 +189,7 @@ router.post(
 
       const passwordHash = await bcrypt.hash(parsed.data.password, 10);
 
-      // Если прислали аватар — сохраним URL (файл уже положен multer в /uploads)
+      // If you sent an avatar, save the URL (the file is already placed by multer in /uploads)
       let avatarUrl: string | undefined;
       if (req.file) {
         avatarUrl = "/uploads/" + req.file.filename;
@@ -212,7 +212,7 @@ router.post(
             usernameSlug,
             displayName: rawUsername,
             passwordHash,
-            avatarUrl, // может быть undefined — это ок
+            avatarUrl,
           },
         },
         update: {
@@ -229,7 +229,7 @@ router.post(
         },
       });
 
-      // Отправляем письмо с кодом (даём понятное сообщение при ошибке SMTP)
+      // We send an email with a code (we provide a clear message in case of SMTP error)
       try {
         await sendVerificationCode(parsed.data.email, code);
       } catch (e: any) {
@@ -285,7 +285,6 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
       return res.status(400).json({ ok: false, error: "Incorrect code" });
     }
 
-    // Достаём черновик
     const payload = (rec.payload ?? {}) as {
       usernameSlug?: string;
       displayName?: string;
@@ -299,7 +298,7 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
         .json({ ok: false, error: "Draft is missing data" });
     }
 
-    // Повторная проверка уникальности (на всякий случай)
+    // Re-check for uniqueness (just in case)
     const [byEmail, byUsername] = await Promise.all([
       prisma.user.findUnique({ where: { email } }),
       prisma.user.findUnique({ where: { username: payload.usernameSlug! } }),
@@ -308,7 +307,7 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
       return res.status(409).json({ ok: false, error: "User already exists" });
     }
 
-    // Создаём пользователя (если аватар не прислали — ставим дефолт)
+    // Create a user
     const user = await prisma.user.create({
       data: {
         email,
@@ -328,7 +327,7 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
       },
     });
 
-    // Удаляем запись с кодом
+    // Delete the entry with the code
     await prisma.emailVerification.delete({ where: { email } });
 
     // === Access + Refresh ===
@@ -350,7 +349,7 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
       },
     });
 
-    // ставим HttpOnly-куку
+    // set the HttpOnly cookie
     res.cookie("refresh", refreshRaw, refreshCookieOptions());
 
     return res.json({ ok: true, accessToken, user });
@@ -362,7 +361,6 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
 
 /* =========================
    POST /api/auth/register
-   (старый одношаговый, оставлен для совместимости)
    multipart/form-data (avatar)
 ========================= */
 router.post("/register", upload.single("avatar"), async (req, res) => {
@@ -421,9 +419,9 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
 
     let avatarUrl: string | undefined;
     if (req.file) {
-      avatarUrl = "/uploads/" + req.file.filename; // раздаётся как статика
+      avatarUrl = "/uploads/" + req.file.filename;
     } else {
-      avatarUrl = DEFAULT_AVATAR_URL; // ← дефолт, если не загрузили
+      avatarUrl = DEFAULT_AVATAR_URL;
     }
 
     const user = await prisma.user.create({
@@ -461,7 +459,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     const parsed = loginSchema.safeParse({
       email: normalizeEmail(req.body.email),
       password: normalizePassword(req.body.password),
-      rememberMe: req.body.rememberMe, // <=== важно!
+      rememberMe: req.body.rememberMe,
     });
 
     if (!parsed.success) {
@@ -492,7 +490,6 @@ router.post("/login", loginLimiter, async (req, res) => {
 
     if (!user) return loginFail(res);
 
-    // Блокировка по фейлам
     if (user.lockUntil && user.lockUntil > now) {
       const lockRemainingMs = user.lockUntil.getTime() - now.getTime();
       return res.status(429).json({
@@ -531,7 +528,7 @@ router.post("/login", loginLimiter, async (req, res) => {
       return loginFail(res, { attemptsLeft: MAX_ATTEMPTS - newCount });
     }
 
-    // Успех — сброс счётчиков
+    // Success - reset counters
     await prisma.user.update({
       where: { id: user.id },
       data: { failedLoginAttempts: 0, lockUntil: null },
@@ -543,7 +540,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     const refreshRaw = newRefreshRaw();
     const refreshHash = sha256(refreshRaw);
 
-    // Выбираем TTL для refresh token
+    // Selecting a TTL for a refresh token
     const ttlDays = rememberMe ? REFRESH_TTL_DAYS : SHORT_REFRESH_TTL_DAYS;
 
     await prisma.refreshToken.create({
@@ -559,7 +556,7 @@ router.post("/login", loginLimiter, async (req, res) => {
       },
     });
 
-    // ставим HttpOnly-куку
+    // set the HttpOnly cookie
     res.cookie("refresh", refreshRaw, refreshCookieOptions(ttlDays));
 
     return res.json({
@@ -597,7 +594,6 @@ router.post("/refresh", async (req, res) => {
     return res.status(401).json({ ok: false, error: "Invalid refresh" });
   }
 
-  // Ротация
   await prisma.refreshToken.update({
     where: { tokenHash: hash },
     data: { revokedAt: new Date() },
@@ -642,7 +638,6 @@ router.post("/logout", async (req, res) => {
 
 /* =========================
    POST /api/auth/logout-all
-   требует access (Bearer)
 ========================= */
 router.post("/logout-all", requireAuth, async (req: AuthedRequest, res) => {
   if (!req.userId) return res.status(401).json({ ok: false });
@@ -687,7 +682,6 @@ router.get("/me", requireAuth, async (req: AuthedRequest, res) => {
 /* =========================
    POST /api/auth/forgot
    JSON: { email }
-   Ответ всегда одинаковый — не палим существование почты
 ========================= */
 router.post("/forgot", forgotLimiter, async (req, res) => {
   try {
@@ -709,7 +703,6 @@ router.post("/forgot", forgotLimiter, async (req, res) => {
       email: normalizeEmail(req.body.email),
     });
 
-    // общий ответ
     const genericOk = {
       ok: true,
       message: "If this email exists, we've sent reset instructions.",
@@ -721,11 +714,10 @@ router.post("/forgot", forgotLimiter, async (req, res) => {
     });
 
     if (!user) {
-      // Не раскрываем, что почта не найдена
       return res.json(genericOk);
     }
 
-    // Генерируем и сохраняем одноразовый токен (хэш)
+    // Generate and store a one-time token (hash)
     const token = generateResetToken();
     const tokenHash = sha256(token);
     const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MIN * 60 * 1000);
@@ -750,7 +742,7 @@ router.post("/forgot", forgotLimiter, async (req, res) => {
     try {
       await sendPasswordResetEmail(user.email, resetUrl);
     } catch (e) {
-      // Не выдаём деталей наружу
+      // We don't reveal any details.
     }
 
     return res.json(genericOk);
@@ -763,7 +755,7 @@ router.post("/forgot", forgotLimiter, async (req, res) => {
 /* =========================
    POST /api/auth/reset
    JSON: { token, newPassword }
-   Меняет пароль, помечает токен использованным, отзывает все refresh
+   Changes the password, marks the token as used, revokes all refreshes
 ========================= */
 router.post("/reset", resetLimiter, async (req, res) => {
   try {
@@ -780,7 +772,6 @@ router.post("/reset", resetLimiter, async (req, res) => {
       },
     });
 
-    // единый ответ на любые фейлы
     const bad = () =>
       res.status(400).json({ ok: false, error: "Invalid or expired token." });
 
@@ -788,7 +779,7 @@ router.post("/reset", resetLimiter, async (req, res) => {
     if (record.usedAt) return bad();
     if (record.expiresAt < new Date()) return bad();
 
-    // Находим пользователя и проверяем, не совпадает ли пароль с текущим
+    // Find the user and check if the password matches the current one
     const user = await prisma.user.findUnique({
       where: { id: record.userId },
       select: { passwordHash: true },
@@ -805,7 +796,7 @@ router.post("/reset", resetLimiter, async (req, res) => {
       });
     }
 
-    // Доп.проверка на утечки/слабость пароля
+    // Additional check for password leaks/weaknesses
     const leaks = await pwnedCount(newPassword);
     if (leaks > 0) {
       return res.status(400).json({
@@ -819,22 +810,21 @@ router.post("/reset", resetLimiter, async (req, res) => {
     const passwordHash = await bcrypt.hash(newPassword, 12);
 
     await prisma.$transaction(async (tx) => {
-      // 1) Сменить пароль пользователя
+      // 1) Change the user's password
       await tx.user.update({
         where: { id: record.userId },
         data: {
           passwordHash,
-          // passwordVersion: { increment: 1 }, // если используешь версионирование
         },
       });
 
-      // 2) Отозвать все активные refresh токены
+      // 2) Revoke all active refresh tokens
       await tx.refreshToken.updateMany({
         where: { userId: record.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
 
-      // 3) Пометить токен использованным
+      // 3) Mark the token as used
       await tx.passwordReset.update({
         where: { tokenHash },
         data: { usedAt: new Date() },

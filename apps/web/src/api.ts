@@ -7,17 +7,17 @@ import {
 import { clearAuth } from "./lib/auth";
 
 // ------------------------
-// Базовый клиент
+// Base client
 // ------------------------
 const BASE_URL = import.meta?.env?.VITE_API_BASE || "/api";
 
 export const api = axios.create({
   baseURL: BASE_URL,
-  withCredentials: true, // важно: чтобы браузер слал refresh-cookie
+  withCredentials: true,
 });
 
 // ------------------------
-// Авторизация: ставим Bearer access
+// Auth: attach Bearer access token
 // ------------------------
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
@@ -31,7 +31,7 @@ api.interceptors.request.use((config) => {
 });
 
 // ------------------------
-// Перехватчик 401 → refresh
+// 401 interceptor → refresh
 // ------------------------
 let isRefreshing = false;
 let waiting: Array<(token: string | null) => void> = [];
@@ -120,12 +120,12 @@ export function submitPasswordReset(token: string, newPassword: string) {
 // ----------------------------------------------------
 export interface ApiUserSummary {
   id: string;
-  username: string; // slug для @упоминаний (без пробелов, lowercase)
-  displayName?: string | null; // красивый ник, как ввёл пользователь
+  username: string; // slug for @mentions (no spaces, lowercase)
+  displayName?: string | null; // nice nickname as entered by the user
   avatarUrl?: string | null;
 }
 
-// 🔥 Типы реакций на пост
+// 🔥 Reaction types for posts
 export type ReactionType = "LIKE" | "FIRE" | "WOW" | "CUTE" | "CLAP";
 
 export interface PostReactionsSummary {
@@ -141,17 +141,17 @@ export interface Post {
   updatedAt?: string;
   author: ApiUserSummary;
 
-  // медиа
+  // media
   mediaType?: "image" | "video" | null;
   mediaUrl?: string | null;
   mediaLocalPath?: string | null;
 
-  // реакции (likesCount = общее число реакций)
+  // reactions (likesCount = total number of reactions)
   likesCount: number;
-  likedByMe: boolean; // true, если есть любая реакция
+  likedByMe: boolean; // true if any reaction exists
   myReaction?: ReactionType | null;
 
-  // комментарии
+  // comments
   commentsCount: number;
 }
 
@@ -164,7 +164,7 @@ export interface PostComment {
   author: ApiUserSummary;
   parentId?: string | null;
 
-  // лайки комментариев
+  // comment likes
   likesCount: number;
   likedByMe: boolean;
 
@@ -176,10 +176,10 @@ export interface CommentsPage {
   nextCursor: string | null;
 }
 
-// режимы сортировки комментариев
+// comment sort modes
 export type CommentSortMode = "best" | "new" | "old";
 
-// Статистика подписок
+// Follow stats
 export interface FollowStatsResponse {
   ok: boolean;
   followers: number;
@@ -187,32 +187,32 @@ export interface FollowStatsResponse {
   isFollowing: boolean;
 }
 
-// 🆕 Тип для подсказок хэштегов
+// 🆕 Type for hashtag suggestions
 export interface HashtagSuggestion {
   id: string;
-  tag: string; // без #, в нижнем регистре
+  tag: string; // without #, lowercase
 }
 
 export interface HashtagDto {
   id: string;
-  tag: string; // без #
+  tag: string; // without #
 }
 
 // ----------------------------------------------------
 // Posts
 // ----------------------------------------------------
 
-// Лента
+// Feed
 export function fetchFeed() {
   return api.get<{ ok: boolean; posts: Post[] }>("/posts");
 }
 
-// Посты конкретного пользователя
+// Posts of a specific user
 export function fetchUserPosts(userId: string) {
   return api.get<{ ok: boolean; posts: Post[] }>(`/posts/user/${userId}`);
 }
 
-// Создать пост (с текстом и файлом, если есть)
+// Create a post (with text and optional file)
 export function createPost(caption: string, media?: File | null) {
   const trimmed = caption.trim();
 
@@ -229,7 +229,7 @@ export function createPost(caption: string, media?: File | null) {
   return api.post<{ ok: boolean; post: Post }>("/posts", { caption: trimmed });
 }
 
-// 🆕 Поставить / изменить реакцию на пост
+// 🆕 Add / change reaction on a post
 export async function reactToPost(postId: string, type: ReactionType) {
   const { data } = await api.post<{
     ok: boolean;
@@ -239,7 +239,7 @@ export async function reactToPost(postId: string, type: ReactionType) {
   return data.reactions;
 }
 
-// 🆕 Получить сводку реакций по посту
+// 🆕 Get reactions summary for a post
 export async function fetchPostReactions(
   postId: string
 ): Promise<PostReactionsSummary> {
@@ -251,7 +251,7 @@ export async function fetchPostReactions(
   return data.reactions;
 }
 
-// Лайк / Unlike (toggle) поста — через реакцию LIKE
+// Like / Unlike (toggle) for a post — via LIKE reaction
 export function toggleLike(postId: string) {
   return reactToPost(postId, "LIKE");
 }
@@ -260,21 +260,21 @@ export function toggleLike(postId: string) {
 // Comments + likes/pin/edit/delete
 // ----------------------------------------------------
 
-// Лайк / Unlike (toggle) комментария
+// Like / Unlike (toggle) for a comment
 export function toggleCommentLike(commentId: string) {
   return api.post<{ ok: boolean; liked: boolean; likesCount: number }>(
     `/posts/comments/${commentId}/like`
   );
 }
 
-// Закрепить / открепить комментарий (только автор поста)
+// Pin / unpin a comment (post author only)
 export function togglePinComment(postId: string, commentId: string) {
   return api.post<{ ok: boolean; pinnedCommentId: string | null }>(
     `/posts/${postId}/comments/${commentId}/pin`
   );
 }
 
-// Получить страницу комментариев с пагинацией и сортировкой
+// Get a page of comments with pagination and sorting
 export async function fetchComments(
   postId: string,
   cursor?: string | null,
@@ -301,7 +301,7 @@ export async function fetchComments(
   };
 }
 
-// Добавить комментарий
+// Add a comment
 export async function addComment(
   postId: string,
   text: string,
@@ -317,7 +317,7 @@ export async function addComment(
   return data.comment;
 }
 
-// Редактировать свой комментарий
+// Edit own comment
 export async function editComment(
   commentId: string,
   text: string
@@ -329,7 +329,7 @@ export async function editComment(
   return data.comment;
 }
 
-// Удалить свой комментарий
+// Delete own comment
 export function deleteComment(commentId: string) {
   return api.delete<{ ok: boolean }>(`/posts/comments/${commentId}`);
 }
@@ -338,29 +338,29 @@ export function deleteComment(commentId: string) {
 // Follow system
 // ----------------------------------------------------
 
-// получить статистику + статус подписки на userId
+// Get stats + follow status for userId
 export function fetchFollowStats(userId: string) {
   return api.get<FollowStatsResponse>(`/follow/stats/${userId}`);
 }
 
-// подписаться на пользователя
+// Follow a user
 export function followUser(userId: string) {
   return api.post<{ ok: boolean; action: "followed" }>(`/follow/${userId}`);
 }
 
-// отписаться от пользователя
+// Unfollow a user
 export function unfollowUser(userId: string) {
   return api.delete<{ ok: boolean; action: "unfollowed" }>(`/follow/${userId}`);
 }
 
-// список фолловеров пользователя
+// Get user followers list
 export function fetchFollowers(userId: string) {
   return api.get<{ ok: boolean; users: ApiUserSummary[] }>(
     `/follow/followers/${userId}`
   );
 }
 
-// 🆕 поиск пользователей по username / displayName (для @упоминаний и поиска)
+// 🆕 Search users by username / displayName (for @mentions and search)
 export async function searchUsers(query: string): Promise<ApiUserSummary[]> {
   const q = query.trim();
   if (!q) return [];
@@ -376,7 +376,7 @@ export async function searchUsers(query: string): Promise<ApiUserSummary[]> {
   return data.users ?? [];
 }
 
-// 🆕 поиск хэштегов для автодополнения (#tag)
+// 🆕 Search hashtags for autocomplete (#tag)
 export async function searchTags(query: string): Promise<HashtagSuggestion[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -388,7 +388,7 @@ export async function searchTags(query: string): Promise<HashtagSuggestion[]> {
   return data ?? [];
 }
 
-// 🆕 поиск хэштегов по префиксу (для автодополнения)
+// 🆕 Search hashtags by prefix (for autocomplete)
 export async function searchHashtags(query: string): Promise<HashtagDto[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -404,7 +404,7 @@ export async function searchHashtags(query: string): Promise<HashtagDto[]> {
   return data.hashtags ?? [];
 }
 
-// получить публичную инфу пользователя по id
+// Get public user info by id
 export function fetchUserPublic(userId: string) {
   return api.get<{ ok: boolean; user: ApiUserSummary }>(`/users/${userId}`);
 }

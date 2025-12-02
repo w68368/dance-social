@@ -27,13 +27,13 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // стейт подписок
+  // follow stats state
   const [followStats, setFollowStats] = useState<FollowStatsResponse | null>(
     null
   );
   const [followLoading, setFollowLoading] = useState(false);
 
-  // модалка подписчиков
+  // followers modal
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followersList, setFollowersList] = useState<ApiUserSummary[]>([]);
   const [followersLoading, setFollowersLoading] = useState(false);
@@ -41,7 +41,7 @@ export default function UserProfile() {
   const me = getUser();
 
   // -----------------------------
-  // Загрузка постов + публичного профиля
+  // Load posts + public profile
   // -----------------------------
   useEffect(() => {
     if (!userId) return;
@@ -66,7 +66,7 @@ export default function UserProfile() {
         if (userResp.data?.ok && userResp.data.user) {
           setOwner(userResp.data.user);
         } else if (loadedPosts.length > 0) {
-          // fallback: берём автора первого поста
+          // fallback: take the author of the first post
           setOwner(loadedPosts[0].author);
         } else {
           setOwner(null);
@@ -76,7 +76,7 @@ export default function UserProfile() {
 
         const message =
           err?.response?.data?.message ??
-          "Не удалось загрузить профиль пользователя.";
+          "Failed to load user profile.";
         setError(message);
       } finally {
         if (!alive) return;
@@ -92,7 +92,7 @@ export default function UserProfile() {
   }, [userId]);
 
   // -----------------------------
-  // Загрузка статистики подписок
+  // Load follow stats
   // -----------------------------
   useEffect(() => {
     if (!userId) return;
@@ -119,7 +119,7 @@ export default function UserProfile() {
   }, [userId]);
 
   // -----------------------------
-  // Вычисления
+  // Derived values
   // -----------------------------
   const postsCount = posts.length;
 
@@ -141,7 +141,7 @@ export default function UserProfile() {
   const ownerHandle = owner ? `@${owner.username}` : "";
 
   // -----------------------------
-  // Подписка / отписка
+  // Follow / unfollow
   // -----------------------------
   async function handleFollowToggle() {
     if (!userId || !followStats || followLoading) return;
@@ -209,7 +209,7 @@ export default function UserProfile() {
   }
 
   // -----------------------------
-  // Комментарии к посту
+  // Post comments
   // -----------------------------
   function closePostModal() {
     setSelectedPost(null);
@@ -230,13 +230,13 @@ export default function UserProfile() {
   };
 
   // -----------------------------
-  // Рендер
+  // Render
   // -----------------------------
   if (!userId) {
     return (
       <main className="profile-page">
         <div className="profile-container">
-          <p>Не передан id пользователя.</p>
+          <p>User id was not provided.</p>
         </div>
       </main>
     );
@@ -246,7 +246,7 @@ export default function UserProfile() {
     return (
       <main className="profile-page">
         <div className="profile-container">
-          <p>Загружаем профиль…</p>
+          <p>Loading profile…</p>
         </div>
       </main>
     );
@@ -256,7 +256,7 @@ export default function UserProfile() {
     return (
       <main className="profile-page">
         <div className="profile-container">
-          <p>{error ?? "Профиль пользователя не найден."}</p>
+          <p>{error ?? "User profile not found."}</p>
         </div>
       </main>
     );
@@ -265,7 +265,7 @@ export default function UserProfile() {
   return (
     <main className="profile-page">
       <div className="profile-container">
-        {/* Шапка профиля */}
+        {/* Profile header */}
         <section className="profile-header">
           <div className="profile-avatar">
             {owner.avatarUrl ? (
@@ -305,7 +305,7 @@ export default function UserProfile() {
               </div>
             </div>
 
-            {/* кнопка Follow только для чужого профиля */}
+            {/* Follow button only for other users' profiles */}
             {followStats && !isOwnProfile && (
               <button
                 type="button"
@@ -324,8 +324,10 @@ export default function UserProfile() {
             )}
 
             <div className="profile-meta">
-              {loading && <span>Загружаем посты…</span>}
-              {!loading && posts.length === 0 && <span>Пока нет постов.</span>}
+              {loading && <span>Loading posts…</span>}
+              {!loading && posts.length === 0 && (
+                <span>No posts yet.</span>
+              )}
             </div>
           </div>
         </section>
@@ -334,7 +336,7 @@ export default function UserProfile() {
 
         {error && <div className="feed-error">{error}</div>}
 
-        {/* Сетка постов */}
+        {/* Posts grid */}
         {posts.length > 0 && (
           <>
             <h2 className="profile-section-title">Posts</h2>
@@ -352,7 +354,7 @@ export default function UserProfile() {
                       {post.mediaType === "video" ? (
                         <video src={src} muted preload="metadata" />
                       ) : (
-                        <img src={src} alt={post.caption} />
+                        <img src={src} alt={post.caption ?? "Post media"} />
                       )}
                     </div>
                     <div className="profile-post-overlay-info">
@@ -366,7 +368,7 @@ export default function UserProfile() {
         )}
       </div>
 
-      {/* Модалка выбранного поста — такая же, как в Feed/Profile */}
+      {/* Selected post modal — same as in Feed/Profile */}
       <PostCommentsModal
         post={selectedPost}
         isOpen={selectedPost !== null}
@@ -378,7 +380,7 @@ export default function UserProfile() {
         }}
       />
 
-      {/* Модалка списка фолловеров */}
+      {/* Followers list modal */}
       {followersOpen && (
         <div className="post-modal-backdrop" onClick={closeFollowersModal}>
           <div className="followers-modal" onClick={(e) => e.stopPropagation()}>
@@ -394,11 +396,11 @@ export default function UserProfile() {
             </div>
 
             {followersLoading && (
-              <div className="followers-empty">Загружаем подписчиков…</div>
+              <div className="followers-empty">Loading followers…</div>
             )}
 
             {!followersLoading && followersList.length === 0 && (
-              <div className="followers-empty">Пока нет подписчиков.</div>
+              <div className="followers-empty">No followers yet.</div>
             )}
 
             {!followersLoading && followersList.length > 0 && (

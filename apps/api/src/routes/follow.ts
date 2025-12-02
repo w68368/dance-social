@@ -5,7 +5,7 @@ import { requireAuth, type AuthedRequest } from "../middlewares/requireAuth.js";
 
 const router = Router();
 
-// ---------- ПОДПИСАТЬСЯ ----------
+// ---------- SUBSCRIBE ----------
 router.post(
   "/:targetId",
   requireAuth,
@@ -21,12 +21,12 @@ router.post(
       if (targetId === userId) {
         return res
           .status(400)
-          .json({ ok: false, message: "Нельзя подписаться на себя" });
+          .json({ ok: false, message: "You can't subscribe to yourself" });
       }
 
       await prisma.follow.upsert({
         where: {
-          // имя композитного ключа из @@unique([followerId, followingId])
+          // composite key name from @@unique([followerId, followingId])
           followerId_followingId: {
             followerId: userId,
             followingId: targetId,
@@ -42,12 +42,12 @@ router.post(
       return res.json({ ok: true, action: "followed" });
     } catch (err) {
       console.error("Follow error", err);
-      return res.status(500).json({ ok: false, message: "Ошибка подписки" });
+      return res.status(500).json({ ok: false, message: "Subscription error" });
     }
   }
 );
 
-// ---------- ОТПИСАТЬСЯ ----------
+// ---------- UNSUBSCRIBE ----------
 router.delete(
   "/:targetId",
   requireAuth,
@@ -70,12 +70,12 @@ router.delete(
       return res.json({ ok: true, action: "unfollowed" });
     } catch (err) {
       console.error("Unfollow error", err);
-      return res.status(500).json({ ok: false, message: "Ошибка отписки" });
+      return res.status(500).json({ ok: false, message: "Unsubscribe error" });
     }
   }
 );
 
-// ---------- СТАТИСТИКА + СТАТУС ----------
+// ---------- STATISTICS + STATUS ----------
 router.get(
   "/stats/:userId",
   requireAuth,
@@ -106,12 +106,12 @@ router.get(
       console.error("Follow stats error", err);
       return res
         .status(500)
-        .json({ ok: false, message: "Ошибка загрузки статистики" });
+        .json({ ok: false, message: "Error loading statistics" });
     }
   }
 );
 
-// ---------- СПИСОК ФОЛЛОВЕРОВ ----------
+// ---------- FOLLOWERS LIST ----------
 router.get(
   "/followers/:userId",
   requireAuth,
@@ -136,8 +136,8 @@ router.get(
 
       const users = follows.map((f) => ({
         id: f.follower.id,
-        username: f.follower.username, // slug для @
-        displayName: f.follower.displayName, // красивый ник
+        username: f.follower.username,
+        displayName: f.follower.displayName,
         avatarUrl: f.follower.avatarUrl,
       }));
 
@@ -149,7 +149,7 @@ router.get(
       console.error("Followers list error", err);
       return res
         .status(500)
-        .json({ ok: false, message: "Не удалось загрузить подписчиков" });
+        .json({ ok: false, message: "Failed to load subscribers" });
     }
   }
 );

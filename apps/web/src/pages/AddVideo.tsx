@@ -15,7 +15,7 @@ const MAX_FILE_MB = 100;
 const CAPTION_MAX_LENGTH = 1000;
 const CAPTION_SOFT_WARNING = 500;
 
-const STEP_LABELS = ["Медиа", "Подпись", "Предпросмотр"];
+const STEP_LABELS = ["Media", "Caption", "Preview"];
 
 export default function AddVideo() {
   const navigate = useNavigate();
@@ -41,25 +41,25 @@ export default function AddVideo() {
   // drag&drop highlight
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // состояние для @упоминаний
+  // state for @mentions
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionResults, setMentionResults] = useState<ApiUserSummary[]>([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const mentionSearchTimeoutRef = useRef<number | null>(null);
 
-  // состояние для #хэштегов
+  // state for #hashtags
   const [hashtagQuery, setHashtagQuery] = useState("");
   const [hashtagResults, setHashtagResults] = useState<HashtagDto[]>([]);
   const [showHashtagDropdown, setShowHashtagDropdown] = useState(false);
   const hashtagSearchTimeoutRef = useRef<number | null>(null);
 
-  // Хэштеги, которые уже есть в подписи (для блока ниже textarea)
+  // Hashtags already present in the caption (for the block under textarea)
   const hashtags = useMemo(() => {
     const matches = caption.match(/#[^\s#]+/g);
     return matches ?? [];
   }, [caption]);
 
-  // Превью медиа
+  // Media preview
   useEffect(() => {
     if (!mediaFile) {
       setMediaPreview(null);
@@ -72,7 +72,7 @@ export default function AddVideo() {
     };
   }, [mediaFile]);
 
-  // Поиск пользователей для @упоминаний с дебаунсом
+  // Debounced user search for @mentions
   useEffect(() => {
     if (mentionSearchTimeoutRef.current !== null) {
       window.clearTimeout(mentionSearchTimeoutRef.current);
@@ -100,7 +100,7 @@ export default function AddVideo() {
     };
   }, [mentionQuery]);
 
-  // Поиск хэштегов с дебаунсом
+  // Debounced hashtag search
   useEffect(() => {
     if (hashtagSearchTimeoutRef.current !== null) {
       window.clearTimeout(hashtagSearchTimeoutRef.current);
@@ -129,7 +129,7 @@ export default function AddVideo() {
   }, [hashtagQuery]);
 
   // -----------------------------
-  // Файл
+  // File
   // -----------------------------
   const handleFileSelect = (file: File | null) => {
     if (!file) {
@@ -138,14 +138,14 @@ export default function AddVideo() {
     }
 
     if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      setError("Поддерживаются только изображения и видео");
+      setError("Only images and videos are supported");
       setMediaFile(null);
       return;
     }
 
     const maxBytes = MAX_FILE_MB * 1024 * 1024;
     if (file.size > maxBytes) {
-      setError(`Файл слишком большой. Максимум ${MAX_FILE_MB}MB.`);
+      setError(`File is too large. Maximum ${MAX_FILE_MB} MB.`);
       setMediaFile(null);
       return;
     }
@@ -198,7 +198,7 @@ export default function AddVideo() {
   };
 
   // -----------------------------
-  // Навигация по шагам
+  // Wizard step navigation
   // -----------------------------
   const totalSteps = STEP_LABELS.length;
 
@@ -219,7 +219,7 @@ export default function AddVideo() {
     totalSteps <= 1 ? "0%" : `${((currentStep - 1) / (totalSteps - 1)) * 100}%`;
 
   // -----------------------------
-  // Детекция @ и # под курсором
+  // Detection of @ and # at cursor
   // -----------------------------
   const detectMentionAtCursor = (value: string) => {
     if (!textareaRef.current) {
@@ -341,14 +341,14 @@ export default function AddVideo() {
   };
 
   // -----------------------------
-  // Сабмит
+  // Submit
   // -----------------------------
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
     const trimmed = caption.trim();
 
     if (!trimmed && !mediaFile) {
-      setError("Добавь текст или прикрепи фото/видео к посту 🙂");
+      setError("Add some text or attach a photo / video to your post 🙂");
       if (currentStep !== 1) {
         setCurrentStep(1);
       }
@@ -357,7 +357,7 @@ export default function AddVideo() {
 
     if (captionLength > CAPTION_MAX_LENGTH) {
       setError(
-        `Подпись длиннее ${CAPTION_MAX_LENGTH} символов. Пожалуйста, сократи текст.`
+        `Caption is longer than ${CAPTION_MAX_LENGTH} characters. Please shorten the text.`
       );
       if (currentStep !== 2) {
         setCurrentStep(2);
@@ -374,7 +374,7 @@ export default function AddVideo() {
       console.error(err);
       const msg =
         err?.response?.data?.message ||
-        "Не удалось создать пост. Попробуй ещё раз.";
+        "Failed to create post. Please try again.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -391,8 +391,8 @@ export default function AddVideo() {
       <div className="container add-post-container">
         <h1 className="page-title add-post-title">Add post</h1>
         <p className="add-post-subtitle">
-          Создай стильный пост шаг за шагом: выбери медиа, добавь подпись и
-          проверь всё в предпросмотре.
+          Create a stylish post step by step: pick media, add a caption, and
+          check everything in the preview.
         </p>
 
         <form onSubmit={handleSubmit} className="add-post-form">
@@ -425,19 +425,18 @@ export default function AddVideo() {
             </div>
 
             <div className="post-wizard-content">
-              {/* ===== ШАГ 1 ===== */}
+              {/* ===== STEP 1 ===== */}
               {currentStep === 1 && (
                 <section className="step-card">
-                  <h2 className="step-title">Шаг 1. Медиа</h2>
+                  <h2 className="step-title">Step 1. Media</h2>
                   <p className="step-subtitle">
-                    Загрузить фото или видео можно кликом по карточке или
-                    перетащив файл. Поддерживаются изображения и короткие
-                    ролики.
+                    Upload a photo or video by clicking the card or dragging a file.
+                    Images and short videos are supported.
                   </p>
 
                   <div className="add-post-media-section">
                     <span className="add-post-label-text">
-                      Медиа (фото или видео):
+                      Media (photo or video):
                     </span>
 
                     <input
@@ -474,7 +473,7 @@ export default function AddVideo() {
                             Tap or drop to add photo / video
                           </div>
                           <div className="add-post-media-hint">
-                            JPG, PNG, MP4, MOV · до {MAX_FILE_MB}MB
+                            JPG, PNG, MP4, MOV · up to {MAX_FILE_MB} MB
                           </div>
                         </div>
                       )}
@@ -502,7 +501,7 @@ export default function AddVideo() {
                       <div className="add-post-media-meta-row">
                         <div className="add-post-media-meta-main">
                           <span className="add-post-media-pill">
-                            {isPhoto ? "Фото" : isVideo ? "Видео" : "Медиа"}
+                            {isPhoto ? "Photo" : isVideo ? "Video" : "Media"}
                           </span>
                           <span className="add-post-media-filename">
                             {mediaFile.name}
@@ -517,14 +516,14 @@ export default function AddVideo() {
                             className="add-post-media-change-btn"
                             onClick={handleMediaCardClick}
                           >
-                            Заменить
+                            Replace
                           </button>
                           <button
                             type="button"
                             className="add-post-media-remove-btn"
                             onClick={clearMedia}
                           >
-                            Удалить
+                            Remove
                           </button>
                         </div>
                       </div>
@@ -532,26 +531,26 @@ export default function AddVideo() {
 
                     {!mediaFile && (
                       <div className="add-post-media-tip">
-                        Можно создать и текстовый пост — медиа не обязательно,
-                        но яркое фото/видео повышает вовлечённость ✨
+                        You can also create a text-only post — media is optional,
+                        but a bright photo/video boosts engagement ✨
                       </div>
                     )}
                   </div>
                 </section>
               )}
 
-              {/* ===== ШАГ 2 ===== */}
+              {/* ===== STEP 2 ===== */}
               {currentStep === 2 && (
                 <section className="step-card">
-                  <h2 className="step-title">Шаг 2. Подпись</h2>
+                  <h2 className="step-title">Step 2. Caption</h2>
                   <p className="step-subtitle">
-                    Опиши танец, отметь стиль, добавь хэштеги и можешь упомянуть
-                    друзей через @username.
+                    Describe the dance, mention the style, add hashtags, and tag
+                    friends using @username.
                   </p>
 
                   <label className="add-post-label add-post-label--with-mentions">
                     <span className="add-post-label-text">
-                      Подпись / описание:
+                      Caption / description:
                     </span>
                     <div className="add-post-textarea-wrapper">
                       <textarea
@@ -559,10 +558,10 @@ export default function AddVideo() {
                         value={caption}
                         onChange={handleCaptionChange}
                         rows={4}
-                        placeholder="Добавь подпись, отметь стиль, хэштеги и упоминания через @username..."
+                        placeholder="Add a caption, mention style, hashtags and friends via @username..."
                         className="add-post-textarea"
                         onBlur={() => {
-                          // небольшая задержка, чтобы успеть кликнуть по дропдаунам
+                          // small delay so you can click dropdown items
                           setTimeout(() => {
                             setShowMentionDropdown(false);
                             setShowHashtagDropdown(false);
@@ -574,7 +573,7 @@ export default function AddVideo() {
                         }}
                       />
 
-                      {/* dropdown упоминаний */}
+                      {/* mentions dropdown */}
                       {showMentionDropdown && mentionResults.length > 0 && (
                         <div className="mention-dropdown">
                           {mentionResults.map((user) => (
@@ -606,7 +605,7 @@ export default function AddVideo() {
                         </div>
                       )}
 
-                      {/* dropdown хэштегов */}
+                      {/* hashtags dropdown */}
                       {showHashtagDropdown && hashtagResults.length > 0 && (
                         <div className="mention-dropdown">
                           {hashtagResults.map((tag) => (
@@ -642,14 +641,15 @@ export default function AddVideo() {
 
                     {isCaptionTooLong && (
                       <span className="add-post-char-error">
-                        Текст длиннее допустимого лимита — сократи подпись.
+                        The text exceeds the allowed length — please shorten the
+                        caption.
                       </span>
                     )}
 
                     {!isCaptionTooLong && isCaptionLongButOk && (
                       <span className="add-post-char-warning">
-                        Подпись довольно длинная — подумай, не разбить ли её на
-                        абзацы 😊
+                        The caption is quite long — consider splitting it into
+                        paragraphs 😊
                       </span>
                     )}
                   </div>
@@ -657,7 +657,7 @@ export default function AddVideo() {
                   {hashtags.length > 0 && (
                     <div className="add-post-hashtags">
                       <div className="add-post-hashtags-title">
-                        Хэштеги, найденные в тексте:
+                        Hashtags detected in text:
                       </div>
                       <div className="add-post-hashtags-list">
                         {hashtags.map((tag) => (
@@ -671,13 +671,13 @@ export default function AddVideo() {
                 </section>
               )}
 
-              {/* ===== ШАГ 3 ===== */}
+              {/* ===== STEP 3 ===== */}
               {currentStep === 3 && (
                 <section className="step-card">
-                  <h2 className="step-title">Шаг 3. Предпросмотр</h2>
+                  <h2 className="step-title">Step 3. Preview</h2>
                   <p className="step-subtitle">
-                    Так пост будет выглядеть в ленте. Проверь подпись и медиа
-                    перед публикацией.
+                    This is how your post will look in the feed. Check the
+                    caption and media before publishing.
                   </p>
 
                   <div className="preview-card">
@@ -715,8 +715,8 @@ export default function AddVideo() {
 
                     {!mediaFile && !caption.trim() && (
                       <div className="add-post-media-tip">
-                        Пока пусто 😅 Добавь медиа или подпись, чтобы
-                        опубликовать пост.
+                        It’s empty for now. Add media or a caption to publish
+                        your post.
                       </div>
                     )}
                   </div>
@@ -724,7 +724,7 @@ export default function AddVideo() {
               )}
             </div>
 
-            {/* Ошибка под контентом */}
+            {/* Error under content */}
             {error && (
               <div
                 className="auth-error add-post-error"
@@ -734,7 +734,7 @@ export default function AddVideo() {
               </div>
             )}
 
-            {/* Навигация по шагам / Публикация */}
+            {/* Step navigation / Publish */}
             <div className="step-actions">
               <button
                 type="button"
@@ -742,7 +742,7 @@ export default function AddVideo() {
                 onClick={prevStep}
                 disabled={currentStep === 1}
               >
-                Назад
+                Back
               </button>
 
               {currentStep < totalSteps ? (
@@ -752,7 +752,7 @@ export default function AddVideo() {
                   onClick={nextStep}
                   disabled={currentStep === 1 && !canGoNextFromMedia}
                 >
-                  Далее
+                  Next
                 </button>
               ) : (
                 <button
@@ -760,7 +760,7 @@ export default function AddVideo() {
                   className="su-btn su-btn--accent add-post-submit"
                   disabled={loading}
                 >
-                  {loading ? "Публикуем..." : "Publish post"}
+                  {loading ? "Publishing..." : "Publish post"}
                 </button>
               )}
             </div>

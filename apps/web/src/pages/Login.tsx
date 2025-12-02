@@ -19,11 +19,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // состояния для лимита и блокировки
+  // state for rate limit and account lock
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
   const [lockMs, setLockMs] = useState<number | null>(null);
 
-  // тикер обратного отсчёта при блокировке
+  // countdown ticker while the account is locked
   useEffect(() => {
     if (lockMs === null) return;
     if (lockMs <= 0) {
@@ -44,13 +44,13 @@ export default function Login() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, [lockMs]);
 
-  // читаем и безопасно парсим next
+  // read and safely parse `next`
   const nextPath = useMemo(() => {
     const raw = searchParams.get("next");
     if (!raw) return "/";
     try {
       const decoded = decodeURIComponent(raw);
-      // защита от внешних URL: только внутренние пути "/..."
+      // protect against external URLs: allow only internal paths starting with "/"
       if (decoded.startsWith("/") && !decoded.startsWith("//")) {
         return decoded;
       }
@@ -75,12 +75,12 @@ export default function Login() {
         rememberMe,
       });
 
-      // ожидаем { ok, accessToken, user }
+      // expecting { ok, accessToken, user }
       if (data?.ok && data?.accessToken && data?.user) {
         setAccessToken(data.accessToken);
         setUser(data.user);
 
-        // ⬇️ вот это — главное: возвращаем туда, откуда пришли
+        // ⬇️ main part: redirect back to where the user came from
         navigate(nextPath);
       } else {
         setError("Incorrect email or password");
@@ -149,7 +149,7 @@ export default function Login() {
               onBlur={reset}
             />
 
-            {/* CapsLock Warning */}
+            {/* CapsLock warning */}
             {capsLock && (
               <div className="msg warn" style={{ marginTop: 6 }}>
                 ⚠️ Caps Lock is ON
@@ -198,7 +198,7 @@ export default function Login() {
 
           <div className="auth-links">
             <div className="auth-links-row">
-              <span className="auth-muted">Don't have an account?</span>{" "}
+              <span className="auth-muted">Don&apos;t have an account?</span>{" "}
               <Link to="/register" className="auth-link-blue">
                 Create account
               </Link>

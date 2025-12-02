@@ -1,10 +1,10 @@
 .auth-page {
-  min-height: calc(100vh - 80px); /* вместо 100dvh — более предсказуемо */
+  min-height: calc(100vh - 80px); /* instead of 100dvh — more predictable */
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  overflow: hidden; /* чтобы overlay/капча не создавали скролл */
+  overflow: hidden; /* so overlay/captcha don't create scrollbars */
 }
 
 .register-card {
@@ -17,7 +17,7 @@
   backdrop-filter: blur(14px);
   border: 1px solid var(--su-card-border);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
-  overflow: visible; /* чтобы overlay не «резал» края карточки */
+  overflow: visible; /* so overlay doesn't "cut" the card edges */
 }
 .register-card h2 {
   margin: 0 0 8px;
@@ -105,7 +105,7 @@
   color: #6bff9a;
 }
 
-/* auth.css — добавь при желании */
+/* auth.css — add if you want */
 .msg.warn {
   margin-top: 0.5rem;
   font-size: 0.9rem;
@@ -130,8 +130,8 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.48); /* лёгкое затемнение */
-  backdrop-filter: blur(4px); /* эффект блюра */
+  background: rgba(0, 0, 0, 0.48); /* soft dim background */
+  backdrop-filter: blur(4px); /* blur effect */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -161,7 +161,7 @@
   color: #b7b7c7;
 }
 
-/* --- внутренняя форма: не на всю ширину, по центру --- */
+/* --- inner form: not full width, centered --- */
 .modal-form {
   max-width: 320px;
   margin: 0 auto;
@@ -170,7 +170,7 @@
   gap: 10px;
 }
 
-/* --- поле кода компактное и по центру --- */
+/* --- code input: compact and centered --- */
 .modal .input,
 .code-input {
   width: 100%;
@@ -195,7 +195,7 @@
   border-color: #6b4eff;
 }
 
-/* --- кнопки по центру --- */
+/* --- buttons centered --- */
 .modal-actions {
   display: flex;
   justify-content: center;
@@ -203,13 +203,13 @@
   margin-top: 6px;
 }
 
-/* --- блок "отправить код ещё раз" --- */
+/* --- "resend code" section --- */
 .modal-resend {
   margin-top: 6px;
   text-align: center;
 }
 
-/* Кнопка-ссылка для повторной отправки */
+/* Link-like button for resending */
 .link-btn {
   background: transparent;
   border: none;
@@ -220,7 +220,7 @@
   color: #b7b7c7;
 }
 
-/* Неактивное состояние (таймер тикает) */
+/* Disabled state (timer is ticking) */
 .link-btn[disabled],
 .link-btn[aria-disabled="true"] {
   cursor: not-allowed;
@@ -228,7 +228,7 @@
   text-decoration: none;
 }
 
-/* --- сообщения --- */
+/* --- messages --- */
 .msg.error {
   background: #ff3b3b25;
   padding: 8px 12px;
@@ -277,7 +277,7 @@
   gap: 10px;
 }
 
-/* Forgot password — справа */
+/* Forgot password — aligned to the right */
 .auth-forgot-right {
   margin-top: 4px;
   text-align: right;
@@ -311,29 +311,29 @@
 /* ===== Password overlay (3-step strength bar) ===== */
 
 .register-card {
-  position: relative; /* нужно для absolute overlay */
+  position: relative; /* needed for absolute overlay */
 }
 
-/* поле пароля поверх overlay, чтобы оно было кликабельным */
+/* password field above overlay so it stays clickable */
 .field--password {
   position: relative;
   z-index: 20;
 }
 
-/* слой overlay: над карточкой, но без перехвата кликов */
+/* overlay layer: above the card, but without intercepting clicks */
 .pw-overlay {
   position: absolute;
-  inset: 0; /* во всю карточку */
-  z-index: 12; /* ниже поля пароля (20), выше остального контента */
-  pointer-events: none; /* не блокируем клики по форме */
+  inset: 0; 
+  z-index: 12; 
+  pointer-events: none;
 }
 
-/* панель внутри overlay. Ставим её вертикально прямо под полем пароля */
+/* panel inside overlay. Placed vertically right under the password field */
 .pw-panel {
   position: absolute;
   left: 24px;
   right: 24px;
-  top: var(--pw-overlay-top, 120px); /* вычисляется из JS */
+  top: var(--pw-overlay-top, 120px); /* computed from JS */
   background: color-mix(in oklab, var(--su-card-bg, #0b0b12) 70%, transparent);
   border: 1px solid var(--su-card-border, rgba(255, 255, 255, 0.12));
   backdrop-filter: blur(10px);
@@ -342,7 +342,7 @@
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
 }
 
-/* Ровная лента прогресса (без сегментов) */
+/* Solid progress bar (no segments) */
 .pw-bar {
   position: relative;
   width: 100%;
@@ -362,7 +362,7 @@
   transition: width 200ms ease, background-color 200ms ease;
 }
 
-/* Подпись справа от полосы */
+/* Label on the right side of the bar */
 .pw-caption {
   display: flex;
   justify-content: flex-end;
@@ -376,7 +376,7 @@
   letter-spacing: 0.2px;
 }
 
-/* Подсказки */
+/* Tips */
 .pw-tips {
   margin: 8px 0 0;
   padding-left: 18px;
@@ -389,16 +389,16 @@
   margin-top: 4px;
 }
 
-/* Цвета по умолчанию (можешь связать с темой) */
+/* Default colors (can be tied to theme) */
 :root {
-  --pw-weak: #ff4d4f; /* красный */
-  --pw-mid: #faad14; /* янтарный */
-  --pw-strong: #52c41a; /* зелёный */
+  --pw-weak: #ff4d4f; 
+  --pw-mid: #faad14; 
+  --pw-strong: #52c41a; 
 }
 
 .captcha-box {
   display: flex;
-  justify-content: flex-start; /* влево */
+  justify-content: flex-start;
   align-items: center;
   margin-top: 4px;
 }
@@ -419,14 +419,13 @@
   margin-right: 8px;
   width: 16px;
   height: 16px;
-  /* если хочешь акцентировать цвет */
   accent-color: var(--su-accent, #4f46e5);
 }
 
 .password-wrapper {
   position: relative;
-  width: 100%; /* 👈 добавили */
-  display: block; /* 👈 на всякий случай, чтобы не было inline-особенностей */
+  width: 100%; 
+  display: block; 
 }
 
 .pw-toggle-btn {
@@ -450,7 +449,7 @@
 }
 
 .pw-toggle-btn svg {
-  color: #bdbdbd; /* серый цвет — можно заменить var(--text-muted) */
+  color: #bdbdbd;
 }
 
 @media (max-width: 560px) {

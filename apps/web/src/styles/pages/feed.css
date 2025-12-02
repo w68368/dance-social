@@ -31,8 +31,8 @@
   border-radius: 18px;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--ring);
-  max-width: 600px; /* 🔥 ключевое */
-  margin: 0 auto; /* центрируем */
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 /* header */
@@ -86,8 +86,8 @@
 }
 
 /* media */
-/* сам элемент <video>/<img> имеет классы feed-media + feed-media-video/feed-media-image */
-/* контейнер медиа */
+/* <video>/<img> elements have classes feed-media + feed-media-video/feed-media-image */
+/* media container */
 .feed-media {
   width: 100%;
   border-radius: 18px;
@@ -98,7 +98,7 @@
   justify-content: center;
 }
 
-/* видео и картинки на всю ширину карточки */
+/* video and images take full card width */
 .feed-media-video,
 .feed-media-image {
   width: 100%;
@@ -106,16 +106,16 @@
   display: block;
 }
 
-/* вертикальные и горизонтальные видео заполняют блок без огромных рамок */
+/* vertical and horizontal video fill the block without huge borders */
 .feed-media-video {
   width: 100%;
   height: auto;
   max-height: 80vh;
-  object-fit: contain; /* 🔥 вместо cover */
+  object-fit: contain;
   border-radius: 18px;
 }
 
-/* изображения тоже без лишних полей */
+/* images also without extra empty space */
 .feed-media-image {
   max-height: 70vh;
   object-fit: cover;
@@ -136,7 +136,7 @@
 }
 
 /* ============================= */
-/*      ❤️ Like (react-icons)    */
+/*      Like (react-icons)       */
 /* ============================= */
 
 .like-btn {
@@ -158,7 +158,7 @@
 /* not liked */
 .like-icon {
   font-size: 26px;
-  color: rgba(255, 255, 255, 0.35); /* бело-серое сердечко */
+  color: rgba(255, 255, 255, 0.35);
   transition: 0.2s ease;
 }
 
@@ -180,7 +180,7 @@
 }
 
 /* ============================= */
-/*      💬 Comment button        */
+/*       Comment button          */
 /* ============================= */
 
 .comment-btn {
@@ -197,7 +197,7 @@
 }
 
 .comment-icon {
-  font-size: 24px; /* почти как сердце, чуть меньше */
+  font-size: 24px; /* almost like heart, slightly smaller */
   color: rgba(255, 255, 255, 0.45);
   transition: 0.2s ease;
 }
@@ -217,7 +217,7 @@
 }
 
 /* ======================================== */
-/*  🔥 REACTIONS POPOVER (мини-модалка)    */
+/*  🔥 REACTIONS POPOVER (mini-popover)     */
 /* ======================================== */
 
 .feed-like-wrapper {
@@ -225,15 +225,15 @@
   display: inline-flex;
   align-items: center;
 
-  /* немного зоны вокруг, чтобы было легче попасть */
+  /* small hit area around for easier hover/tap */
   padding: 4px 8px;
 }
 
-/* пузырь с реакциями */
+/* bubble with reactions */
 .feed-reactions-popover {
   position: absolute;
   left: 50%;
-  /* центр поповера будет над сердцем, с лёгким оверлапом */
+  /* popover center is above the heart, with a small overlap */
   bottom: 50%;
   transform: translate(-50%, 40%);
 
@@ -256,7 +256,7 @@
   white-space: nowrap;
 }
 
-/* показываем поповер при ховере или фокусе внутри обёртки */
+/* show popover on hover or focus within the wrapper */
 .feed-like-wrapper:hover .feed-reactions-popover,
 .feed-like-wrapper:focus-within .feed-reactions-popover {
   opacity: 1;
@@ -274,10 +274,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px; /* ← чтобы иконка и цифра не слипались */
+  gap: 4px;
 }
 
-/* маленькая цифра рядом с эмодзи */
+/* small number next to emoji */
 .reaction-chip-count {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.85);
@@ -285,7 +285,7 @@
   text-align: center;
 }
 
-/* иконки — золотые */
+/* icons — golden */
 .reaction-chip-icon svg {
   font-size: 18px;
   color: var(--gold, #f6c449);
@@ -303,13 +303,13 @@
   color: #ffe08a;
 }
 
-/* выбранная реакция */
+/* selected reaction */
 .reaction-chip--active {
   background: rgba(246, 196, 73, 0.3);
   box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.75);
 }
 
-/* на мобиле можно чуть упростить */
+/* on mobile we can simplify a bit */
 @media (max-width: 600px) {
   .feed-reactions-popover {
     padding: 4px 6px;

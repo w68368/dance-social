@@ -13,7 +13,7 @@ import NotFound from "../pages/NotFound";
 import Profile from "../pages/Profile";
 import ProtectedRoute from "./ProtectedRoute";
 
-// новые страницы
+// new pages
 import Forgot from "../pages/ForgotPassword";
 import Reset from "../pages/ResetPassword";
 
@@ -40,7 +40,7 @@ export default function AppRoutes() {
       {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<Profile />} />
-        {/* профиль любого пользователя по id */}
+        {/* profile of any user by id */}
         <Route path="/users/:userId" element={<UserProfile />} />
         <Route path="/add-video" element={<AddVideo />} />
       </Route>

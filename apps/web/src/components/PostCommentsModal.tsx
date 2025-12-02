@@ -41,7 +41,7 @@ interface PostCommentsModalProps {
   onCommentAdded?: () => void;
 }
 
-// конфиг реакций поста для нижнего блока
+// post reaction config for the bottom block
 const POST_REACTIONS: {
   type: ReactionType;
   label: string;
@@ -66,46 +66,46 @@ export default function PostCommentsModal({
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState("");
 
-  // пагинация
+  // pagination
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // режим сортировки
+  // sorting mode
   const [sortMode, setSortMode] = useState<CommentSortMode>("best");
 
-  // ответ на конкретный комментарий (для подсказки + @ник)
+  // reply to a specific comment (for hint + @nickname)
   const [replyTo, setReplyTo] = useState<PostComment | null>(null);
-  // id того комментария, к которому реально привязываем ответ (всегда root)
+  // the id of the comment to which we actually bind the response (always root)
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
 
-  // редактирование комментария
+  // editing a comment
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [editingSending, setEditingSending] = useState(false);
 
-  // какие треды (root-комменты) свёрнуты
+  // which threads (root comments) are collapsed
   const [collapsedThreads, setCollapsedThreads] = useState<
     Record<string, boolean>
   >({});
 
-  // 🔒 анти-флуд
+  // Anti-flood
   const [lastSendAt, setLastSendAt] = useState<number | null>(null);
   const [lastText, setLastText] = useState<string>("");
 
-  // кастомный тост
+  // custom toast
   const [toast, setToast] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  // кастомный диалог удаления
+  // custom delete dialog
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteSending, setDeleteSending] = useState(false);
 
-  // открытое меню "три точки" для конкретного комментария
+  // open the "three dots" menu for a specific comment
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
 
-  // сводка реакций поста (для нижнего блока)
+  // post reactions summary
   const [reactionsSummary, setReactionsSummary] =
     useState<PostReactionsSummary | null>(null);
   const [reactionsLoading, setReactionsLoading] = useState(false);
@@ -119,7 +119,7 @@ export default function PostCommentsModal({
     setOpenMenuFor((prev) => (prev === commentId ? null : commentId));
   };
 
-  // форматирование времени
+  // format relative time like "5 min ago", "yesterday", etc.
   const formatRelativeTime = (iso: string) => {
     if (!iso) return "";
     const date = new Date(iso);
@@ -140,7 +140,7 @@ export default function PostCommentsModal({
     return date.toLocaleDateString();
   };
 
-  // загрузка первой страницы комментариев (при открытии и смене sortMode)
+  // download comments when opening
   useEffect(() => {
     if (!isOpen || !post) return;
 
@@ -168,7 +168,7 @@ export default function PostCommentsModal({
       })
       .catch(() => {
         if (!alive) return;
-        setError("Не удалось загрузить комментарии");
+        setError("Failed to load comments");
       })
       .finally(() => {
         if (!alive) return;
@@ -180,7 +180,7 @@ export default function PostCommentsModal({
     };
   }, [isOpen, post?.id, sortMode]);
 
-  // загрузка сводки реакций поста для нижнего блока
+  // load post reactions summary
   useEffect(() => {
     if (!isOpen || !post) {
       setReactionsSummary(null);
@@ -210,14 +210,14 @@ export default function PostCommentsModal({
     };
   }, [isOpen, post?.id]);
 
-  // авто-скрытие тоста
+  // auto-hide toast
   useEffect(() => {
     if (!toast) return;
     const id = window.setTimeout(() => setToast(null), 2500);
     return () => window.clearTimeout(id);
   }, [toast]);
 
-  // догрузка следующей страницы
+  // load more comments (pagination)
   const handleLoadMore = async () => {
     if (!post || !nextCursor || loadingMore) return;
 
@@ -244,14 +244,14 @@ export default function PostCommentsModal({
     }
   };
 
-  // фокус на поле ввода при выборе "Ответить"
+  // focus input when starting a reply
   useEffect(() => {
     if (replyTo && inputRef.current) {
       inputRef.current.focus();
     }
   }, [replyTo]);
 
-  // карта username → пользователь (для навигации по @)
+  // map username → user (for navigation by @)
   const usersByUsername = useMemo(() => {
     const map = new Map<string, ApiUserSummary>();
 
@@ -282,21 +282,21 @@ export default function PostCommentsModal({
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    // 🔒 анти-флуд: не чаще, чем раз в 4 секунды
+    // Anti-flood: no more than once every 4 seconds
     const now = Date.now();
     if (lastSendAt && now - lastSendAt < 4000) {
       setToast({
         type: "error",
-        message: "Слишком часто 😅 Подожди пару секунд.",
+        message: "Too often. Wait a few seconds.",
       });
       return;
     }
 
-    // 🔒 анти-флуд: не спамить одним и тем же текстом подряд
+    // Anti-flood: don't spam with the same text over and over again
     if (lastText && trimmed === lastText) {
       setToast({
         type: "error",
-        message: "Точно такой же комментарий уже отправлен.",
+        message: "Exactly the same comment has already been sent.",
       });
       return;
     }
@@ -319,14 +319,13 @@ export default function PostCommentsModal({
       setLastText(trimmed);
       onCommentAdded?.();
     } catch {
-      setError("Не удалось отправить комментарий");
+      setError("Failed to send comment. Please try again.");
     } finally {
       setSending(false);
     }
   };
 
   const handleToggleCommentLike = async (commentId: string) => {
-    // оптимистичное обновление
     setComments((prev) =>
       prev.map((c) =>
         c.id === commentId
@@ -349,7 +348,6 @@ export default function PostCommentsModal({
         )
       );
     } catch {
-      // если ошибка — откатим
       setComments((prev) =>
         prev.map((c) =>
           c.id === commentId
@@ -377,11 +375,11 @@ export default function PostCommentsModal({
         }))
       );
     } catch {
-      // можно добавить показ ошибки, если нужно
+      // ignore
     }
   };
 
-  // редактирование
+  // start editing a comment
   const startEdit = (c: PostComment) => {
     if (!me || c.author.id !== me.id) return;
     setEditingId(c.id);
@@ -409,19 +407,18 @@ export default function PostCommentsModal({
         prev.map((c) => (c.id === commentId ? updated : c))
       );
       cancelEdit();
-      setToast({ type: "success", message: "Комментарий обновлён" });
+      setToast({ type: "success", message: "Comment updated" });
     } catch (e) {
       console.error("Failed to edit comment", e);
       setToast({
         type: "error",
-        message: "Не удалось обновить комментарий",
+        message: "Failed to update comment",
       });
     } finally {
       setEditingSending(false);
     }
   };
 
-  // открыть кастомное подтверждение удаления
   const openDeleteConfirm = (commentId: string) => {
     setDeleteTargetId(commentId);
     setOpenMenuFor(null);
@@ -433,7 +430,6 @@ export default function PostCommentsModal({
     setOpenMenuFor(null);
   };
 
-  // выполняем удаление после подтверждения
   const handleDeleteComment = async (commentId: string) => {
     try {
       setDeleteSending(true);
@@ -445,12 +441,12 @@ export default function PostCommentsModal({
       if (editingId === commentId) {
         cancelEdit();
       }
-      setToast({ type: "success", message: "Комментарий удалён" });
+      setToast({ type: "success", message: "Comment deleted" });
     } catch (e) {
       console.error("Failed to delete comment", e);
       setToast({
         type: "error",
-        message: "Не удалось удалить комментарий",
+        message: "Failed to delete comment",
       });
     } finally {
       setDeleteSending(false);
@@ -459,7 +455,7 @@ export default function PostCommentsModal({
     }
   };
 
-  // сворачивание / разворачивание треда
+  // collapse / expand thread
   const toggleThreadCollapsed = (rootId: string) => {
     setCollapsedThreads((prev) => ({
       ...prev,
@@ -472,7 +468,7 @@ export default function PostCommentsModal({
   const createdAt = new Date(post.createdAt);
   const postAuthorName = post.author.displayName || post.author.username;
 
-  // сгруппируем комментарии: родитель -> список ответов
+  // group comments: parent -> list of replies
   const roots = comments.filter((c) => !c.parentId);
   const pinnedRoots = roots.filter((c) => c.isPinned);
   const regularRoots = roots.filter((c) => !c.isPinned);
@@ -486,7 +482,7 @@ export default function PostCommentsModal({
     }
   });
 
-  // сводка реакций для нижнего блока
+  // Summary of reactions for the lower block
   const counts = reactionsSummary?.counts;
   const myReaction =
     reactionsSummary?.myReaction ?? (post.likedByMe ? "LIKE" : null);
@@ -523,9 +519,8 @@ export default function PostCommentsModal({
     }
   };
 
-  // старт ответа
   const startReply = (c: PostComment) => {
-    const parentId = c.parentId ?? c.id; // root для треда
+    const parentId = c.parentId ?? c.id;
     setReplyTo(c);
     setReplyParentId(parentId);
     setEditingId(null);
@@ -542,9 +537,9 @@ export default function PostCommentsModal({
     setReplyParentId(null);
   };
 
-  // подсветка и кликабельность @mention
+  // highlighting and clickability @mention
   const formatTextWithMentions = (value: string) => {
-    const parts = value.split(/(\s+)/); // сохраняем пробелы
+    const parts = value.split(/(\s+)/);
     return parts.map((part, idx) => {
       if (part.startsWith("@") && part.trim().length > 1) {
         const raw = part.trim();
@@ -579,7 +574,7 @@ export default function PostCommentsModal({
   return (
     <div className="pcm-backdrop" onClick={onClose}>
       <div className="pcm-modal" onClick={(e) => e.stopPropagation()}>
-        {/* Левая часть — медиа */}
+        {/* Left side - media */}
         <div className="pcm-media-pane">
           {post.mediaType === "image" && post.mediaUrl && (
             <img src={post.mediaUrl} alt="post media" />
@@ -589,7 +584,7 @@ export default function PostCommentsModal({
           )}
         </div>
 
-        {/* Правая часть — инфо + комментарии */}
+        {/* Right side — info + comments */}
         <div className="pcm-side-pane">
           <header className="pcm-header">
             <div className="pcm-header-left">
@@ -611,7 +606,7 @@ export default function PostCommentsModal({
           </header>
 
           <div className="pcm-content">
-            {/* Тост-уведомление */}
+            {/* Toast notification */}
             {toast && (
               <div
                 className={`pcm-toast ${
@@ -624,19 +619,19 @@ export default function PostCommentsModal({
               </div>
             )}
 
-            {/* Список комментариев */}
+            {/* List of comments */}
             <div className="pcm-comments-block">
               {loading ? (
-                <div className="pcm-status">Загружаем комментарии…</div>
+                <div className="pcm-status">Loading comments…</div>
               ) : error ? (
                 <div className="pcm-status pcm-error">{error}</div>
               ) : roots.length === 0 ? (
                 <div className="pcm-status pcm-empty">
-                  Пока нет комментариев — стань первым ✨
+                  No comments yet - be the first ✨
                 </div>
               ) : (
                 <>
-                  {/* Переключатель сортировки */}
+                  {/* Sorting switch */}
                   <div className="pcm-sort">
                     <button
                       type="button"
@@ -645,7 +640,7 @@ export default function PostCommentsModal({
                       }`}
                       onClick={() => setSortMode("best")}
                     >
-                      Лучшие
+                      The best
                     </button>
                     <button
                       type="button"
@@ -654,7 +649,7 @@ export default function PostCommentsModal({
                       }`}
                       onClick={() => setSortMode("new")}
                     >
-                      Новые
+                      New
                     </button>
                     <button
                       type="button"
@@ -663,7 +658,7 @@ export default function PostCommentsModal({
                       }`}
                       onClick={() => setSortMode("old")}
                     >
-                      Старые
+                      Oldest
                     </button>
                   </div>
 
@@ -703,7 +698,7 @@ export default function PostCommentsModal({
                               )}
                             </div>
                             <div className="pcm-body">
-                              {/* верхняя строка: имя + бейджи слева, время + меню справа */}
+                              {/* Top row: name + badges on the left, time + menu on the right */}
                               <div className="pcm-row-top">
                                 <div className="pcm-meta">
                                   <span className="pcm-username">
@@ -711,12 +706,12 @@ export default function PostCommentsModal({
                                   </span>
                                   {isPostAuthor(c) && (
                                     <span className="pcm-author-badge">
-                                      Автор
+                                      Author
                                     </span>
                                   )}
                                   {c.isPinned && (
                                     <span className="pcm-pinned-badge">
-                                      Закреплён
+                                      Pinned
                                     </span>
                                   )}
                                 </div>
@@ -727,7 +722,7 @@ export default function PostCommentsModal({
                                   </span>
                                   {isEdited && (
                                     <span className="pcm-edited">
-                                      · изменено
+                                      · changed
                                     </span>
                                   )}
 
@@ -750,7 +745,7 @@ export default function PostCommentsModal({
                                             onClick={() => startEdit(c)}
                                           >
                                             <FaEdit />
-                                            <span>Редактировать</span>
+                                            <span>Edit</span>
                                           </button>
                                           <button
                                             type="button"
@@ -760,7 +755,7 @@ export default function PostCommentsModal({
                                             }
                                           >
                                             <FaTrash />
-                                            <span>Удалить</span>
+                                            <span>Delete</span>
                                           </button>
                                         </div>
                                       )}
@@ -769,7 +764,7 @@ export default function PostCommentsModal({
                                 </div>
                               </div>
 
-                              {/* Текст или режим редактирования */}
+                              {/* Text or edit mode */}
                               {editingId === c.id ? (
                                 <div className="pcm-edit-block">
                                   <input
@@ -791,7 +786,7 @@ export default function PostCommentsModal({
                                       }
                                       onClick={() => submitEdit(c.id)}
                                     >
-                                      Сохранить
+                                      Save
                                     </button>
                                     <button
                                       type="button"
@@ -799,7 +794,7 @@ export default function PostCommentsModal({
                                       onClick={cancelEdit}
                                       disabled={editingSending}
                                     >
-                                      Отмена
+                                      Cancel
                                     </button>
                                   </div>
                                 </div>
@@ -809,14 +804,14 @@ export default function PostCommentsModal({
                                 </div>
                               )}
 
-                              {/* нижняя строка: Ответить слева, лайк + закрепить справа */}
+                              {/* Bottom line: Reply on the left, like + pin on the right */}
                               <div className="pcm-row-bottom">
                                 <button
                                   type="button"
                                   className="pcm-reply-inline"
                                   onClick={() => startReply(c)}
                                 >
-                                  Ответить
+                                  Reply
                                 </button>
 
                                 <div className="pcm-row-bottom-right">
@@ -847,13 +842,13 @@ export default function PostCommentsModal({
                                       className="pcm-pin-link"
                                       onClick={() => handleTogglePin(c.id)}
                                     >
-                                      {c.isPinned ? "Открепить" : "Закрепить"}
+                                      {c.isPinned ? "Unpin" : "Pin"}
                                     </button>
                                   )}
                                 </div>
                               </div>
 
-                              {/* Тогглер треда, если есть ответы */}
+                              {/* Thread toggler if there are any answers */}
                               {replies.length > 0 && (
                                 <div className="pcm-thread-toggle-row">
                                   <button
@@ -862,13 +857,13 @@ export default function PostCommentsModal({
                                     onClick={() => toggleThreadCollapsed(c.id)}
                                   >
                                     {isCollapsed
-                                      ? `Показать ответы (${replies.length})`
-                                      : `Скрыть ответы (${replies.length})`}
+                                      ? `Show replies (${replies.length})`
+                                      : `Hide replies (${replies.length})`}
                                   </button>
                                 </div>
                               )}
 
-                              {/* Ответы */}
+                              {/* Replies */}
                               {replies.length > 0 && !isCollapsed && (
                                 <ul className="pcm-replies">
                                   {replies.map((r) => {
@@ -901,7 +896,7 @@ export default function PostCommentsModal({
                                           )}
                                         </div>
                                         <div className="pcm-body">
-                                          {/* верхняя строка ответа */}
+                                          {/* reply top row */}
                                           <div className="pcm-row-top">
                                             <div className="pcm-meta">
                                               <span className="pcm-username">
@@ -909,7 +904,7 @@ export default function PostCommentsModal({
                                               </span>
                                               {isPostAuthor(r) && (
                                                 <span className="pcm-author-badge">
-                                                  Автор
+                                                  Author
                                                 </span>
                                               )}
                                             </div>
@@ -922,7 +917,7 @@ export default function PostCommentsModal({
                                               </span>
                                               {replyEdited && (
                                                 <span className="pcm-edited">
-                                                  · изменено
+                                                  · edited
                                                 </span>
                                               )}
 
@@ -934,7 +929,7 @@ export default function PostCommentsModal({
                                                     onClick={() =>
                                                       toggleMenuFor(r.id)
                                                     }
-                                                    aria-label="Меню комментария"
+                                                    aria-label="Comment menu"
                                                   >
                                                     <FaEllipsisH />
                                                   </button>
@@ -950,7 +945,7 @@ export default function PostCommentsModal({
                                                       >
                                                         <FaEdit />
                                                         <span>
-                                                          Редактировать
+                                                          Edit
                                                         </span>
                                                       </button>
                                                       <button
@@ -963,7 +958,7 @@ export default function PostCommentsModal({
                                                         }
                                                       >
                                                         <FaTrash />
-                                                        <span>Удалить</span>
+                                                        <span>Delete</span>
                                                       </button>
                                                     </div>
                                                   )}
@@ -972,7 +967,7 @@ export default function PostCommentsModal({
                                             </div>
                                           </div>
 
-                                          {/* текст / редактирование */}
+                                          {/* text / editing */}
                                           {editingId === r.id ? (
                                             <div className="pcm-edit-block">
                                               <input
@@ -997,7 +992,7 @@ export default function PostCommentsModal({
                                                     submitEdit(r.id)
                                                   }
                                                 >
-                                                  Сохранить
+                                                  Save
                                                 </button>
                                                 <button
                                                   type="button"
@@ -1005,7 +1000,7 @@ export default function PostCommentsModal({
                                                   onClick={cancelEdit}
                                                   disabled={editingSending}
                                                 >
-                                                  Отмена
+                                                  Cancel
                                                 </button>
                                               </div>
                                             </div>
@@ -1015,14 +1010,14 @@ export default function PostCommentsModal({
                                             </div>
                                           )}
 
-                                          {/* низ ответа: Ответить + лайк справа */}
+                                          {/* bottom of the reply: Reply + like on the right */}
                                           <div className="pcm-row-bottom">
                                             <button
                                               type="button"
                                               className="pcm-reply-inline"
                                               onClick={() => startReply(r)}
                                             >
-                                              Ответить
+                                              Reply
                                             </button>
 
                                             <div className="pcm-row-bottom-right">
@@ -1069,7 +1064,7 @@ export default function PostCommentsModal({
                           onClick={handleLoadMore}
                           disabled={loadingMore}
                         >
-                          {loadingMore ? "Загружаем…" : "Показать ещё"}
+                          {loadingMore ? "Loading…" : "Show more"}
                         </button>
                       </div>
                     )}
@@ -1078,12 +1073,12 @@ export default function PostCommentsModal({
               )}
             </div>
 
-            {/* Форма + лайки поста снизу */}
+            {/* Form + post likes at the bottom */}
             <div className="pcm-bottom">
               {replyTo && (
                 <div className="pcm-replying-to">
                   <span>
-                    Ответ на <strong>@{replyTo.author.username}</strong>
+                    Replying to <strong>@{replyTo.author.username}</strong>
                   </span>
                   <button
                     type="button"
@@ -1099,17 +1094,17 @@ export default function PostCommentsModal({
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder="Напиши комментарий…"
+                  placeholder="Write a comment…"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   maxLength={500}
                 />
                 <button type="submit" disabled={sending || !text.trim()}>
-                  {sending ? "Отправляем…" : "Отправить"}
+                  {sending ? "Sending…" : "Send"}
                 </button>
               </form>
 
-              {/* 🔥 Лайки поста + разбор реакций */}
+              {/* Post likes + reaction analysis */}
               <div className="pcm-likes-row">
                 {renderPostMainIcon()}
                 <span className="pcm-likes-count">{totalLikes}</span>
@@ -1133,13 +1128,13 @@ export default function PostCommentsModal({
             </div>
           </div>
 
-          {/* Кастомный диалог подтверждения удаления */}
+          {/* Custom delete confirmation dialog */}
           {deleteTargetId && (
             <div className="pcm-confirm-backdrop">
               <div className="pcm-confirm">
-                <div className="pcm-confirm-title">Удалить комментарий?</div>
+                <div className="pcm-confirm-title">Delete comment?</div>
                 <div className="pcm-confirm-text">
-                  Это действие нельзя отменить.
+                  This action cannot be undone.
                 </div>
                 <div className="pcm-confirm-actions">
                   <button
@@ -1148,7 +1143,7 @@ export default function PostCommentsModal({
                     onClick={() => handleDeleteComment(deleteTargetId)}
                     disabled={deleteSending}
                   >
-                    {deleteSending ? "Удаляем…" : "Да, удалить"}
+                    {deleteSending ? "Deleting…" : "Yes, delete"}
                   </button>
                   <button
                     type="button"
@@ -1156,7 +1151,7 @@ export default function PostCommentsModal({
                     onClick={cancelDeleteConfirm}
                     disabled={deleteSending}
                   >
-                    Отмена
+                    Cancel
                   </button>
                 </div>
               </div>

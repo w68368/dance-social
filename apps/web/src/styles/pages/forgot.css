@@ -1,17 +1,17 @@
-/* Доп-стили именно для страницы Forgot password */
+/* Extra styles specifically for the Forgot password page */
 
 .forgot-card h2 {
   margin: 0 0 8px;
 }
 
-/* маленькая подсказка под полем email */
+/* small hint under the email field */
 .forgot-hint {
   margin-top: 4px;
   font-size: 13px;
   color: var(--su-muted);
 }
 
-/* кнопка во всю ширину, как на логине */
+/* full-width button, same as on the login page */
 .forgot-submit-btn {
   width: 100%;
   margin-top: 8px;
