@@ -198,13 +198,34 @@ export interface HashtagDto {
   tag: string; // without #
 }
 
+// ✅ Feed pagination response
+export interface FeedPage {
+  ok: boolean;
+  posts: Post[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+// ✅ Feed scope for filter
+export type FeedScope = "all" | "following";
+
 // ----------------------------------------------------
 // Posts
 // ----------------------------------------------------
 
-// Feed
-export function fetchFeed() {
-  return api.get<{ ok: boolean; posts: Post[] }>("/posts");
+// Feed (cursor pagination: 5 + 5 + 5 ...) + scope (all / following)
+export function fetchFeed(params?: {
+  limit?: number;
+  cursor?: string | null;
+  scope?: FeedScope;
+}) {
+  return api.get<FeedPage>("/posts", {
+    params: {
+      limit: params?.limit ?? 5,
+      cursor: params?.cursor ?? null,
+      scope: params?.scope ?? "all",
+    },
+  });
 }
 
 // Posts of a specific user
@@ -350,7 +371,9 @@ export function followUser(userId: string) {
 
 // Unfollow a user
 export function unfollowUser(userId: string) {
-  return api.delete<{ ok: boolean; action: "unfollowed" }>(`/follow/${userId}`);
+  return api.delete<{ ok: boolean; action: "unfollowed" }>(
+    `/follow/${userId}`
+  );
 }
 
 // Get user followers list

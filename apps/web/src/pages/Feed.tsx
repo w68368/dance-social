@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   fetchFeed,
@@ -8,6 +8,7 @@ import {
   type Post,
   type ReactionType,
   type PostReactionsSummary,
+  type FeedScope,
 } from "../api";
 import {
   FaHeart,
@@ -60,9 +61,18 @@ function getMainReactionIcon(
 }
 
 export default function Feed() {
+  const PAGE_SIZE = 5;
+
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // initial load
+  const [loadingMore, setLoadingMore] = useState(false); // pagination load
   const [error, setError] = useState<string | null>(null);
+
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+
+  // filter: all / following
+  const [scope, setScope] = useState<FeedScope>("all");
 
   // comments modal
   const [commentsPost, setCommentsPost] = useState<Post | null>(null);
@@ -74,33 +84,114 @@ export default function Feed() {
 
   const me = getUser();
 
+  const isBusy = useMemo(() => loading || loadingMore, [loading, loadingMore]);
+
+  // Load first page / refresh feed
+  const loadFirstPage = async (nextScope?: FeedScope) => {
+    const activeScope = nextScope ?? scope;
+
+    setLoading(true);
+    setError(null);
+    setCursor(null);
+    setHasMore(true);
+    setPosts([]);
+    setReactionsMap({});
+
+    try {
+      const res = await fetchFeed({
+        limit: PAGE_SIZE,
+        cursor: null,
+        scope: activeScope,
+      });
+
+      setPosts(res.data.posts ?? []);
+      setCursor(res.data.nextCursor ?? null);
+      setHasMore(!!res.data.hasMore);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.response?.data?.message || "Failed to load the feed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load next page
+  const loadMore = async () => {
+    if (loadingMore || loading) return;
+    if (!hasMore) return;
+
+    setLoadingMore(true);
+    setError(null);
+
+    try {
+      const res = await fetchFeed({
+        limit: PAGE_SIZE,
+        cursor,
+        scope,
+      });
+
+      const newPosts = res.data.posts ?? [];
+
+      setPosts((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        const merged = [...prev];
+        for (const p of newPosts) {
+          if (!seen.has(p.id)) merged.push(p);
+        }
+        return merged;
+      });
+
+      setCursor(res.data.nextCursor ?? null);
+      setHasMore(!!res.data.hasMore);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.response?.data?.message || "Failed to load more posts.");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // initial load
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      setLoading(true);
-      setError(null);
+    (async () => {
+      if (cancelled) return;
+      await loadFirstPage();
+    })();
 
-      try {
-        const res = await fetchFeed();
-        if (!cancelled) setPosts(res.data.posts);
-      } catch (err: any) {
-        console.error(err);
-        if (!cancelled) {
-          setError(
-            err?.response?.data?.message || "Failed to load the feed."
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // reload when scope changes (All / Following)
+  useEffect(() => {
+    loadFirstPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope]);
+
+  // Auto-load on scroll (IntersectionObserver)
+  useEffect(() => {
+    const el = document.getElementById("feed-sentinel");
+    if (!el) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting) return;
+        if (isBusy) return;
+        if (!hasMore) return;
+        loadMore();
+      },
+      { root: null, rootMargin: "600px", threshold: 0 }
+    );
+
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor, hasMore, isBusy, scope]);
 
   // helper: apply reactions summary to a post + store it in reactionsMap
   const applyReactionsSummary = (
@@ -205,15 +296,73 @@ export default function Feed() {
   return (
     <main className="su-main">
       <div className="container feed-container">
-        <h1 className="page-title feed-title">Feed</h1>
+        <div className="feed-topbar">
+          <h1 className="page-title feed-title">Feed</h1>
+
+          {/* Filter */}
+          <div className="feed-filter">
+            <button
+              className={`feed-filter-btn ${
+                scope === "all" ? "is-active" : ""
+              }`}
+              onClick={() => setScope("all")}
+              disabled={isBusy}
+              type="button"
+            >
+              All
+            </button>
+
+            <button
+              className={`feed-filter-btn ${
+                scope === "following" ? "is-active" : ""
+              }`}
+              onClick={() => setScope("following")}
+              disabled={isBusy || !me}
+              title={!me ? "Login to view Following feed" : ""}
+              type="button"
+            >
+              Following
+            </button>
+          </div>
+        </div>
+
+        {scope === "following" && !me && (
+          <p className="feed-info" style={{ marginTop: 8 }}>
+            Login to see posts from people you follow.
+          </p>
+        )}
 
         {loading && <p className="feed-info">Loading posts…</p>}
-        {error && <p className="feed-error">{error}</p>}
+
+        {error && (
+          <div style={{ marginBottom: 12 }}>
+            <p className="feed-error">{error}</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn"
+                onClick={() => loadFirstPage()}
+                disabled={isBusy}
+                type="button"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
 
         {!loading && !error && posts.length === 0 && (
           <p className="feed-empty">
-            There are no posts in the feed yet. Try publishing something via{" "}
-            <strong>Add post</strong>.
+            {scope === "following" ? (
+              <>
+                No posts from your subscriptions yet. Try following more dancers
+                ✨
+              </>
+            ) : (
+              <>
+                There are no posts in the feed yet. Try publishing something via{" "}
+                <strong>Add post</strong>.
+              </>
+            )}
           </p>
         )}
 
@@ -296,6 +445,7 @@ export default function Feed() {
                               handleReact(post.id, r.type);
                             }}
                             title={r.label}
+                            type="button"
                           >
                             <span className="reaction-chip-icon">{r.icon}</span>
                             {count > 0 && (
@@ -311,6 +461,7 @@ export default function Feed() {
                     <button
                       className={`like-btn ${post.likedByMe ? "liked" : ""}`}
                       onClick={() => handleToggleLike(post.id)}
+                      type="button"
                     >
                       {mainIcon}
                       <span className="like-count">{post.likesCount}</span>
@@ -320,17 +471,39 @@ export default function Feed() {
                   <button
                     className="comment-btn"
                     onClick={() => openComments(post)}
+                    type="button"
                   >
                     <FaRegCommentDots className="comment-icon" />
-                    <span className="comment-count">
-                      {post.commentsCount}
-                    </span>
+                    <span className="comment-count">{post.commentsCount}</span>
                   </button>
                 </div>
               </article>
             );
           })}
         </div>
+
+        {/* Sentinel for infinite scroll */}
+        <div id="feed-sentinel" style={{ height: 1 }} />
+
+        {/* Fallback button */}
+        {!loading && !error && hasMore && (
+          <div style={{ display: "flex", justifyContent: "center", margin: 16 }}>
+            <button
+              className="btn"
+              onClick={loadMore}
+              disabled={isBusy}
+              type="button"
+            >
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && !hasMore && posts.length > 0 && (
+          <p className="feed-info" style={{ textAlign: "center" }}>
+            You’ve reached the end.
+          </p>
+        )}
       </div>
 
       <PostCommentsModal

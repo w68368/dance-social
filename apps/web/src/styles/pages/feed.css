@@ -19,6 +19,64 @@
   color: #ff8a8a;
 }
 
+/* ✅ Topbar + filter buttons */
+.feed-topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.feed-filter {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.feed-filter-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  transition: 0.15s ease;
+  line-height: 1;
+  user-select: none;
+}
+
+.feed-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.feed-filter-btn:active {
+  transform: translateY(0);
+}
+
+.feed-filter-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(246, 196, 73, 0.22);
+  border-color: rgba(246, 196, 73, 0.45);
+}
+
+/* active */
+.feed-filter-btn.is-active {
+  background: rgba(246, 196, 73, 0.14);
+  border-color: rgba(246, 196, 73, 0.55);
+  box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.18);
+  color: #fff;
+}
+
+.feed-filter-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .feed-list {
   display: flex;
   flex-direction: column;
@@ -86,8 +144,6 @@
 }
 
 /* media */
-/* <video>/<img> elements have classes feed-media + feed-media-video/feed-media-image */
-/* media container */
 .feed-media {
   width: 100%;
   border-radius: 18px;
@@ -197,7 +253,7 @@
 }
 
 .comment-icon {
-  font-size: 24px; /* almost like heart, slightly smaller */
+  font-size: 24px;
   color: rgba(255, 255, 255, 0.45);
   transition: 0.2s ease;
 }
@@ -224,8 +280,6 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-
-  /* small hit area around for easier hover/tap */
   padding: 4px 8px;
 }
 
@@ -233,7 +287,6 @@
 .feed-reactions-popover {
   position: absolute;
   left: 50%;
-  /* popover center is above the heart, with a small overlap */
   bottom: 50%;
   transform: translate(-50%, 40%);
 
@@ -311,6 +364,10 @@
 
 /* on mobile we can simplify a bit */
 @media (max-width: 600px) {
+  .feed-container {
+    padding: 16px;
+  }
+
   .feed-reactions-popover {
     padding: 4px 6px;
   }

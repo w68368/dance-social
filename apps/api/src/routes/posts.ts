@@ -798,67 +798,98 @@ router.get("/:id/comments", optionalAuth, async (req, res) => {
 
 // -----------------------------
 // GET /api/posts
-// Post feed
+// Post feed (cursor pagination)
 // -----------------------------
 router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const currentUserId = req.userId ?? null;
 
-    const posts = await prisma.post.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 50,
+    const scopeRaw = typeof req.query.scope === "string" ? req.query.scope : "all";
+    const scope = scopeRaw === "following" ? "following" : "all";
+
+    const rawLimit = Number(req.query.limit) || 5;
+    const limit = Math.min(Math.max(rawLimit, 1), 50);
+    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : null;
+
+    // ✅ WHERE для "Только подписки"
+    let where: any = undefined;
+
+    if (scope === "following") {
+      if (!currentUserId) {
+        return res.status(401).json({ ok: false, message: "Login required" });
+      }
+
+      const follows = await prisma.follow.findMany({
+        where: { followerId: currentUserId },
+        select: { followingId: true },
+      });
+
+      const followingIds = follows.map((f) => f.followingId);
+
+      // показываем посты тех, на кого подписан + свои
+      where = {
+        OR: [
+          { authorId: currentUserId },
+          { authorId: { in: followingIds } },
+        ],
+      };
+    }
+
+    const rows = await prisma.post.findMany({
+      where,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: limit + 1,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       include: {
         author: {
-          select: {
-            id: true,
-            username: true,
-            displayName: true,
-            avatarUrl: true,
-          },
+          select: { id: true, username: true, displayName: true, avatarUrl: true },
         },
-        _count: {
-          select: {
-            reactions: true,
-            comments: true,
-          },
-        },
+        _count: { select: { reactions: true, comments: true } },
         reactions: currentUserId
-          ? {
-              where: { userId: currentUserId },
-              select: { type: true },
-            }
+          ? { where: { userId: currentUserId }, select: { type: true } }
           : false,
       },
     });
 
-    const shaped = posts.map((p: any) => {
-      const myReaction: ReactionType | null =
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+
+    const shaped = page.map((p: any) => {
+      const myReaction =
         currentUserId && Array.isArray(p.reactions) && p.reactions.length > 0
-          ? (p.reactions[0].type as ReactionType)
+          ? p.reactions[0].type
           : null;
 
       return {
         id: p.id,
         caption: p.caption,
-        mediaType: p.mediaType,
-        mediaUrl: p.mediaUrl,
-        mediaLocalPath: p.mediaLocalPath,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         author: p.author,
-        likesCount: p._count.reactions, 
+        mediaType: p.mediaType,
+        mediaUrl: p.mediaUrl,
+        mediaLocalPath: p.mediaLocalPath,
+        likesCount: p._count.reactions,
         likedByMe: !!myReaction,
         myReaction,
         commentsCount: p._count.comments,
       };
     });
 
-    res.json({ ok: true, posts: shaped });
+    const nextCursor = shaped.length ? shaped[shaped.length - 1].id : null;
+
+    return res.json({
+      ok: true,
+      posts: shaped,
+      nextCursor: hasMore ? nextCursor : null,
+      hasMore,
+    });
   } catch (err) {
     console.error("Fetch posts error:", err);
-    res.status(500).json({ ok: false, message: "Server error" });
+    return res.status(500).json({ ok: false, message: "Failed to load posts" });
   }
 });
+
 
 // -----------------------------
 // GET /api/posts/user/:userId
