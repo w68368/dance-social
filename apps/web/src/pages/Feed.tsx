@@ -7,6 +7,7 @@ import {
   reactToPost,
   fetchPostReactions,
   deletePost,
+  updatePostCaption,
   type Post,
   type ReactionType,
   type PostReactionsSummary,
@@ -93,9 +94,16 @@ export default function Feed() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const prevPostsRef = useRef<Post[] | null>(null);
 
+  // edit caption modal
+  const [editPost, setEditPost] = useState<Post | null>(null);
+  const [editCaption, setEditCaption] = useState<string>("");
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const prevCaptionRef = useRef<string>("");
+
   const me = getUser();
 
   const isBusy = useMemo(() => loading || loadingMore, [loading, loadingMore]);
+  const isAnyModalOpen = !!confirmDelete || !!editPost;
 
   // Load first page / refresh feed
   const loadFirstPage = async (nextScope?: FeedScope) => {
@@ -218,6 +226,7 @@ export default function Feed() {
       if (e.key === "Escape") {
         setOpenMenuPostId(null);
         setConfirmDelete(null);
+        setEditPost(null);
       }
     }
 
@@ -364,6 +373,43 @@ export default function Feed() {
     }
   };
 
+  const handleSaveCaption = async () => {
+    if (!editPost) return;
+
+    const postId = editPost.id;
+    const nextCaption = editCaption.trim(); // can be ""
+
+    setSavingEditId(postId);
+    setError(null);
+
+    // optimistic update + remember prev caption for rollback
+    prevCaptionRef.current = editPost.caption ?? "";
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, caption: nextCaption } : p))
+    );
+
+    try {
+      await updatePostCaption(postId, nextCaption);
+      setEditPost(null);
+      setEditCaption("");
+    } catch (err: any) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message || err?.message || "Failed to update caption."
+      );
+
+      // rollback
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, caption: prevCaptionRef.current } : p
+        )
+      );
+    } finally {
+      setSavingEditId(null);
+      prevCaptionRef.current = "";
+    }
+  };
+
   return (
     <main className="su-main">
       <div className="container feed-container">
@@ -375,7 +421,7 @@ export default function Feed() {
             <button
               className={`feed-filter-btn ${scope === "all" ? "is-active" : ""}`}
               onClick={() => setScope("all")}
-              disabled={isBusy}
+              disabled={isBusy || isAnyModalOpen}
               type="button"
             >
               All
@@ -386,7 +432,7 @@ export default function Feed() {
                 scope === "following" ? "is-active" : ""
               }`}
               onClick={() => setScope("following")}
-              disabled={isBusy || !me}
+              disabled={isBusy || !me || isAnyModalOpen}
               title={!me ? "Login to view Following feed" : ""}
               type="button"
             >
@@ -503,6 +549,21 @@ export default function Feed() {
 
                       {openMenuPostId === post.id && (
                         <div className="feed-menu" role="menu">
+                          <button
+                            type="button"
+                            className="feed-menu-item"
+                            role="menuitem"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setEditPost(post);
+                              setEditCaption(post.caption ?? "");
+                              setOpenMenuPostId(null);
+                            }}
+                          >
+                            Edit caption
+                          </button>
+
                           <button
                             type="button"
                             className="feed-menu-item feed-menu-danger"
@@ -622,6 +683,52 @@ export default function Feed() {
         )}
       </div>
 
+      {/* Edit caption modal */}
+      {editPost && (
+        <div
+          className="feed-confirm-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setEditPost(null);
+          }}
+        >
+          <div className="feed-confirm-modal">
+            <div className="feed-confirm-title">Edit caption</div>
+            <div className="feed-confirm-text">Update your post description.</div>
+
+            <textarea
+              className="feed-edit-textarea"
+              value={editCaption}
+              onChange={(e) => setEditCaption(e.target.value)}
+              placeholder="Write a caption…"
+              rows={4}
+              autoFocus
+            />
+
+            <div className="feed-confirm-actions">
+              <button
+                type="button"
+                className="feed-confirm-btn feed-confirm-btn--ghost"
+                onClick={() => setEditPost(null)}
+                disabled={savingEditId === editPost.id}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="feed-confirm-btn"
+                onClick={handleSaveCaption}
+                disabled={savingEditId === editPost.id}
+              >
+                {savingEditId === editPost.id ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirm delete modal */}
       {confirmDelete && (
         <div
@@ -634,9 +741,7 @@ export default function Feed() {
         >
           <div className="feed-confirm-modal">
             <div className="feed-confirm-title">Delete this post?</div>
-            <div className="feed-confirm-text">
-              This action can’t be undone.
-            </div>
+            <div className="feed-confirm-text">This action can’t be undone.</div>
 
             <div className="feed-confirm-actions">
               <button

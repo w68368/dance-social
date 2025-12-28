@@ -1,10 +1,12 @@
 // apps/web/src/pages/Profile.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   api,
   fetchUserPosts,
   fetchFollowers,
+  deletePost,
+  updatePostCaption,
   type Post,
   type FollowStatsResponse,
   type ApiUserSummary,
@@ -33,6 +35,21 @@ export default function Profile() {
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followersList, setFollowersList] = useState<ApiUserSummary[]>([]);
   const [followersLoading, setFollowersLoading] = useState(false);
+
+  // post menu (⋯)
+  const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // delete confirm modal
+  const [confirmDelete, setConfirmDelete] = useState<Post | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const prevPostsRef = useRef<Post[] | null>(null);
+
+  // edit caption modal
+  const [editPost, setEditPost] = useState<Post | null>(null);
+  const [editCaption, setEditCaption] = useState<string>("");
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const prevCaptionRef = useRef<string>("");
 
   useEffect(() => {
     let alive = true;
@@ -90,6 +107,32 @@ export default function Profile() {
     };
   }, []);
 
+  // Close menu on outside click + Escape
+  useEffect(() => {
+    function onDocMouseDown(e: MouseEvent) {
+      if (!openMenuPostId) return;
+      const t = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(t)) {
+        setOpenMenuPostId(null);
+      }
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpenMenuPostId(null);
+        setConfirmDelete(null);
+        setEditPost(null);
+      }
+    }
+
+    document.addEventListener("mousedown", onDocMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openMenuPostId]);
+
   const postsCount = posts.length;
   const totalLikes = useMemo(
     () =>
@@ -144,6 +187,91 @@ export default function Profile() {
     setFollowersOpen(false);
     setFollowersList([]);
   }
+
+  const handleDeletePost = async (post: Post) => {
+    if (!post?.id) return;
+
+    setDeletingId(post.id);
+    setError(null);
+
+    // optimistic remove + remember snapshot for rollback
+    setPosts((prev) => {
+      prevPostsRef.current = prev;
+      return prev.filter((p) => p.id !== post.id);
+    });
+
+    // close related UI
+    if (selectedPost?.id === post.id) {
+      setSelectedPost(null);
+    }
+
+    try {
+      await deletePost(post.id);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.response?.data?.message || "Failed to delete the post.");
+
+      // rollback
+      if (prevPostsRef.current) {
+        setPosts(prevPostsRef.current);
+      }
+    } finally {
+      setDeletingId(null);
+      setConfirmDelete(null);
+      setOpenMenuPostId(null);
+      prevPostsRef.current = null;
+    }
+  };
+
+  const handleSaveCaption = async () => {
+    if (!editPost) return;
+
+    const postId = editPost.id;
+    const nextCaption = editCaption.trim(); // can be ""
+
+    setSavingEditId(postId);
+    setError(null);
+
+    // optimistic update + remember prev caption for rollback
+    prevCaptionRef.current = editPost.caption ?? "";
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, caption: nextCaption } : p))
+    );
+
+    // keep modal post in sync if it’s currently opened
+    setSelectedPost((prev) =>
+      prev && prev.id === postId ? { ...prev, caption: nextCaption } : prev
+    );
+
+    try {
+      await updatePostCaption(postId, nextCaption);
+      setEditPost(null);
+      setEditCaption("");
+    } catch (err: any) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to update caption."
+      );
+
+      // rollback
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, caption: prevCaptionRef.current } : p
+        )
+      );
+      setSelectedPost((prev) =>
+        prev && prev.id === postId
+          ? { ...prev, caption: prevCaptionRef.current }
+          : prev
+      );
+    } finally {
+      setSavingEditId(null);
+      prevCaptionRef.current = "";
+      setOpenMenuPostId(null);
+    }
+  };
 
   if (loading && !me) {
     return (
@@ -229,30 +357,176 @@ export default function Profile() {
             <div className="profile-posts-grid">
               {posts.map((post) => {
                 const src = post.mediaUrl ?? post.mediaLocalPath ?? "";
+
                 return (
-                  <button
-                    key={post.id}
-                    type="button"
-                    className="profile-post-tile"
-                    onClick={() => setSelectedPost(post)}
-                  >
-                    <div className="profile-post-media-thumb">
-                      {post.mediaType === "video" ? (
-                        <video src={src} muted preload="metadata" />
-                      ) : (
-                        <img src={src} alt={post.caption ?? "Post media"} />
+                  <div key={post.id} className="profile-post-tile-wrap">
+                    {/* click to open modal */}
+                    <button
+                      type="button"
+                      className="profile-post-tile"
+                      onClick={() => setSelectedPost(post)}
+                    >
+                      <div className="profile-post-media-thumb">
+                        {post.mediaType === "video" ? (
+                          <video src={src} muted preload="metadata" />
+                        ) : (
+                          <img src={src} alt={post.caption ?? "Post media"} />
+                        )}
+                      </div>
+                      <div className="profile-post-overlay-info">
+                        <span>❤ {post.likesCount}</span>
+                      </div>
+                    </button>
+
+                    {/* ⋯ menu (hover + click) */}
+                    <div
+                      className="profile-post-more"
+                      ref={(el) => {
+                        if (openMenuPostId === post.id) {
+                          menuRef.current = el;
+                        }
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="profile-post-more-btn"
+                        aria-label="Post menu"
+                        aria-haspopup="menu"
+                        aria-expanded={openMenuPostId === post.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenMenuPostId((cur) =>
+                            cur === post.id ? null : post.id
+                          );
+                        }}
+                      >
+                        ⋯
+                      </button>
+
+                      {openMenuPostId === post.id && (
+                        <div className="profile-post-menu" role="menu">
+                          <button
+                            type="button"
+                            className="profile-post-menu-item"
+                            role="menuitem"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setEditPost(post);
+                              setEditCaption(post.caption ?? "");
+                              setOpenMenuPostId(null);
+                            }}
+                          >
+                            Edit caption
+                          </button>
+
+                          <button
+                            type="button"
+                            className="profile-post-menu-item profile-post-menu-danger"
+                            role="menuitem"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setConfirmDelete(post);
+                              setOpenMenuPostId(null);
+                            }}
+                          >
+                            Delete post
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <div className="profile-post-overlay-info">
-                      <span>❤ {post.likesCount}</span>
-                    </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
           </>
         )}
       </div>
+
+      {/* Edit caption modal (reuse feed modal styles) */}
+      {editPost && (
+        <div
+          className="feed-confirm-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setEditPost(null);
+          }}
+        >
+          <div className="feed-confirm-modal">
+            <div className="feed-confirm-title">Edit caption</div>
+            <div className="feed-confirm-text">Update your post description.</div>
+
+            <textarea
+              className="feed-edit-textarea"
+              value={editCaption}
+              onChange={(e) => setEditCaption(e.target.value)}
+              placeholder="Write a caption…"
+              rows={4}
+              autoFocus
+            />
+
+            <div className="feed-confirm-actions">
+              <button
+                type="button"
+                className="feed-confirm-btn feed-confirm-btn--ghost"
+                onClick={() => setEditPost(null)}
+                disabled={savingEditId === editPost.id}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="feed-confirm-btn"
+                onClick={handleSaveCaption}
+                disabled={savingEditId === editPost.id}
+              >
+                {savingEditId === editPost.id ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm delete modal (reuse feed modal styles) */}
+      {confirmDelete && (
+        <div
+          className="feed-confirm-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setConfirmDelete(null);
+          }}
+        >
+          <div className="feed-confirm-modal">
+            <div className="feed-confirm-title">Delete this post?</div>
+            <div className="feed-confirm-text">This action can’t be undone.</div>
+
+            <div className="feed-confirm-actions">
+              <button
+                type="button"
+                className="feed-confirm-btn feed-confirm-btn--ghost"
+                onClick={() => setConfirmDelete(null)}
+                disabled={deletingId === confirmDelete.id}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="feed-confirm-btn feed-confirm-btn--danger"
+                onClick={() => handleDeletePost(confirmDelete)}
+                disabled={deletingId === confirmDelete.id}
+              >
+                {deletingId === confirmDelete.id ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Selected post modal — same as in Feed */}
       <PostCommentsModal

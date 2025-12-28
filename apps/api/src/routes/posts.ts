@@ -1028,5 +1028,96 @@ router.delete("/:id", requireAuth, async (req: AuthedRequest, res) => {
   }
 });
 
+// -----------------------------
+// PATCH /api/posts/:id
+// Edit post caption (author only)
+// -----------------------------
+router.patch("/:id", requireAuth, async (req: AuthedRequest, res) => {
+  if (!req.userId) {
+    return res.status(401).json({ ok: false, message: "Unauthorized" });
+  }
+
+  const postId = req.params.id;
+
+  // validation
+  const schema = z.object({
+    caption: z.string().max(2000),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ ok: false, message: "Invalid caption" });
+  }
+
+  const caption = parsed.data.caption.trim(); // always string
+
+  try {
+    const existing = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { id: true, authorId: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ ok: false, message: "Post not found" });
+    }
+
+    if (existing.authorId !== req.userId) {
+      return res.status(403).json({ ok: false, message: "Forbidden" });
+    }
+
+    // update caption
+    const updated = await prisma.post.update({
+      where: { id: postId },
+      data: { caption },
+      include: {
+        author: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    // ---- update hashtags to reflect new caption ----
+    const tags = Array.from(
+      new Set(
+        (caption.match(/#[\p{L}\p{N}_]+/gu) ?? [])
+          .map((t) => t.slice(1).toLowerCase())
+          .filter(Boolean)
+      )
+    );
+
+    // clear old relations
+    await prisma.postHashtag.deleteMany({
+      where: { postId },
+    });
+
+    // create new ones
+    for (const tag of tags) {
+      const hashtag = await prisma.hashtag.upsert({
+        where: { tag },
+        update: {},
+        create: { tag },
+      });
+
+      await prisma.postHashtag.create({
+        data: {
+          postId,
+          hashtagId: hashtag.id,
+        },
+      });
+    }
+
+    return res.json({ ok: true, post: updated });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Server error" });
+  }
+});
+
+
 
 export default router;

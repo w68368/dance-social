@@ -373,6 +373,20 @@ export async function deletePost(postId: string) {
   return data;
 }
 
+export async function updatePostCaption(postId: string, caption: string) {
+  const { data } = await api.patch<{
+    ok: boolean;
+    post?: Post;
+    message?: string;
+  }>(`/posts/${postId}`, { caption });
+
+  if (!data.ok) {
+    throw new Error(data.message || "Failed to update caption");
+  }
+  return data;
+}
+
+
 // ----------------------------------------------------
 // Comments + likes/pin/edit/delete
 // ----------------------------------------------------
