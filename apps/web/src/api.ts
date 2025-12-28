@@ -117,6 +117,15 @@ export async function updateAvatar(avatar: File) {
 }
 
 // ----------------------------------------------------
+// Nickname (displayName + username slug)
+// ----------------------------------------------------
+export async function updateNickname(nickname: string) {
+  return api.patch<{ ok: boolean; user: any }>("/auth/nickname", {
+    nickname: nickname.trim(),
+  });
+}
+
+// ----------------------------------------------------
 // Forgot / Reset password
 // ----------------------------------------------------
 export function requestPasswordReset(email: string, captchaToken: string) {

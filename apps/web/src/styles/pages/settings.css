@@ -229,6 +229,159 @@
   cursor: pointer;
 }
 
+/* ========================= */
+/* Minimal modal (Settings) */
+/* ========================= */
+
+.su-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 999;
+}
+
+.su-modal {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 18px;
+  border: 1px solid var(--ring);
+  background: rgba(15, 8, 40, 0.98);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+}
+
+.su-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.su-modal-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.su-modal-close {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.su-modal-close:hover {
+  color: #fff;
+}
+
+.su-modal-body {
+  padding: 14px 16px;
+}
+
+.su-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.su-field-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.su-input {
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--ring);
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 0 12px;
+  outline: none;
+}
+
+.su-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(246, 196, 73, 0.16);
+}
+
+.su-hint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.su-hint-muted {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.su-error {
+  margin-top: 10px;
+  color: #ff8a8a;
+  font-size: 13px;
+}
+
+.su-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+
+/* ===============================
+   Change nickname button
+=============================== */
+
+.settings-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px 14px;
+  border-radius: 999px;
+
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
+
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* hover — subtle highlight */
+.settings-action-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+/* active — soft press */
+.settings-action-btn:active {
+  transform: translateY(1px);
+}
+
+/* focus — accessible gold ring */
+.settings-action-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(246, 196, 73, 0.25);
+  border-color: rgba(246, 196, 73, 0.6);
+}
+
+/* disabled (на будущее) */
+.settings-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 
 @media (max-width: 720px) {

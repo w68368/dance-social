@@ -914,4 +914,121 @@ router.patch(
 );
 
 
+// =========================
+// PATCH /api/auth/nickname
+// body: { nickname: string }
+// updates displayName + generates username slug
+// =========================
+router.patch("/nickname", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ ok: false, message: "Unauthorized" });
+    }
+
+    const nicknameRaw = String(req.body?.nickname ?? "");
+    const nickname = nicknameRaw.trim();
+
+    if (!nickname) {
+      return res.status(400).json({ ok: false, message: "Nickname is required." });
+    }
+
+    if (nickname.length < 2 || nickname.length > 40) {
+      return res.status(400).json({
+        ok: false,
+        message: "Nickname must be between 2 and 40 characters.",
+      });
+    }
+
+    // slugify -> username
+    const slugify = (s: string) => {
+      return s
+        .trim()
+        .toLowerCase()
+        // replace polish chars etc. (basic)
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        // spaces -> dash
+        .replace(/\s+/g, "-")
+        // keep a-z 0-9 dash underscore
+        .replace(/[^a-z0-9_-]/g, "")
+        // collapse dashes
+        .replace(/-+/g, "-")
+        .replace(/^[-_]+|[-_]+$/g, "");
+    };
+
+    const base = slugify(nickname);
+
+    if (!base || base.length < 3) {
+      return res.status(400).json({
+        ok: false,
+        message:
+          "Nickname is too short or contains unsupported characters. Try using letters/numbers.",
+      });
+    }
+
+    // Ensure unique username:
+    // if taken -> add -2, -3 ... (up to 50)
+    let candidate = base;
+    const existingSame = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { username: true },
+    });
+
+    if (!existingSame) {
+      return res.status(404).json({ ok: false, message: "User not found." });
+    }
+
+    // If user keeps same nickname producing same username, it's fine
+    if (candidate !== existingSame.username) {
+      for (let i = 0; i < 50; i++) {
+        const taken = await prisma.user.findUnique({
+          where: { username: candidate },
+          select: { id: true },
+        });
+
+        if (!taken || taken.id === req.userId) break;
+        candidate = `${base}-${i + 2}`;
+      }
+
+      // final check
+      const takenFinal = await prisma.user.findUnique({
+        where: { username: candidate },
+        select: { id: true },
+      });
+
+      if (takenFinal && takenFinal.id !== req.userId) {
+        return res
+          .status(409)
+          .json({ ok: false, message: "Username is taken. Try another nickname." });
+      }
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.userId },
+      data: {
+        displayName: nickname,
+        username: candidate,
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+        createdAt: true,
+      },
+    });
+
+    return res.json({ ok: true, user: updated });
+  } catch (err: any) {
+    console.error("Update nickname error:", err);
+    return res.status(500).json({
+      ok: false,
+      message: err?.message || "Server error",
+    });
+  }
+});
+
+
+
 export default router;

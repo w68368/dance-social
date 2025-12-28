@@ -1,6 +1,6 @@
 // apps/web/src/pages/Settings.tsx
 import { useEffect, useMemo, useState } from "react";
-import { api, updateAvatar } from "../api";
+import { api, updateAvatar, updateNickname } from "../api";
 import { getUser, setUser } from "../lib/auth";
 import type { PublicUser } from "../lib/auth";
 import "../styles/pages/settings.css";
@@ -14,6 +14,12 @@ export default function Settings() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  // nickname modal state
+  const [nickOpen, setNickOpen] = useState(false);
+  const [nickValue, setNickValue] = useState("");
+  const [nickBusy, setNickBusy] = useState(false);
+  const [nickError, setNickError] = useState<string | null>(null);
 
   const avatarPreview = useMemo(() => {
     if (!avatarFile) return null;
@@ -117,6 +123,61 @@ export default function Settings() {
     }
   };
 
+  // ---------- Nickname (displayName + @slug) ----------
+  const slugify = (s: string) =>
+    s
+      .trim()
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9_-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^[-_]+|[-_]+$/g, "");
+
+  const openNickModal = () => {
+    setNickError(null);
+    setNickValue(me?.displayName || me?.username || "");
+    setNickOpen(true);
+  };
+
+  const closeNickModal = () => {
+    if (nickBusy) return;
+    setNickOpen(false);
+  };
+
+  const saveNickname = async () => {
+    const value = nickValue.trim();
+    setNickError(null);
+
+    if (!value) {
+      setNickError("Nickname is required.");
+      return;
+    }
+    if (value.length < 2 || value.length > 40) {
+      setNickError("Nickname must be between 2 and 40 characters.");
+      return;
+    }
+
+    setNickBusy(true);
+    try {
+      const res = await updateNickname(value);
+      if (res.data?.ok && res.data.user) {
+        setMe(res.data.user);
+        setUser(res.data.user);
+        setNickOpen(false);
+      } else {
+        setNickError("Failed to update nickname.");
+      }
+    } catch (err: any) {
+      setNickError(
+        err?.response?.data?.message || "Failed to update nickname."
+      );
+    } finally {
+      setNickBusy(false);
+    }
+  };
+
   return (
     <main className="su-main">
       <div className="container settings-container">
@@ -161,20 +222,20 @@ export default function Settings() {
 
                 <div className="settings-avatar-right">
                   <div className="settings-avatar-actions">
-                <label
-                className="settings-avatar-action"
-                title="Change your profile picture"
-                >
-                Change avatar
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                    onPickAvatar(e.target.files?.[0] ?? null)
-                    }
-                    disabled={avatarBusy}
-                />
-                </label>
+                    <label
+                      className="settings-avatar-action"
+                      title="Change your profile picture"
+                    >
+                      Change avatar
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          onPickAvatar(e.target.files?.[0] ?? null)
+                        }
+                        disabled={avatarBusy}
+                      />
+                    </label>
 
                     <button
                       className="btn"
@@ -237,7 +298,7 @@ export default function Settings() {
               </div>
             </section>
 
-            {/* ✅ Future */}
+            {/* ✅ Manage */}
             <section className="settings-section">
               <h2 className="settings-section-title">Manage</h2>
 
@@ -245,11 +306,15 @@ export default function Settings() {
                 <div className="settings-card">
                   <h3 className="settings-card-title">Profile</h3>
                   <p className="settings-card-text">
-                    Change your display name / username.
+                    Change your display name and generate a new @slug.
                   </p>
-                  <button className="btn" type="button" disabled>
-                    Coming soon
-                  </button>
+                    <button
+                    className="settings-action-btn"
+                    type="button"
+                    onClick={openNickModal}
+                    >
+                    Change nickname
+                    </button>
                 </div>
 
                 <div className="settings-card">
@@ -286,6 +351,67 @@ export default function Settings() {
           </>
         )}
       </div>
+
+      {/* ✅ Nickname modal */}
+      {nickOpen && (
+        <div className="su-modal-backdrop" onClick={closeNickModal}>
+          <div className="su-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="su-modal-header">
+              <h3 className="su-modal-title">Change nickname</h3>
+              <button
+                className="su-modal-close"
+                type="button"
+                onClick={closeNickModal}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="su-modal-body">
+              <label className="su-field">
+                <span className="su-field-label">New nickname</span>
+                <input
+                  className="su-input"
+                  value={nickValue}
+                  onChange={(e) => setNickValue(e.target.value)}
+                  placeholder="e.g. Anastasiya B."
+                  disabled={nickBusy}
+                  autoFocus
+                />
+              </label>
+
+              <div className="su-hint">
+                Preview: <strong>{nickValue.trim() || "—"}</strong>{" "}
+                <span className="su-hint-muted">
+                  (@{slugify(nickValue) || "slug"})
+                </span>
+              </div>
+
+              {nickError && <div className="su-error">{nickError}</div>}
+            </div>
+
+            <div className="su-modal-footer">
+              <button
+                className="btn"
+                type="button"
+                onClick={closeNickModal}
+                disabled={nickBusy}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                type="button"
+                onClick={saveNickname}
+                disabled={nickBusy}
+              >
+                {nickBusy ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
