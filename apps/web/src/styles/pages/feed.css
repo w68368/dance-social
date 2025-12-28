@@ -362,6 +362,154 @@
   box-shadow: 0 0 0 2px rgba(246, 196, 73, 0.75);
 }
 
+/* --- Post menu (three dots) --- */
+.feed-more {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.feed-more-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text, #f1ecff);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.feed-more-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.feed-menu {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  min-width: 180px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(20, 12, 32, 0.92);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  z-index: 30;
+}
+
+.feed-menu-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text, #f1ecff);
+  padding: 10px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.feed-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.feed-menu-danger {
+  color: #ff6b6b;
+}
+
+.feed-menu-danger:hover {
+  background: rgba(255, 107, 107, 0.12);
+}
+
+/* --- Delete confirm modal --- */
+.feed-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 0, 20, 0.7);
+  backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.feed-confirm-modal {
+  width: 100%;
+  max-width: 460px;
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(
+    135deg,
+    var(--bg-1, #1f1a2e),
+    var(--bg-2, #2a1630)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.feed-confirm-title {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.feed-confirm-text {
+  color: var(--muted, #c8bfdc);
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+.feed-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.feed-confirm-btn {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text, #f1ecff);
+}
+
+.feed-confirm-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.feed-confirm-btn--ghost {
+  background: transparent;
+}
+
+.feed-confirm-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.feed-confirm-btn--danger {
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  background: rgba(255, 107, 107, 0.16);
+  color: #ffd0d0;
+}
+
+.feed-confirm-btn--danger:hover {
+  background: rgba(255, 107, 107, 0.22);
+}
+
+.feed-confirm-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+
 /* on mobile we can simplify a bit */
 @media (max-width: 600px) {
   .feed-container {

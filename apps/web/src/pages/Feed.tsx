@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+// apps/web/src/pages/Feed.tsx
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   fetchFeed,
   toggleLike,
   reactToPost,
   fetchPostReactions,
+  deletePost,
   type Post,
   type ReactionType,
   type PostReactionsSummary,
@@ -81,6 +83,15 @@ export default function Feed() {
   const [reactionsMap, setReactionsMap] = useState<
     Record<string, PostReactionsSummary>
   >({});
+
+  // post menu (⋯)
+  const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // delete confirm modal
+  const [confirmDelete, setConfirmDelete] = useState<Post | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const prevPostsRef = useRef<Post[] | null>(null);
 
   const me = getUser();
 
@@ -193,6 +204,31 @@ export default function Feed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, hasMore, isBusy, scope]);
 
+  // Close menu on outside click + Escape
+  useEffect(() => {
+    function onDocMouseDown(e: MouseEvent) {
+      if (!openMenuPostId) return;
+      const t = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(t)) {
+        setOpenMenuPostId(null);
+      }
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpenMenuPostId(null);
+        setConfirmDelete(null);
+      }
+    }
+
+    document.addEventListener("mousedown", onDocMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openMenuPostId]);
+
   // helper: apply reactions summary to a post + store it in reactionsMap
   const applyReactionsSummary = (
     postId: string,
@@ -293,6 +329,41 @@ export default function Feed() {
     );
   };
 
+  const handleDeletePost = async (post: Post) => {
+    if (!post?.id) return;
+
+    setDeletingId(post.id);
+    setError(null);
+
+    // optimistic remove + remember snapshot for rollback
+    setPosts((prev) => {
+      prevPostsRef.current = prev;
+      return prev.filter((p) => p.id !== post.id);
+    });
+
+    // close related UI
+    if (commentsPost?.id === post.id) {
+      setCommentsPost(null);
+    }
+
+    try {
+      await deletePost(post.id);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.response?.data?.message || "Failed to delete the post.");
+
+      // rollback
+      if (prevPostsRef.current) {
+        setPosts(prevPostsRef.current);
+      }
+    } finally {
+      setDeletingId(null);
+      setConfirmDelete(null);
+      setOpenMenuPostId(null);
+      prevPostsRef.current = null;
+    }
+  };
+
   return (
     <main className="su-main">
       <div className="container feed-container">
@@ -302,9 +373,7 @@ export default function Feed() {
           {/* Filter */}
           <div className="feed-filter">
             <button
-              className={`feed-filter-btn ${
-                scope === "all" ? "is-active" : ""
-              }`}
+              className={`feed-filter-btn ${scope === "all" ? "is-active" : ""}`}
               onClick={() => setScope("all")}
               disabled={isBusy}
               type="button"
@@ -404,6 +473,53 @@ export default function Feed() {
                       </div>
                     </div>
                   </Link>
+
+                  {/* ⋯ menu (only for author) */}
+                  {isMe && (
+                    <div
+                      className="feed-more"
+                      ref={(el) => {
+                        if (openMenuPostId === post.id) {
+                          menuRef.current = el;
+                        }
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="feed-more-btn"
+                        aria-label="Post menu"
+                        aria-haspopup="menu"
+                        aria-expanded={openMenuPostId === post.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenMenuPostId((cur) =>
+                            cur === post.id ? null : post.id
+                          );
+                        }}
+                      >
+                        ⋯
+                      </button>
+
+                      {openMenuPostId === post.id && (
+                        <div className="feed-menu" role="menu">
+                          <button
+                            type="button"
+                            className="feed-menu-item feed-menu-danger"
+                            role="menuitem"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setConfirmDelete(post);
+                              setOpenMenuPostId(null);
+                            }}
+                          >
+                            Delete post
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </header>
 
                 {post.mediaUrl && post.mediaType === "image" && (
@@ -505,6 +621,45 @@ export default function Feed() {
           </p>
         )}
       </div>
+
+      {/* Confirm delete modal */}
+      {confirmDelete && (
+        <div
+          className="feed-confirm-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setConfirmDelete(null);
+          }}
+        >
+          <div className="feed-confirm-modal">
+            <div className="feed-confirm-title">Delete this post?</div>
+            <div className="feed-confirm-text">
+              This action can’t be undone.
+            </div>
+
+            <div className="feed-confirm-actions">
+              <button
+                type="button"
+                className="feed-confirm-btn feed-confirm-btn--ghost"
+                onClick={() => setConfirmDelete(null)}
+                disabled={deletingId === confirmDelete.id}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="feed-confirm-btn feed-confirm-btn--danger"
+                onClick={() => handleDeletePost(confirmDelete)}
+                disabled={deletingId === confirmDelete.id}
+              >
+                {deletingId === confirmDelete.id ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <PostCommentsModal
         post={commentsPost}

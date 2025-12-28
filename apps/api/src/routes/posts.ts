@@ -956,4 +956,77 @@ router.get("/user/:userId", optionalAuth, async (req: AuthedRequest, res) => {
   }
 });
 
+// -----------------------------
+// DELETE /api/posts/:id
+// Delete a post (only author)
+// -----------------------------
+router.delete("/:id", requireAuth, async (req: AuthedRequest, res) => {
+  if (!req.userId) {
+    return res.status(401).json({ ok: false, message: "Unauthorized" });
+  }
+
+  const postId = req.params.id;
+
+  try {
+    const existing = await prisma.post.findUnique({
+      where: { id: postId },
+      select: {
+        id: true,
+        authorId: true,
+        mediaUrl: true,
+        mediaType: true,
+        mediaLocalPath: true,
+      },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ ok: false, message: "Post not found" });
+    }
+
+    if (existing.authorId !== req.userId) {
+      return res.status(403).json({ ok: false, message: "Forbidden" });
+    }
+
+    // Best-effort: delete local uploaded file (if any)
+    if (existing.mediaLocalPath) {
+      try {
+        if (fs.existsSync(existing.mediaLocalPath)) {
+          fs.unlinkSync(existing.mediaLocalPath);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Best-effort: delete Cloudinary asset (if we can derive public_id)
+    if (existing.mediaUrl && existing.mediaType) {
+      try {
+        const url = existing.mediaUrl;
+        const m = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?$/);
+        const publicId = m?.[1];
+
+        if (publicId) {
+          const resourceType =
+            existing.mediaType === "video" ? "video" : "image";
+          
+          await cloudinary.uploader.destroy(publicId, {
+            resource_type: resourceType,
+          });
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Prisma CASCADE удалит реакции/комменты/связи тегов
+    await prisma.post.delete({ where: { id: postId } });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Server error" });
+  }
+});
+
+
 export default router;

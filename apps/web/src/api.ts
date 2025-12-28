@@ -365,6 +365,14 @@ export function toggleLike(postId: string) {
   return reactToPost(postId, "LIKE");
 }
 
+// 🆕 Delete a post (author only)
+export async function deletePost(postId: string) {
+  const { data } = await api.delete<{ ok: boolean; message?: string }>(
+    `/posts/${postId}`
+  );
+  return data;
+}
+
 // ----------------------------------------------------
 // Comments + likes/pin/edit/delete
 // ----------------------------------------------------
