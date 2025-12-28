@@ -101,6 +101,21 @@ api.interceptors.response.use(
   }
 );
 
+
+// ----------------------------------------------------
+// Avatar
+// ----------------------------------------------------
+export async function updateAvatar(avatar: File) {
+  const formData = new FormData();
+  formData.append("avatar", avatar);
+
+  return api.patch<{ ok: boolean; user: import("./lib/auth").PublicUser }>(
+    "/auth/avatar",
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+}
+
 // ----------------------------------------------------
 // Forgot / Reset password
 // ----------------------------------------------------

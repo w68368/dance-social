@@ -1,0 +1,258 @@
+/* apps/web/src/styles/pages/settings.css */
+
+.settings-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.settings-top {
+  margin-bottom: 14px;
+}
+
+.settings-title {
+  margin-bottom: 6px;
+}
+
+.settings-subtitle {
+  color: var(--muted);
+  margin: 0;
+}
+
+.settings-info {
+  color: var(--muted);
+  margin-top: 12px;
+}
+
+.settings-error {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 138, 138, 0.35);
+  background: rgba(255, 138, 138, 0.08);
+  color: #ff8a8a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.settings-section {
+  margin-top: 18px;
+}
+
+.settings-section-title {
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* cards */
+.settings-card {
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--ring);
+  padding: 16px;
+}
+
+.settings-card--info {
+  padding: 14px 16px;
+}
+
+/* info grid */
+.settings-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.settings-info-item {
+  min-width: 0;
+}
+
+.settings-info-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 4px;
+}
+
+.settings-info-value {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  word-break: break-word;
+}
+
+/* manage grid */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.settings-card-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.settings-card-text {
+  margin: 0 0 12px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
+/* ------------------------- */
+/* Avatar block */
+/* ------------------------- */
+
+.settings-avatar-card {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.settings-avatar-left {
+  flex: 0 0 auto;
+}
+
+.settings-avatar-img {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--ring);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.settings-avatar-right {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-avatar-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.settings-file-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.settings-file-btn input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.settings-avatar-hint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+.settings-avatar-error {
+  margin-bottom: 8px;
+  color: #ff8a8a;
+  font-size: 13px;
+}
+
+/* ------------------------- */
+/* Avatar pick button */
+/* ------------------------- */
+
+.settings-avatar-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.settings-avatar-pick-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.settings-avatar-pick:hover {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1px var(--ring);
+}
+
+/* make whole button clickable */
+.settings-avatar-pick input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+
+/* ========================= */
+/* Avatar change action */
+/* ========================= */
+
+.settings-avatar-action {
+  position: relative;
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 10px;
+
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+
+  cursor: pointer;
+  user-select: none;
+
+  border: 1px dashed var(--ring);
+  background: transparent;
+
+  transition: all 0.15s ease;
+}
+
+.settings-avatar-action:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border-color: var(--gold);
+}
+
+/* hide native file input but keep it clickable */
+.settings-avatar-action input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+
+
+@media (max-width: 720px) {
+  .settings-avatar-card {
+    align-items: flex-start;
+  }
+
+  .settings-avatar-img {
+    width: 72px;
+    height: 72px;
+  }
+}
+
+
+@media (max-width: 720px) {
+  .settings-container {
+    padding: 16px;
+  }
+
+  .settings-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}

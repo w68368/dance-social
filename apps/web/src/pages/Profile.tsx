@@ -208,15 +208,6 @@ export default function Profile() {
                 <span className="profile-stat-label">following</span>
               </div>
             </div>
-
-            <div className="profile-meta">
-              {me.createdAt && (
-                <span>
-                  Joined: {new Date(me.createdAt).toLocaleDateString()}
-                </span>
-              )}
-              {me.email && <span>Email: {me.email}</span>}
-            </div>
           </div>
         </section>
 

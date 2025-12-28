@@ -3,6 +3,8 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { z } from "zod";
 import { pwnedCount } from "../lib/pwned.js";
+import fs from "fs";
+import path from "path";
 
 import { prisma } from "../lib/prisma.js";
 import { upload } from "../lib/upload.js";
@@ -837,5 +839,79 @@ router.post("/reset", resetLimiter, async (req, res) => {
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 });
+
+// =========================
+// PATCH /api/auth/avatar
+// multipart/form-data: avatar (image)
+// =========================
+router.patch(
+  "/avatar",
+  requireAuth,
+  upload.single("avatar"),
+  async (req: AuthedRequest & { file?: Express.Multer.File }, res) => {
+    try {
+      if (!req.userId) {
+        return res.status(401).json({ ok: false, message: "Unauthorized" });
+      }
+
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ ok: false, message: "Avatar is required" });
+      }
+
+      // only images
+      if (!file.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          ok: false,
+          message: "Only image files are allowed for avatar",
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { avatarUrl: true },
+      });
+
+      const newAvatarUrl = "/uploads/" + file.filename;
+
+      // delete old avatar file (only if it was a local uploaded file)
+      const old = user?.avatarUrl || "";
+      const isOldLocal =
+        typeof old === "string" &&
+        old.startsWith("/uploads/") &&
+        !old.includes("/uploads/defaults/") &&
+        !old.endsWith("/uploads/_noavatar.png");
+
+      if (isOldLocal) {
+        const oldPath = path.join(process.cwd(), old.replace("/uploads/", "uploads/"));
+        fs.promises.unlink(oldPath).catch(() => {
+          // ignore if file doesn't exist
+        });
+      }
+
+      const updated = await prisma.user.update({
+        where: { id: req.userId },
+        data: { avatarUrl: newAvatarUrl },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+          createdAt: true,
+        },
+      });
+
+      return res.json({ ok: true, user: updated });
+    } catch (err: any) {
+      console.error("Update avatar error:", err);
+      return res.status(500).json({
+        ok: false,
+        message: err?.message || "Server error",
+      });
+    }
+  }
+);
+
 
 export default router;

@@ -84,7 +84,7 @@ export default function Header() {
     try {
       await api.post("/auth/logout");
     } catch {
-     
+      // ignore
     } finally {
       clearAccessToken();
       clearAuth();
@@ -191,12 +191,20 @@ export default function Header() {
                     My profile
                   </button>
 
+                  {/* ✅ NEW: Settings */}
+                  <button
+                    className="user-dropdown-item"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate("/settings");
+                    }}
+                  >
+                    Settings
+                  </button>
+
                   <div className="user-dropdown-divider" />
 
-                  <button
-                    className="user-dropdown-item danger"
-                    onClick={logout}
-                  >
+                  <button className="user-dropdown-item danger" onClick={logout}>
                     Logout
                   </button>
                 </div>
@@ -241,6 +249,12 @@ export default function Header() {
               <Link className="mobile-link" to="/recommendations">
                 Recommendations
               </Link>
+
+              {/* ✅ NEW: Settings in mobile menu (shown always; route is protected anyway) */}
+              <Link className="mobile-link" to="/settings">
+                Settings
+              </Link>
+
               <Link className="mobile-btn" to="/add-video">
                 Add post
               </Link>
@@ -277,12 +291,25 @@ export default function Header() {
                     <span className="mobile-user-name">{displayName}</span>
                   </button>
 
+                  {/* ✅ Optional: quick Settings button for logged-in user */}
+                  <button
+                    className="mobile-auth"
+                    onClick={() => {
+                      setOpen(false);
+                      navigate("/settings");
+                    }}
+                    type="button"
+                  >
+                    Settings
+                  </button>
+
                   <button
                     className="mobile-auth logout"
                     onClick={() => {
                       setOpen(false);
                       logout();
                     }}
+                    type="button"
                   >
                     Logout
                   </button>
