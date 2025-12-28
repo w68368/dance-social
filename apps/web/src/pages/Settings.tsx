@@ -8,6 +8,7 @@ import {
   changeEmailStart,
   changeEmailVerify,
   requestPasswordReset,
+  logoutOtherDevices,
 } from "../api";
 import { getUser, setUser } from "../lib/auth";
 import type { PublicUser } from "../lib/auth";
@@ -22,24 +23,23 @@ declare global {
   }
 }
 
-const RECAPTCHA_SITE_KEY =
-  import.meta.env?.VITE_RECAPTCHA_SITE_KEY || "";
+const RECAPTCHA_SITE_KEY = import.meta.env?.VITE_RECAPTCHA_SITE_KEY || "";
 
 function loadRecaptchaScript(): Promise<void> {
   return new Promise((resolve, reject) => {
-    // already loaded
     if (window.grecaptcha && typeof window.grecaptcha.render === "function") {
       resolve();
       return;
     }
 
-    // already injected
     const existing = document.querySelector<HTMLScriptElement>(
       'script[src^="https://www.google.com/recaptcha/api.js"]'
     );
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("reCAPTCHA load error")));
+      existing.addEventListener("error", () =>
+        reject(new Error("reCAPTCHA load error"))
+      );
       return;
     }
 
@@ -77,18 +77,21 @@ export default function Settings() {
 
   const [emailPassword, setEmailPassword] = useState("");
   const [emailProof, setEmailProof] = useState<string | null>(null);
-
   const [newEmail, setNewEmail] = useState("");
   const [emailCode, setEmailCode] = useState("");
 
-  // ✅ password reset modal state
+  // password reset modal state
   const [passOpen, setPassOpen] = useState(false);
   const [passStep, setPassStep] = useState<PasswordStep>("confirm");
   const [passBusy, setPassBusy] = useState(false);
   const [passError, setPassError] = useState<string | null>(null);
-
-  // ✅ real captcha token
   const [captchaToken, setCaptchaToken] = useState<string>("");
+
+  // logout other devices modal
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [logoutDone, setLogoutDone] = useState(false);
 
   // recaptcha refs
   const recaptchaBoxRef = useRef<HTMLDivElement | null>(null);
@@ -106,6 +109,7 @@ export default function Settings() {
     };
   }, [avatarPreview]);
 
+  // load account
   useEffect(() => {
     let alive = true;
 
@@ -152,6 +156,7 @@ export default function Settings() {
 
   const currentAvatar = me?.avatarUrl || "/uploads/_noavatar.png";
 
+  // ---------- Avatar ----------
   const onPickAvatar = (file: File | null) => {
     setAvatarError(null);
     if (!file) {
@@ -257,7 +262,6 @@ export default function Settings() {
 
     setEmailPassword("");
     setEmailProof(null);
-
     setNewEmail("");
     setEmailCode("");
 
@@ -378,7 +382,7 @@ export default function Settings() {
     setPassOpen(false);
   };
 
-  // ✅ render real reCAPTCHA when modal opens
+  // Render reCAPTCHA checkbox when pass modal opens
   useEffect(() => {
     let cancelled = false;
 
@@ -395,9 +399,11 @@ export default function Settings() {
 
         if (!recaptchaBoxRef.current) return;
 
-        // render only once per open cycle
-        if (recaptchaReadyRef.current && recaptchaWidgetIdRef.current !== null) {
-          // reset on open
+        // If already rendered, just reset
+        if (
+          recaptchaReadyRef.current &&
+          recaptchaWidgetIdRef.current !== null
+        ) {
           window.grecaptcha?.reset(recaptchaWidgetIdRef.current);
           setCaptchaToken("");
           return;
@@ -406,15 +412,9 @@ export default function Settings() {
         const id = window.grecaptcha.render(recaptchaBoxRef.current, {
           sitekey: RECAPTCHA_SITE_KEY,
           theme: "dark",
-          callback: (token: string) => {
-            setCaptchaToken(token || "");
-          },
-          "expired-callback": () => {
-            setCaptchaToken("");
-          },
-          "error-callback": () => {
-            setCaptchaToken("");
-          },
+          callback: (token: string) => setCaptchaToken(token || ""),
+          "expired-callback": () => setCaptchaToken(""),
+          "error-callback": () => setCaptchaToken(""),
         });
 
         recaptchaWidgetIdRef.current = id;
@@ -432,22 +432,21 @@ export default function Settings() {
     };
   }, [passOpen]);
 
-  // reset captcha token if modal closed
+  // cleanup on close
   useEffect(() => {
     if (!passOpen) {
       setCaptchaToken("");
       setPassError(null);
       recaptchaReadyRef.current = false;
       recaptchaWidgetIdRef.current = null;
-      // clear container content to re-render next time
       if (recaptchaBoxRef.current) recaptchaBoxRef.current.innerHTML = "";
     }
   }, [passOpen]);
 
   const sendResetLink = async () => {
     setPassError(null);
-    const target = (me?.email || "").trim().toLowerCase();
 
+    const target = (me?.email || "").trim().toLowerCase();
     if (!target || !validateEmail(target)) {
       setPassError("Your account email is missing or invalid.");
       return;
@@ -466,6 +465,32 @@ export default function Settings() {
       setPassError(err?.response?.data?.message || "Failed to send reset link.");
     } finally {
       setPassBusy(false);
+    }
+  };
+
+  // ---------- Logout other devices ----------
+  const openLogoutModal = () => {
+    setLogoutError(null);
+    setLogoutBusy(false);
+    setLogoutDone(false);
+    setLogoutOpen(true);
+  };
+
+  const closeLogoutModal = () => {
+    if (logoutBusy) return;
+    setLogoutOpen(false);
+  };
+
+  const confirmLogoutOthers = async () => {
+    setLogoutError(null);
+    setLogoutBusy(true);
+    try {
+      await logoutOtherDevices();
+      setLogoutDone(true);
+    } catch (err: any) {
+      setLogoutError(err?.message || "Failed to logout other devices.");
+    } finally {
+      setLogoutBusy(false);
     }
   };
 
@@ -529,23 +554,25 @@ export default function Settings() {
                     </label>
 
                     <button
-                      className="btn"
+                      className="settings-avatar-action"
                       type="button"
                       onClick={saveAvatar}
                       disabled={!avatarFile || avatarBusy}
+                      title="Save new avatar"
                     >
                       {avatarBusy ? "Saving…" : "Save avatar"}
                     </button>
 
                     {avatarFile && (
-                      <button
-                        className="btn"
-                        type="button"
-                        onClick={() => setAvatarFile(null)}
-                        disabled={avatarBusy}
-                      >
-                        Cancel
-                      </button>
+                    <button
+                      className="settings-avatar-action"
+                      type="button"
+                      onClick={() => setAvatarFile(null)}
+                      disabled={avatarBusy}
+                    >
+                      Cancel
+                    </button>
+
                     )}
                   </div>
 
@@ -639,10 +666,14 @@ export default function Settings() {
                 <div className="settings-card">
                   <h3 className="settings-card-title">Security</h3>
                   <p className="settings-card-text">
-                    Sessions, logout from all devices, etc.
+                    Logout from all other devices (keep this session).
                   </p>
-                  <button className="btn" type="button" disabled>
-                    Coming soon
+                  <button
+                    className="settings-action-btn settings-action-btn--gold"
+                    type="button"
+                    onClick={openLogoutModal}
+                  >
+                    Logout other devices
                   </button>
                 </div>
               </div>
@@ -865,7 +896,7 @@ export default function Settings() {
         </div>
       )}
 
-      {/* ✅ Password modal (real reCAPTCHA v2 checkbox) */}
+      {/* Password modal (reCAPTCHA checkbox) */}
       {passOpen && (
         <div className="su-modal-backdrop" onClick={closePassModal}>
           <div className="su-modal" onClick={(e) => e.stopPropagation()}>
@@ -895,7 +926,6 @@ export default function Settings() {
                     Complete reCAPTCHA and press “Send reset link”.
                   </div>
 
-                  {/* ✅ Real checkbox */}
                   <div style={{ marginTop: 12 }}>
                     <div ref={recaptchaBoxRef} />
                   </div>
@@ -906,7 +936,8 @@ export default function Settings() {
                 <div className="su-hint">
                   ✅ If this email exists, we’ve sent reset instructions.
                   <div className="su-hint su-hint-muted" style={{ marginTop: 6 }}>
-                    Check inbox (and spam) and follow the link to set a new password.
+                    Check inbox (and spam) and follow the link to set a new
+                    password.
                   </div>
                 </div>
               )}
@@ -932,6 +963,64 @@ export default function Settings() {
                   disabled={passBusy}
                 >
                   {passBusy ? "Please wait…" : "Send reset link"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout other devices modal */}
+      {logoutOpen && (
+        <div className="su-modal-backdrop" onClick={closeLogoutModal}>
+          <div className="su-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="su-modal-header">
+              <h3 className="su-modal-title">Logout other devices</h3>
+              <button
+                className="su-modal-close"
+                type="button"
+                onClick={closeLogoutModal}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="su-modal-body">
+              {!logoutDone ? (
+                <>
+                  <div className="su-hint" style={{ marginTop: 0 }}>
+                    Are you sure you want to log out from all other devices?
+                  </div>
+                  <div className="su-hint su-hint-muted">
+                    Your current session will stay active.
+                  </div>
+                </>
+              ) : (
+                <div className="su-hint">✅ Done. Other devices were logged out.</div>
+              )}
+
+              {logoutError && <div className="su-error">{logoutError}</div>}
+            </div>
+
+            <div className="su-modal-footer">
+              <button
+                className="su-btn su-btn--ghost"
+                type="button"
+                onClick={closeLogoutModal}
+                disabled={logoutBusy}
+              >
+                {logoutDone ? "Close" : "Cancel"}
+              </button>
+
+              {!logoutDone && (
+                <button
+                  className="su-btn su-btn--primary"
+                  type="button"
+                  onClick={confirmLogoutOthers}
+                  disabled={logoutBusy}
+                >
+                  {logoutBusy ? "Please wait…" : "Yes, logout"}
                 </button>
               )}
             </div>

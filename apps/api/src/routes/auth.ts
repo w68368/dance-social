@@ -973,6 +973,61 @@ router.post("/logout", async (req, res) => {
 });
 
 /* =========================
+   POST /api/auth/logout-others
+   Revokes all refresh tokens except the current one (from cookie)
+========================= */
+router.post("/logout-others", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ ok: false, error: "Unauthorized" });
+
+    const raw = (req as any).cookies?.refresh as string | undefined;
+    if (!raw) {
+      return res.status(400).json({
+        ok: false,
+        error: "No refresh cookie. Please re-login.",
+      });
+    }
+
+    const currentHash = sha256(raw);
+
+    const current = await prisma.refreshToken.findUnique({
+      where: { tokenHash: currentHash },
+      select: { userId: true, revokedAt: true, expiresAt: true },
+    });
+
+    if (!current || current.userId !== req.userId) {
+      return res.status(400).json({
+        ok: false,
+        error: "Current session not found. Please re-login.",
+      });
+    }
+
+    if (current.revokedAt || current.expiresAt <= new Date()) {
+      return res.status(400).json({
+        ok: false,
+        error: "Current session expired. Please re-login.",
+      });
+    }
+
+    // revoke everything else (keep current)
+    const result = await prisma.refreshToken.updateMany({
+      where: {
+        userId: req.userId,
+        revokedAt: null,
+        tokenHash: { not: currentHash },
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    return res.json({ ok: true, revoked: result.count });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
+
+/* =========================
    POST /api/auth/logout-all
 ========================= */
 router.post("/logout-all", requireAuth, async (req: AuthedRequest, res) => {
@@ -983,6 +1038,8 @@ router.post("/logout-all", requireAuth, async (req: AuthedRequest, res) => {
   });
   res.clearCookie("refresh", { path: "/api/auth" }).json({ ok: true });
 });
+
+
 
 /* =========================
    GET /api/auth/me

@@ -170,6 +170,15 @@ export async function changeEmailVerify(newEmail: string, code: string) {
   return data.user;
 }
 
+export async function logoutOtherDevices() {
+  // keep current session, revoke others
+  const { data } = await api.post("/auth/logout-others");
+  if (!data?.ok) {
+    throw new Error(data?.error || data?.message || "Failed to logout other devices.");
+  }
+  return data as { ok: true; revoked: number };
+}
+
 // ----------------------------------------------------
 // Forgot / Reset password
 // ----------------------------------------------------
@@ -193,7 +202,6 @@ export function requestChangePasswordLink() {
     {}
   );
 }
-
 
 // ----------------------------------------------------
 // Types

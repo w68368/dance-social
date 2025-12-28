@@ -464,6 +464,28 @@
   border-color: rgba(246, 196, 73, 0.9);
 }
 
+/* allow using .settings-avatar-action on <button> too */
+button.settings-avatar-action {
+  appearance: none;
+  outline: none;
+}
+
+button.settings-avatar-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* neutral cancel variant */
+.settings-avatar-action--cancel {
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.settings-avatar-action--cancel:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* ===============================
    Responsive
 =============================== */
