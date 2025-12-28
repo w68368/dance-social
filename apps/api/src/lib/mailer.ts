@@ -7,7 +7,8 @@ const PASS = process.env.SMTP_PASS || "";
 const FROM = process.env.MAIL_FROM || "no-reply@localhost";
 
 const APP_NAME = process.env.APP_NAME || "StepUnity";
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const FRONTEND_ORIGIN =
+  process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
 export const mailer = nodemailer.createTransport({
   host: HOST,
@@ -20,22 +21,55 @@ export const mailer = nodemailer.createTransport({
 });
 
 /* =========================================================
-   ✅ Function: send email verification code (registration)
+   ✅ Function: send email verification code
+   (registration / email change)
    ========================================================= */
-export async function sendVerificationCode(to: string, code: string) {
-  const subject = `${APP_NAME}: Your verification code`;
-  const text = `Your verification code: ${code} (valid for 10 minutes).`;
+
+type VerificationEmailContext = "register" | "change-email";
+
+export async function sendVerificationCode(
+  to: string,
+  code: string,
+  context: VerificationEmailContext = "register"
+) {
+  const subjectMap: Record<VerificationEmailContext, string> = {
+    register: `${APP_NAME}: Your verification code`,
+    "change-email": `${APP_NAME}: Confirm your new email`,
+  };
+
+  const descriptionMap: Record<VerificationEmailContext, string> = {
+    register: "Your verification code:",
+    "change-email": "Confirmation code for your new email:",
+  };
+
+  const subject = subjectMap[context];
+  const description = descriptionMap[context];
+
+  const text = [
+    description,
+    code,
+    "",
+    "The code is valid for 10 minutes.",
+    "If you did not request this — simply ignore this email.",
+  ].join("\n");
 
   const html = `
-    <p style="font-size:16px;">
-      Your verification code:
-      <b style="font-size:24px;">${code}</b>
-    </p>
-    <p>The code is valid for 10 minutes.</p>
-    <p>If you did not request this — simply ignore this email.</p>
+    <div style="font-family:Arial,sans-serif;line-height:1.5;">
+      <p style="font-size:16px;">${description}</p>
+      <p style="font-size:28px;font-weight:bold;letter-spacing:2px;">
+        ${code}
+      </p>
+      <p>The code is valid for <b>10 minutes</b>.</p>
+      <p style="color:#666;">
+        If you did not request this — simply ignore this email.
+      </p>
+    </div>
   `;
 
-  console.log("[mailer] sendVerificationCode →", to);
+  console.log("[mailer] sendVerificationCode →", {
+    to,
+    context,
+  });
 
   await mailer.sendMail({
     from: FROM,
@@ -46,11 +80,14 @@ export async function sendVerificationCode(to: string, code: string) {
   });
 }
 
-
 /* =========================================================
    ✅ Function: send password reset email (Forgot → Reset)
    ========================================================= */
-export async function sendPasswordResetEmail(to: string, resetUrl: string) {
+
+export async function sendPasswordResetEmail(
+  to: string,
+  resetUrl: string
+) {
   const subject = `${APP_NAME}: Reset your password`;
 
   const text = [
@@ -62,15 +99,17 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   ].join("\n");
 
   const html = `
-    <p>You requested a password reset.</p>
-    <p>If this wasn’t you — simply ignore this email.</p>
-    <p>
-      <a href="${resetUrl}" style="font-size:18px;">
-        Reset password
-      </a>
-      <br />
-      (The link is valid for a limited time)
-    </p>
+    <div style="font-family:Arial,sans-serif;line-height:1.5;">
+      <p>You requested a password reset.</p>
+      <p>If this wasn’t you — simply ignore this email.</p>
+      <p style="margin-top:16px;">
+        <a href="${resetUrl}" style="font-size:18px;">
+          Reset password
+        </a>
+        <br />
+        <small>(The link is valid for a limited time)</small>
+      </p>
+    </div>
   `;
 
   console.log("[mailer] sendPasswordResetEmail →", to, resetUrl);
@@ -84,10 +123,10 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   });
 }
 
-
 /* =========================================================
    SMTP check at API startup
    ========================================================= */
+
 mailer
   .verify()
   .then(() => {

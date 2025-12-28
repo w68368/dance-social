@@ -101,7 +101,6 @@ api.interceptors.response.use(
   }
 );
 
-
 // ----------------------------------------------------
 // Avatar
 // ----------------------------------------------------
@@ -123,6 +122,52 @@ export async function updateNickname(nickname: string) {
   return api.patch<{ ok: boolean; user: any }>("/auth/nickname", {
     nickname: nickname.trim(),
   });
+}
+
+// ----------------------------------------------------
+// Change email (password -> new email -> verify code)
+// ----------------------------------------------------
+export async function changeEmailPasswordProof(password: string) {
+  const { data } = await api.post<{ ok: boolean; proof?: string; error?: string }>(
+    "/auth/change-email/proof",
+    { password: password.trim() }
+  );
+
+  if (!data?.ok || !data.proof) {
+    throw new Error(data?.error || "Password verification failed");
+  }
+
+  return data.proof;
+}
+
+export async function changeEmailStart(newEmail: string, proof: string) {
+  const { data } = await api.post<{ ok: boolean; message?: string; error?: string }>(
+    "/auth/change-email/start",
+    { newEmail: newEmail.trim().toLowerCase(), proof }
+  );
+
+  if (!data?.ok) {
+    throw new Error(data?.error || "Failed to send verification code");
+  }
+
+  return data;
+}
+
+export async function changeEmailVerify(newEmail: string, code: string) {
+  const { data } = await api.post<{
+    ok: boolean;
+    user?: import("./lib/auth").PublicUser;
+    error?: string;
+  }>("/auth/change-email/verify", {
+    newEmail: newEmail.trim().toLowerCase(),
+    code: code.trim(),
+  });
+
+  if (!data?.ok || !data.user) {
+    throw new Error(data?.error || "Email verification failed");
+  }
+
+  return data.user;
 }
 
 // ----------------------------------------------------
@@ -395,9 +440,7 @@ export function followUser(userId: string) {
 
 // Unfollow a user
 export function unfollowUser(userId: string) {
-  return api.delete<{ ok: boolean; action: "unfollowed" }>(
-    `/follow/${userId}`
-  );
+  return api.delete<{ ok: boolean; action: "unfollowed" }>(`/follow/${userId}`);
 }
 
 // Get user followers list
@@ -424,15 +467,20 @@ export async function searchUsers(query: string): Promise<ApiUserSummary[]> {
 }
 
 // 🆕 Search hashtags for autocomplete (#tag)
+// NOTE: backend returns { ok, hashtags }, NOT an array.
 export async function searchTags(query: string): Promise<HashtagSuggestion[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
-  const { data } = await api.get<HashtagSuggestion[]>("/tags/search", {
+  const { data } = await api.get<{
+    ok: boolean;
+    hashtags: HashtagDto[];
+  }>("/tags/search", {
     params: { q },
   });
 
-  return data ?? [];
+  if (!data?.ok) return [];
+  return (data.hashtags ?? []).map((h) => ({ id: h.id, tag: h.tag }));
 }
 
 // 🆕 Search hashtags by prefix (for autocomplete)

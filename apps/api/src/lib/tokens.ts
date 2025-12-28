@@ -15,7 +15,6 @@ import type { CookieOptions } from "express";
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined;
 
 // COOKIE_SAMESITE: "lax" | "strict" | "none"
-// In dev, it's usually "lax"; in production, with different front-end/back-end domains, it's "none"
 const RAW_COOKIE_SAMESITE = (
   process.env.COOKIE_SAMESITE || "lax"
 ).toLowerCase();
@@ -41,7 +40,17 @@ type ExpiresLike =
   | `${number}${"ms" | "s" | "m" | "h" | "d" | "w" | "y"}`;
 
 const JWT_SECRET: Secret = (process.env.JWT_SECRET ?? "dev-secret") as Secret;
-const ACCESS_TOKEN_TTL = (process.env.ACCESS_TOKEN_TTL ?? "15m") as ExpiresLike;
+
+const ACCESS_TOKEN_TTL = (process.env.ACCESS_TOKEN_TTL ??
+  "15m") as ExpiresLike;
+
+// Short-lived proof token for sensitive operations (e.g. email change)
+const EMAIL_CHANGE_PROOF_TTL = (process.env.EMAIL_CHANGE_PROOF_TTL ??
+  "10m") as ExpiresLike;
+
+// ----------------------------------------------------
+// Access token
+// ----------------------------------------------------
 
 export function signAccess(userId: string) {
   const payload = { sub: userId };
@@ -51,6 +60,38 @@ export function signAccess(userId: string) {
 
 export function verifyAccess(token: string) {
   return jwt.verify(token, JWT_SECRET) as JwtPayload & { sub: string };
+}
+
+// ----------------------------------------------------
+// Email change proof token (after password confirmation)
+// ----------------------------------------------------
+
+type EmailChangeProofPayload = JwtPayload & {
+  sub: string;
+  purpose: "change-email";
+};
+
+export function signEmailChangeProof(userId: string) {
+  const payload: EmailChangeProofPayload = {
+    sub: userId,
+    purpose: "change-email",
+  };
+
+  const options: SignOptions = {
+    expiresIn: EMAIL_CHANGE_PROOF_TTL,
+  };
+
+  return jwt.sign(payload, JWT_SECRET, options);
+}
+
+export function verifyEmailChangeProof(token: string) {
+  const decoded = jwt.verify(token, JWT_SECRET) as EmailChangeProofPayload;
+
+  if (decoded.purpose !== "change-email") {
+    throw new Error("Invalid email change proof token");
+  }
+
+  return decoded;
 }
 
 // ====================================================
@@ -94,12 +135,12 @@ export function refreshCookieOptions(daysOverride?: number): CookieOptions {
 // ====================================================
 
 /**
-* Generate a cryptographically strong password reset token.
-* It is:
-* long (48 bytes → ~64 characters base64url)
-* undetectable
-* ideal for one-time links
-*/
+ * Generate a cryptographically strong password reset token.
+ * It is:
+ * - long (48 bytes → ~64 characters base64url)
+ * - undetectable
+ * - ideal for one-time links
+ */
 export function generateResetToken(): string {
   return crypto.randomBytes(48).toString("base64url");
 }

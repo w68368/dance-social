@@ -384,6 +384,132 @@
 }
 
 
+/* ===============================
+   Unified buttons (Settings + Modals)
+=============================== */
+
+/* Use same pill button for all Manage actions (nickname/email/...) */
+.settings-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px 14px;
+  border-radius: 999px;
+
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
+
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-action-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+.settings-action-btn:active {
+  transform: translateY(1px);
+}
+
+.settings-action-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(246, 196, 73, 0.25);
+  border-color: rgba(246, 196, 73, 0.6);
+}
+
+.settings-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Optional: highlight for email action */
+.settings-action-btn--gold {
+  border-color: rgba(246, 196, 73, 0.35);
+}
+.settings-action-btn--gold:hover {
+  border-color: rgba(246, 196, 73, 0.6);
+  box-shadow: 0 0 0 3px rgba(246, 196, 73, 0.12);
+}
+
+/* ===============================
+   Modal buttons
+=============================== */
+
+.su-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+  user-select: none;
+
+  transition: transform 0.05s ease, background 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.su-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.su-btn:active {
+  transform: translateY(1px);
+}
+
+.su-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(246, 196, 73, 0.2);
+  border-color: rgba(246, 196, 73, 0.55);
+}
+
+.su-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* primary (gold) */
+.su-btn--primary {
+  border-color: rgba(246, 196, 73, 0.45);
+  background: rgba(246, 196, 73, 0.14);
+}
+
+.su-btn--primary:hover {
+  border-color: rgba(246, 196, 73, 0.75);
+  background: rgba(246, 196, 73, 0.18);
+  box-shadow: 0 0 0 3px rgba(246, 196, 73, 0.12);
+}
+
+/* subtle/secondary */
+.su-btn--ghost {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.su-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+
 @media (max-width: 720px) {
   .settings-avatar-card {
     align-items: flex-start;

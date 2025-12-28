@@ -15,6 +15,8 @@ import {
   newRefreshRaw,
   refreshCookieOptions,
   generateResetToken,
+  signEmailChangeProof,
+  verifyEmailChangeProof,
 } from "../lib/tokens.js";
 import { sendVerificationCode, sendPasswordResetEmail } from "../lib/mailer.js";
 import {
@@ -107,7 +109,255 @@ const resetSchema = z.object({
   newPassword: z.string().min(8).max(128),
 });
 
-/* ============================================================
+// Change email schemas
+const changeEmailProofSchema = z.object({
+  password: z.string().min(6).max(200),
+});
+
+const changeEmailStartSchema = z.object({
+  newEmail: z.string().email(),
+  proof: z.string().min(20),
+});
+
+const changeEmailVerifySchema = z.object({
+  newEmail: z.string().email(),
+  code: z.string().min(6).max(6),
+});
+
+/* =========================================================
+   NEW: Change email (password -> new email -> verify code)
+========================================================= */
+
+/* =========================
+   POST /api/auth/change-email/proof
+   JSON: { password }
+   -> { ok, proof }
+========================= */
+router.post("/change-email/proof", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ ok: false, error: "Unauthorized" });
+
+    const parsed = changeEmailProofSchema.safeParse({
+      password: normalizePassword(req.body?.password),
+    });
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        ok: false,
+        error: "Validation failed",
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user) return res.status(404).json({ ok: false, error: "User not found" });
+
+    const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
+    if (!ok) {
+      return res.status(401).json({ ok: false, error: "Invalid password" });
+    }
+
+    const proof = signEmailChangeProof(user.id);
+    return res.json({ ok: true, proof });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
+/* =========================
+   POST /api/auth/change-email/start
+   JSON: { newEmail, proof }
+   -> sends code to newEmail
+========================= */
+router.post("/change-email/start", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ ok: false, error: "Unauthorized" });
+
+    const parsed = changeEmailStartSchema.safeParse({
+      newEmail: normalizeEmail(req.body?.newEmail),
+      proof: (req.body?.proof ?? "").toString(),
+    });
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        ok: false,
+        error: "Validation failed",
+        details: parsed.error.flatten(),
+      });
+    }
+
+    // verify proof
+    let decoded: { sub: string };
+    try {
+      const p = verifyEmailChangeProof(parsed.data.proof);
+      decoded = { sub: p.sub };
+    } catch (e) {
+      return res.status(401).json({ ok: false, error: "Invalid proof token" });
+    }
+
+    if (decoded.sub !== req.userId) {
+      return res.status(401).json({ ok: false, error: "Invalid proof token" });
+    }
+
+    // newEmail must be free
+    const existing = await prisma.user.findUnique({
+      where: { email: parsed.data.newEmail },
+      select: { id: true },
+    });
+    if (existing) {
+      return res.status(409).json({ ok: false, error: "Email already in use" });
+    }
+
+    // generate code
+    const code = random6();
+    const codeHash = sha256hex(code);
+    const expiresAt = new Date(Date.now() + EMAIL_CODE_TTL_MIN * 60 * 1000);
+
+    // store record for new email
+    await prisma.emailVerification.upsert({
+      where: { email: parsed.data.newEmail },
+      create: {
+        email: parsed.data.newEmail,
+        codeHash,
+        expiresAt,
+        attempts: 0,
+        maxAttempts: EMAIL_MAX_ATTEMPTS,
+        payload: {
+          kind: "changeEmail",
+          userId: req.userId,
+        },
+      },
+      update: {
+        codeHash,
+        expiresAt,
+        attempts: 0,
+        maxAttempts: EMAIL_MAX_ATTEMPTS,
+        payload: {
+          kind: "changeEmail",
+          userId: req.userId,
+        },
+      },
+    });
+
+    try {
+      await sendVerificationCode(parsed.data.newEmail, code, "change-email");
+    } catch (e: any) {
+      console.error("[sendMail] error:", e?.message || e);
+      return res.status(500).json({
+        ok: false,
+        error:
+          "Email sending failed (SMTP). Check SMTP_* in .env or reset Mailtrap credentials.",
+      });
+    }
+
+    return res.json({ ok: true, message: "Verification code sent" });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
+/* =========================
+   POST /api/auth/change-email/verify
+   JSON: { newEmail, code }
+   -> updates user.email
+========================= */
+router.post("/change-email/verify", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ ok: false, error: "Unauthorized" });
+
+    const parsed = changeEmailVerifySchema.safeParse({
+      newEmail: normalizeEmail(req.body?.newEmail),
+      code: (req.body?.code ?? "").toString().trim(),
+    });
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        ok: false,
+        error: "Validation failed",
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const rec = await prisma.emailVerification.findUnique({
+      where: { email: parsed.data.newEmail },
+    });
+
+    if (!rec) return res.status(400).json({ ok: false, error: "Code not found" });
+
+    const now = new Date();
+    if (rec.expiresAt < now) {
+      return res.status(400).json({ ok: false, error: "Code expired" });
+    }
+    if (rec.attempts >= rec.maxAttempts) {
+      return res.status(429).json({ ok: false, error: "Too many attempts" });
+    }
+
+    // check payload
+    const payload = (rec.payload ?? {}) as { kind?: string; userId?: string };
+    if (payload.kind !== "changeEmail" || !payload.userId) {
+      return res.status(400).json({ ok: false, error: "Invalid verification record" });
+    }
+
+    if (payload.userId !== req.userId) {
+      return res.status(403).json({ ok: false, error: "Forbidden" });
+    }
+
+    const ok = rec.codeHash === sha256hex(parsed.data.code);
+    if (!ok) {
+      await prisma.emailVerification.update({
+        where: { email: parsed.data.newEmail },
+        data: { attempts: { increment: 1 } },
+      });
+      return res.status(400).json({ ok: false, error: "Incorrect code" });
+    }
+
+    // newEmail must still be free (race condition)
+    const taken = await prisma.user.findUnique({
+      where: { email: parsed.data.newEmail },
+      select: { id: true },
+    });
+    if (taken) {
+      return res.status(409).json({ ok: false, error: "Email already in use" });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.user.update({
+        where: { id: req.userId! },
+        data: {
+          email: parsed.data.newEmail,
+          emailVerifiedAt: new Date(),
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+          createdAt: true,
+        },
+      });
+
+      await tx.emailVerification.delete({
+        where: { email: parsed.data.newEmail },
+      });
+
+      return u;
+    });
+
+    return res.json({ ok: true, user: updated });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
+/* =========================================================
   NEW: Two-step registration with email code
   1) /register-start — sends the code and uploads a draft
   2) /register-verify — verifies the code, creates a user, and logs in
@@ -233,7 +483,7 @@ router.post(
 
       // We send an email with a code (we provide a clear message in case of SMTP error)
       try {
-        await sendVerificationCode(parsed.data.email, code);
+        await sendVerificationCode(parsed.data.email, code, "register");
       } catch (e: any) {
         console.error("[sendMail] error:", e?.message || e);
         return res.status(500).json({
@@ -883,7 +1133,10 @@ router.patch(
         !old.endsWith("/uploads/_noavatar.png");
 
       if (isOldLocal) {
-        const oldPath = path.join(process.cwd(), old.replace("/uploads/", "uploads/"));
+        const oldPath = path.join(
+          process.cwd(),
+          old.replace("/uploads/", "uploads/")
+        );
         fs.promises.unlink(oldPath).catch(() => {
           // ignore if file doesn't exist
         });
@@ -912,7 +1165,6 @@ router.patch(
     }
   }
 );
-
 
 // =========================
 // PATCH /api/auth/nickname
@@ -1028,7 +1280,5 @@ router.patch("/nickname", requireAuth, async (req: AuthedRequest, res) => {
     });
   }
 });
-
-
 
 export default router;
