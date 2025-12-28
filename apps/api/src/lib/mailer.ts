@@ -124,6 +124,44 @@ export async function sendPasswordResetEmail(
 }
 
 /* =========================================================
+   ✅ Function: send change password email (Settings → link)
+   ========================================================= */
+export async function sendChangePasswordEmail(to: string, resetUrl: string) {
+  const subject = `${APP_NAME}: Change your password`;
+
+  const text = [
+    `You requested to change your password.`,
+    `If this wasn’t you — you can ignore this email.`,
+    ``,
+    `Change password link (valid for a limited time):`,
+    resetUrl,
+  ].join("\n");
+
+  const html = `
+    <p>You requested to change your password.</p>
+    <p>If this wasn’t you — you can ignore this email.</p>
+    <p>
+      <a href="${resetUrl}" style="font-size:18px;">
+        Change password
+      </a>
+      <br />
+      (The link is valid for a limited time)
+    </p>
+  `;
+
+  console.log("[mailer] sendChangePasswordEmail →", to, resetUrl);
+
+  await mailer.sendMail({
+    from: FROM,
+    to,
+    subject,
+    text,
+    html,
+  });
+}
+
+
+/* =========================================================
    SMTP check at API startup
    ========================================================= */
 

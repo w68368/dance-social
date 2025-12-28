@@ -1,3 +1,4 @@
+// src/routes/auth.ts
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -18,7 +19,11 @@ import {
   signEmailChangeProof,
   verifyEmailChangeProof,
 } from "../lib/tokens.js";
-import { sendVerificationCode, sendPasswordResetEmail } from "../lib/mailer.js";
+import {
+  sendVerificationCode,
+  sendPasswordResetEmail,
+  sendChangePasswordEmail, // ✅ NEW (если нет в mailer.ts — временно используй sendPasswordResetEmail)
+} from "../lib/mailer.js";
 import {
   forgotLimiter,
   resetLimiter,
@@ -133,232 +138,331 @@ const changeEmailVerifySchema = z.object({
    JSON: { password }
    -> { ok, proof }
 ========================= */
-router.post("/change-email/proof", requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    if (!req.userId) return res.status(401).json({ ok: false, error: "Unauthorized" });
+router.post(
+  "/change-email/proof",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      if (!req.userId)
+        return res.status(401).json({ ok: false, error: "Unauthorized" });
 
-    const parsed = changeEmailProofSchema.safeParse({
-      password: normalizePassword(req.body?.password),
-    });
-
-    if (!parsed.success) {
-      return res.status(400).json({
-        ok: false,
-        error: "Validation failed",
-        details: parsed.error.flatten(),
+      const parsed = changeEmailProofSchema.safeParse({
+        password: normalizePassword(req.body?.password),
       });
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          ok: false,
+          error: "Validation failed",
+          details: parsed.error.flatten(),
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { id: true, passwordHash: true },
+      });
+
+      if (!user)
+        return res.status(404).json({ ok: false, error: "User not found" });
+
+      const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
+      if (!ok) {
+        return res.status(401).json({ ok: false, error: "Invalid password" });
+      }
+
+      const proof = signEmailChangeProof(user.id);
+      return res.json({ ok: true, proof });
+    } catch (e) {
+      console.error(e);
+      return res
+        .status(500)
+        .json({ ok: false, error: "Internal server error" });
     }
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { id: true, passwordHash: true },
-    });
-
-    if (!user) return res.status(404).json({ ok: false, error: "User not found" });
-
-    const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
-    if (!ok) {
-      return res.status(401).json({ ok: false, error: "Invalid password" });
-    }
-
-    const proof = signEmailChangeProof(user.id);
-    return res.json({ ok: true, proof });
-  } catch (e) {
-    console.error(e);
-    return res.status(500).json({ ok: false, error: "Internal server error" });
   }
-});
+);
 
 /* =========================
    POST /api/auth/change-email/start
    JSON: { newEmail, proof }
    -> sends code to newEmail
 ========================= */
-router.post("/change-email/start", requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    if (!req.userId) return res.status(401).json({ ok: false, error: "Unauthorized" });
-
-    const parsed = changeEmailStartSchema.safeParse({
-      newEmail: normalizeEmail(req.body?.newEmail),
-      proof: (req.body?.proof ?? "").toString(),
-    });
-
-    if (!parsed.success) {
-      return res.status(400).json({
-        ok: false,
-        error: "Validation failed",
-        details: parsed.error.flatten(),
-      });
-    }
-
-    // verify proof
-    let decoded: { sub: string };
+router.post(
+  "/change-email/start",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
     try {
-      const p = verifyEmailChangeProof(parsed.data.proof);
-      decoded = { sub: p.sub };
+      if (!req.userId)
+        return res.status(401).json({ ok: false, error: "Unauthorized" });
+
+      const parsed = changeEmailStartSchema.safeParse({
+        newEmail: normalizeEmail(req.body?.newEmail),
+        proof: (req.body?.proof ?? "").toString(),
+      });
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          ok: false,
+          error: "Validation failed",
+          details: parsed.error.flatten(),
+        });
+      }
+
+      // verify proof
+      let decoded: { sub: string };
+      try {
+        const p = verifyEmailChangeProof(parsed.data.proof);
+        decoded = { sub: p.sub };
+      } catch (e) {
+        return res.status(401).json({ ok: false, error: "Invalid proof token" });
+      }
+
+      if (decoded.sub !== req.userId) {
+        return res.status(401).json({ ok: false, error: "Invalid proof token" });
+      }
+
+      // newEmail must be free
+      const existing = await prisma.user.findUnique({
+        where: { email: parsed.data.newEmail },
+        select: { id: true },
+      });
+      if (existing) {
+        return res.status(409).json({ ok: false, error: "Email already in use" });
+      }
+
+      // generate code
+      const code = random6();
+      const codeHash = sha256hex(code);
+      const expiresAt = new Date(Date.now() + EMAIL_CODE_TTL_MIN * 60 * 1000);
+
+      // store record for new email
+      await prisma.emailVerification.upsert({
+        where: { email: parsed.data.newEmail },
+        create: {
+          email: parsed.data.newEmail,
+          codeHash,
+          expiresAt,
+          attempts: 0,
+          maxAttempts: EMAIL_MAX_ATTEMPTS,
+          payload: {
+            kind: "changeEmail",
+            userId: req.userId,
+          },
+        },
+        update: {
+          codeHash,
+          expiresAt,
+          attempts: 0,
+          maxAttempts: EMAIL_MAX_ATTEMPTS,
+          payload: {
+            kind: "changeEmail",
+            userId: req.userId,
+          },
+        },
+      });
+
+      try {
+        await sendVerificationCode(parsed.data.newEmail, code, "change-email");
+      } catch (e: any) {
+        console.error("[sendMail] error:", e?.message || e);
+        return res.status(500).json({
+          ok: false,
+          error:
+            "Email sending failed (SMTP). Check SMTP_* in .env or reset Mailtrap credentials.",
+        });
+      }
+
+      return res.json({ ok: true, message: "Verification code sent" });
     } catch (e) {
-      return res.status(401).json({ ok: false, error: "Invalid proof token" });
+      console.error(e);
+      return res
+        .status(500)
+        .json({ ok: false, error: "Internal server error" });
     }
-
-    if (decoded.sub !== req.userId) {
-      return res.status(401).json({ ok: false, error: "Invalid proof token" });
-    }
-
-    // newEmail must be free
-    const existing = await prisma.user.findUnique({
-      where: { email: parsed.data.newEmail },
-      select: { id: true },
-    });
-    if (existing) {
-      return res.status(409).json({ ok: false, error: "Email already in use" });
-    }
-
-    // generate code
-    const code = random6();
-    const codeHash = sha256hex(code);
-    const expiresAt = new Date(Date.now() + EMAIL_CODE_TTL_MIN * 60 * 1000);
-
-    // store record for new email
-    await prisma.emailVerification.upsert({
-      where: { email: parsed.data.newEmail },
-      create: {
-        email: parsed.data.newEmail,
-        codeHash,
-        expiresAt,
-        attempts: 0,
-        maxAttempts: EMAIL_MAX_ATTEMPTS,
-        payload: {
-          kind: "changeEmail",
-          userId: req.userId,
-        },
-      },
-      update: {
-        codeHash,
-        expiresAt,
-        attempts: 0,
-        maxAttempts: EMAIL_MAX_ATTEMPTS,
-        payload: {
-          kind: "changeEmail",
-          userId: req.userId,
-        },
-      },
-    });
-
-    try {
-      await sendVerificationCode(parsed.data.newEmail, code, "change-email");
-    } catch (e: any) {
-      console.error("[sendMail] error:", e?.message || e);
-      return res.status(500).json({
-        ok: false,
-        error:
-          "Email sending failed (SMTP). Check SMTP_* in .env or reset Mailtrap credentials.",
-      });
-    }
-
-    return res.json({ ok: true, message: "Verification code sent" });
-  } catch (e) {
-    console.error(e);
-    return res.status(500).json({ ok: false, error: "Internal server error" });
   }
-});
+);
 
 /* =========================
    POST /api/auth/change-email/verify
    JSON: { newEmail, code }
    -> updates user.email
 ========================= */
-router.post("/change-email/verify", requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    if (!req.userId) return res.status(401).json({ ok: false, error: "Unauthorized" });
+router.post(
+  "/change-email/verify",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      if (!req.userId)
+        return res.status(401).json({ ok: false, error: "Unauthorized" });
 
-    const parsed = changeEmailVerifySchema.safeParse({
-      newEmail: normalizeEmail(req.body?.newEmail),
-      code: (req.body?.code ?? "").toString().trim(),
-    });
-
-    if (!parsed.success) {
-      return res.status(400).json({
-        ok: false,
-        error: "Validation failed",
-        details: parsed.error.flatten(),
-      });
-    }
-
-    const rec = await prisma.emailVerification.findUnique({
-      where: { email: parsed.data.newEmail },
-    });
-
-    if (!rec) return res.status(400).json({ ok: false, error: "Code not found" });
-
-    const now = new Date();
-    if (rec.expiresAt < now) {
-      return res.status(400).json({ ok: false, error: "Code expired" });
-    }
-    if (rec.attempts >= rec.maxAttempts) {
-      return res.status(429).json({ ok: false, error: "Too many attempts" });
-    }
-
-    // check payload
-    const payload = (rec.payload ?? {}) as { kind?: string; userId?: string };
-    if (payload.kind !== "changeEmail" || !payload.userId) {
-      return res.status(400).json({ ok: false, error: "Invalid verification record" });
-    }
-
-    if (payload.userId !== req.userId) {
-      return res.status(403).json({ ok: false, error: "Forbidden" });
-    }
-
-    const ok = rec.codeHash === sha256hex(parsed.data.code);
-    if (!ok) {
-      await prisma.emailVerification.update({
-        where: { email: parsed.data.newEmail },
-        data: { attempts: { increment: 1 } },
-      });
-      return res.status(400).json({ ok: false, error: "Incorrect code" });
-    }
-
-    // newEmail must still be free (race condition)
-    const taken = await prisma.user.findUnique({
-      where: { email: parsed.data.newEmail },
-      select: { id: true },
-    });
-    if (taken) {
-      return res.status(409).json({ ok: false, error: "Email already in use" });
-    }
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const u = await tx.user.update({
-        where: { id: req.userId! },
-        data: {
-          email: parsed.data.newEmail,
-          emailVerifiedAt: new Date(),
-        },
-        select: {
-          id: true,
-          email: true,
-          username: true,
-          displayName: true,
-          avatarUrl: true,
-          createdAt: true,
-        },
+      const parsed = changeEmailVerifySchema.safeParse({
+        newEmail: normalizeEmail(req.body?.newEmail),
+        code: (req.body?.code ?? "").toString().trim(),
       });
 
-      await tx.emailVerification.delete({
+      if (!parsed.success) {
+        return res.status(400).json({
+          ok: false,
+          error: "Validation failed",
+          details: parsed.error.flatten(),
+        });
+      }
+
+      const rec = await prisma.emailVerification.findUnique({
         where: { email: parsed.data.newEmail },
       });
 
-      return u;
-    });
+      if (!rec) return res.status(400).json({ ok: false, error: "Code not found" });
 
-    return res.json({ ok: true, user: updated });
-  } catch (e) {
-    console.error(e);
-    return res.status(500).json({ ok: false, error: "Internal server error" });
+      const now = new Date();
+      if (rec.expiresAt < now) {
+        return res.status(400).json({ ok: false, error: "Code expired" });
+      }
+      if (rec.attempts >= rec.maxAttempts) {
+        return res.status(429).json({ ok: false, error: "Too many attempts" });
+      }
+
+      // check payload
+      const payload = (rec.payload ?? {}) as { kind?: string; userId?: string };
+      if (payload.kind !== "changeEmail" || !payload.userId) {
+        return res
+          .status(400)
+          .json({ ok: false, error: "Invalid verification record" });
+      }
+
+      if (payload.userId !== req.userId) {
+        return res.status(403).json({ ok: false, error: "Forbidden" });
+      }
+
+      const ok = rec.codeHash === sha256hex(parsed.data.code);
+      if (!ok) {
+        await prisma.emailVerification.update({
+          where: { email: parsed.data.newEmail },
+          data: { attempts: { increment: 1 } },
+        });
+        return res.status(400).json({ ok: false, error: "Incorrect code" });
+      }
+
+      // newEmail must still be free (race condition)
+      const taken = await prisma.user.findUnique({
+        where: { email: parsed.data.newEmail },
+        select: { id: true },
+      });
+      if (taken) {
+        return res.status(409).json({ ok: false, error: "Email already in use" });
+      }
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const u = await tx.user.update({
+          where: { id: req.userId! },
+          data: {
+            email: parsed.data.newEmail,
+            emailVerifiedAt: new Date(),
+          },
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+            createdAt: true,
+          },
+        });
+
+        await tx.emailVerification.delete({
+          where: { email: parsed.data.newEmail },
+        });
+
+        return u;
+      });
+
+      return res.json({ ok: true, user: updated });
+    } catch (e) {
+      console.error(e);
+      return res
+        .status(500)
+        .json({ ok: false, error: "Internal server error" });
+    }
   }
-});
+);
 
 /* =========================================================
-  NEW: Two-step registration with email code
+   NEW: Change password link for AUTHED user (Settings)
+   POST /api/auth/change-password/request
+========================================================= */
+router.post(
+  "/change-password/request",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      if (!req.userId)
+        return res.status(401).json({ ok: false, error: "Unauthorized" });
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { id: true, email: true },
+      });
+
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      // (опционально) можно ревокнуть старые неиспользованные токены
+      // чтобы всегда работала только последняя ссылка:
+      // await prisma.passwordReset.updateMany({
+      //   where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      //   data: { usedAt: new Date() },
+      // });
+
+      const token = generateResetToken();
+      const tokenHash = sha256(token);
+      const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MIN * 60 * 1000);
+
+      await prisma.passwordReset.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+          requestedIp:
+            (req.headers["x-forwarded-for"] as string) ||
+            req.socket.remoteAddress ||
+            "",
+          requestedUA: req.get("user-agent") || "",
+        },
+      });
+
+      const resetUrl = `${FRONTEND_ORIGIN}/reset?token=${encodeURIComponent(
+        token
+      )}`;
+
+      try {
+        // ✅ красивое письмо "Change password"
+        await sendChangePasswordEmail(user.email, resetUrl);
+
+        // ⚠️ если нет sendChangePasswordEmail в mailer.ts,
+        // временно используй:
+        // await sendPasswordResetEmail(user.email, resetUrl);
+      } catch (e: any) {
+        console.error("[sendChangePasswordEmail] error:", e?.message || e);
+        return res.status(500).json({
+          ok: false,
+          error:
+            "Email sending failed (SMTP). Check SMTP_* in .env or reset Mailtrap credentials.",
+        });
+      }
+
+      return res.json({ ok: true, message: "Password change link sent" });
+    } catch (e) {
+      console.error(e);
+      return res
+        .status(500)
+        .json({ ok: false, error: "Internal server error" });
+    }
+  }
+);
+
+/* =========================================================
+  Two-step registration with email code
   1) /register-start — sends the code and uploads a draft
   2) /register-verify — verifies the code, creates a user, and logs in
 ============================================================ */
@@ -420,13 +524,9 @@ router.post(
         prisma.user.findUnique({ where: { username: usernameSlug } }),
       ]);
       if (byEmail)
-        return res
-          .status(409)
-          .json({ ok: false, error: "Email already in use" });
+        return res.status(409).json({ ok: false, error: "Email already in use" });
       if (byUsername)
-        return res
-          .status(409)
-          .json({ ok: false, error: "Username already in use" });
+        return res.status(409).json({ ok: false, error: "Username already in use" });
 
       // Password Leak Check (HIBP)
       const leaks = await pwnedCount(parsed.data.password);
@@ -496,9 +596,7 @@ router.post(
       return res.json({ ok: true, message: "Verification code sent" });
     } catch (e) {
       console.error(e);
-      return res
-        .status(500)
-        .json({ ok: false, error: "Internal server error" });
+      return res.status(500).json({ ok: false, error: "Internal server error" });
     }
   }
 );
@@ -517,8 +615,7 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
     }
 
     const rec = await prisma.emailVerification.findUnique({ where: { email } });
-    if (!rec)
-      return res.status(400).json({ ok: false, error: "Code not found" });
+    if (!rec) return res.status(400).json({ ok: false, error: "Code not found" });
 
     const now = new Date();
     if (rec.expiresAt < now) {
@@ -559,7 +656,6 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
       return res.status(409).json({ ok: false, error: "User already exists" });
     }
 
-    // Create a user
     const user = await prisma.user.create({
       data: {
         email,
@@ -579,10 +675,8 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
       },
     });
 
-    // Delete the entry with the code
     await prisma.emailVerification.delete({ where: { email } });
 
-    // === Access + Refresh ===
     const accessToken = signAccess(user.id);
 
     const refreshRaw = newRefreshRaw();
@@ -601,7 +695,6 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
       },
     });
 
-    // set the HttpOnly cookie
     res.cookie("refresh", refreshRaw, refreshCookieOptions());
 
     return res.json({ ok: true, accessToken, user });
@@ -617,7 +710,6 @@ router.post("/register-verify", registerVerifyLimiter, async (req, res) => {
 ========================= */
 router.post("/register", upload.single("avatar"), async (req, res) => {
   try {
-    // reCAPTCHA v2
     const captchaToken = req.body.captchaToken as string | undefined;
     const captcha = await verifyRecaptcha(
       captchaToken,
@@ -663,9 +755,7 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
     if (byEmail)
       return res.status(409).json({ ok: false, error: "Email already in use" });
     if (byUsername)
-      return res
-        .status(409)
-        .json({ ok: false, error: "Username already in use" });
+      return res.status(409).json({ ok: false, error: "Username already in use" });
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 10);
 
@@ -703,8 +793,6 @@ router.post("/register", upload.single("avatar"), async (req, res) => {
 
 /* =========================
    POST /api/auth/login
-   JSON: { email, password, rememberMe }
-   -> set-cookie: refresh=... (HttpOnly) + { accessToken, user }
 ========================= */
 router.post("/login", loginLimiter, async (req, res) => {
   try {
@@ -780,19 +868,16 @@ router.post("/login", loginLimiter, async (req, res) => {
       return loginFail(res, { attemptsLeft: MAX_ATTEMPTS - newCount });
     }
 
-    // Success - reset counters
     await prisma.user.update({
       where: { id: user.id },
       data: { failedLoginAttempts: 0, lockUntil: null },
     });
 
-    // === Access + Refresh ===
     const accessToken = signAccess(user.id);
 
     const refreshRaw = newRefreshRaw();
     const refreshHash = sha256(refreshRaw);
 
-    // Selecting a TTL for a refresh token
     const ttlDays = rememberMe ? REFRESH_TTL_DAYS : SHORT_REFRESH_TTL_DAYS;
 
     await prisma.refreshToken.create({
@@ -808,7 +893,6 @@ router.post("/login", loginLimiter, async (req, res) => {
       },
     });
 
-    // set the HttpOnly cookie
     res.cookie("refresh", refreshRaw, refreshCookieOptions(ttlDays));
 
     return res.json({
@@ -928,16 +1012,14 @@ router.get("/me", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 /* =========================================================
-   NEW: Forgot / Reset password
+   Forgot / Reset password
 ========================================================= */
 
 /* =========================
    POST /api/auth/forgot
-   JSON: { email }
 ========================= */
 router.post("/forgot", forgotLimiter, async (req, res) => {
   try {
-    // reCAPTCHA v2
     const captchaToken = req.body.captchaToken as string | undefined;
     const captcha = await verifyRecaptcha(
       captchaToken,
@@ -969,7 +1051,6 @@ router.post("/forgot", forgotLimiter, async (req, res) => {
       return res.json(genericOk);
     }
 
-    // Generate and store a one-time token (hash)
     const token = generateResetToken();
     const tokenHash = sha256(token);
     const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MIN * 60 * 1000);
@@ -994,7 +1075,7 @@ router.post("/forgot", forgotLimiter, async (req, res) => {
     try {
       await sendPasswordResetEmail(user.email, resetUrl);
     } catch (e) {
-      // We don't reveal any details.
+      // do not reveal details
     }
 
     return res.json(genericOk);
@@ -1006,8 +1087,6 @@ router.post("/forgot", forgotLimiter, async (req, res) => {
 
 /* =========================
    POST /api/auth/reset
-   JSON: { token, newPassword }
-   Changes the password, marks the token as used, revokes all refreshes
 ========================= */
 router.post("/reset", resetLimiter, async (req, res) => {
   try {
@@ -1031,7 +1110,6 @@ router.post("/reset", resetLimiter, async (req, res) => {
     if (record.usedAt) return bad();
     if (record.expiresAt < new Date()) return bad();
 
-    // Find the user and check if the password matches the current one
     const user = await prisma.user.findUnique({
       where: { id: record.userId },
       select: { passwordHash: true },
@@ -1040,7 +1118,6 @@ router.post("/reset", resetLimiter, async (req, res) => {
     if (!user) return bad();
 
     const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
-
     if (isSamePassword) {
       return res.status(400).json({
         ok: false,
@@ -1048,7 +1125,6 @@ router.post("/reset", resetLimiter, async (req, res) => {
       });
     }
 
-    // Additional check for password leaks/weaknesses
     const leaks = await pwnedCount(newPassword);
     if (leaks > 0) {
       return res.status(400).json({
@@ -1062,7 +1138,6 @@ router.post("/reset", resetLimiter, async (req, res) => {
     const passwordHash = await bcrypt.hash(newPassword, 12);
 
     await prisma.$transaction(async (tx) => {
-      // 1) Change the user's password
       await tx.user.update({
         where: { id: record.userId },
         data: {
@@ -1070,13 +1145,11 @@ router.post("/reset", resetLimiter, async (req, res) => {
         },
       });
 
-      // 2) Revoke all active refresh tokens
       await tx.refreshToken.updateMany({
         where: { userId: record.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
 
-      // 3) Mark the token as used
       await tx.passwordReset.update({
         where: { tokenHash },
         data: { usedAt: new Date() },
@@ -1092,7 +1165,6 @@ router.post("/reset", resetLimiter, async (req, res) => {
 
 // =========================
 // PATCH /api/auth/avatar
-// multipart/form-data: avatar (image)
 // =========================
 router.patch(
   "/avatar",
@@ -1106,10 +1178,11 @@ router.patch(
 
       const file = req.file;
       if (!file) {
-        return res.status(400).json({ ok: false, message: "Avatar is required" });
+        return res
+          .status(400)
+          .json({ ok: false, message: "Avatar is required" });
       }
 
-      // only images
       if (!file.mimetype.startsWith("image/")) {
         return res.status(400).json({
           ok: false,
@@ -1124,7 +1197,6 @@ router.patch(
 
       const newAvatarUrl = "/uploads/" + file.filename;
 
-      // delete old avatar file (only if it was a local uploaded file)
       const old = user?.avatarUrl || "";
       const isOldLocal =
         typeof old === "string" &&
@@ -1137,9 +1209,7 @@ router.patch(
           process.cwd(),
           old.replace("/uploads/", "uploads/")
         );
-        fs.promises.unlink(oldPath).catch(() => {
-          // ignore if file doesn't exist
-        });
+        fs.promises.unlink(oldPath).catch(() => {});
       }
 
       const updated = await prisma.user.update({
@@ -1168,8 +1238,6 @@ router.patch(
 
 // =========================
 // PATCH /api/auth/nickname
-// body: { nickname: string }
-// updates displayName + generates username slug
 // =========================
 router.patch("/nickname", requireAuth, async (req: AuthedRequest, res) => {
   try {
@@ -1181,7 +1249,9 @@ router.patch("/nickname", requireAuth, async (req: AuthedRequest, res) => {
     const nickname = nicknameRaw.trim();
 
     if (!nickname) {
-      return res.status(400).json({ ok: false, message: "Nickname is required." });
+      return res
+        .status(400)
+        .json({ ok: false, message: "Nickname is required." });
     }
 
     if (nickname.length < 2 || nickname.length > 40) {
@@ -1191,19 +1261,14 @@ router.patch("/nickname", requireAuth, async (req: AuthedRequest, res) => {
       });
     }
 
-    // slugify -> username
     const slugify = (s: string) => {
       return s
         .trim()
         .toLowerCase()
-        // replace polish chars etc. (basic)
         .normalize("NFKD")
         .replace(/[\u0300-\u036f]/g, "")
-        // spaces -> dash
         .replace(/\s+/g, "-")
-        // keep a-z 0-9 dash underscore
         .replace(/[^a-z0-9_-]/g, "")
-        // collapse dashes
         .replace(/-+/g, "-")
         .replace(/^[-_]+|[-_]+$/g, "");
     };
@@ -1218,8 +1283,6 @@ router.patch("/nickname", requireAuth, async (req: AuthedRequest, res) => {
       });
     }
 
-    // Ensure unique username:
-    // if taken -> add -2, -3 ... (up to 50)
     let candidate = base;
     const existingSame = await prisma.user.findUnique({
       where: { id: req.userId },
@@ -1230,7 +1293,6 @@ router.patch("/nickname", requireAuth, async (req: AuthedRequest, res) => {
       return res.status(404).json({ ok: false, message: "User not found." });
     }
 
-    // If user keeps same nickname producing same username, it's fine
     if (candidate !== existingSame.username) {
       for (let i = 0; i < 50; i++) {
         const taken = await prisma.user.findUnique({
@@ -1242,16 +1304,16 @@ router.patch("/nickname", requireAuth, async (req: AuthedRequest, res) => {
         candidate = `${base}-${i + 2}`;
       }
 
-      // final check
       const takenFinal = await prisma.user.findUnique({
         where: { username: candidate },
         select: { id: true },
       });
 
       if (takenFinal && takenFinal.id !== req.userId) {
-        return res
-          .status(409)
-          .json({ ok: false, message: "Username is taken. Try another nickname." });
+        return res.status(409).json({
+          ok: false,
+          message: "Username is taken. Try another nickname.",
+        });
       }
     }
 

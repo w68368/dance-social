@@ -1,5 +1,5 @@
 // apps/web/src/pages/Settings.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   updateAvatar,
@@ -7,12 +7,51 @@ import {
   changeEmailPasswordProof,
   changeEmailStart,
   changeEmailVerify,
+  requestPasswordReset,
 } from "../api";
 import { getUser, setUser } from "../lib/auth";
 import type { PublicUser } from "../lib/auth";
 import "../styles/pages/settings.css";
 
 type EmailStep = "password" | "newEmail" | "code" | "done";
+type PasswordStep = "confirm" | "sent";
+
+declare global {
+  interface Window {
+    grecaptcha?: any;
+  }
+}
+
+const RECAPTCHA_SITE_KEY =
+  import.meta.env?.VITE_RECAPTCHA_SITE_KEY || "";
+
+function loadRecaptchaScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // already loaded
+    if (window.grecaptcha && typeof window.grecaptcha.render === "function") {
+      resolve();
+      return;
+    }
+
+    // already injected
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src^="https://www.google.com/recaptcha/api.js"]'
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("reCAPTCHA load error")));
+      return;
+    }
+
+    const s = document.createElement("script");
+    s.src = "https://www.google.com/recaptcha/api.js?render=explicit";
+    s.async = true;
+    s.defer = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("reCAPTCHA load error"));
+    document.head.appendChild(s);
+  });
+}
 
 export default function Settings() {
   const [me, setMe] = useState<PublicUser | null>(getUser());
@@ -41,6 +80,20 @@ export default function Settings() {
 
   const [newEmail, setNewEmail] = useState("");
   const [emailCode, setEmailCode] = useState("");
+
+  // ✅ password reset modal state
+  const [passOpen, setPassOpen] = useState(false);
+  const [passStep, setPassStep] = useState<PasswordStep>("confirm");
+  const [passBusy, setPassBusy] = useState(false);
+  const [passError, setPassError] = useState<string | null>(null);
+
+  // ✅ real captcha token
+  const [captchaToken, setCaptchaToken] = useState<string>("");
+
+  // recaptcha refs
+  const recaptchaBoxRef = useRef<HTMLDivElement | null>(null);
+  const recaptchaWidgetIdRef = useRef<number | null>(null);
+  const recaptchaReadyRef = useRef(false);
 
   const avatarPreview = useMemo(() => {
     if (!avatarFile) return null;
@@ -112,7 +165,6 @@ export default function Settings() {
       return;
     }
 
-    // 5MB safety (backend also limits)
     if (file.size > 5 * 1024 * 1024) {
       setAvatarError("Max avatar size is 5MB.");
       setAvatarFile(null);
@@ -132,7 +184,7 @@ export default function Settings() {
       const res = await updateAvatar(avatarFile);
       if (res.data?.ok && res.data.user) {
         setMe(res.data.user);
-        setUser(res.data.user); // 🔥 instantly updates header via onAuthChange
+        setUser(res.data.user);
         setAvatarFile(null);
       } else {
         setAvatarError("Failed to update avatar.");
@@ -144,7 +196,7 @@ export default function Settings() {
     }
   };
 
-  // ---------- Nickname (displayName + @slug) ----------
+  // ---------- Nickname ----------
   const slugify = (s: string) =>
     s
       .trim()
@@ -191,15 +243,13 @@ export default function Settings() {
         setNickError("Failed to update nickname.");
       }
     } catch (err: any) {
-      setNickError(
-        err?.response?.data?.message || "Failed to update nickname."
-      );
+      setNickError(err?.response?.data?.message || "Failed to update nickname.");
     } finally {
       setNickBusy(false);
     }
   };
 
-  // ---------- Change email modal ----------
+  // ---------- Email ----------
   const openEmailModal = () => {
     setEmailError(null);
     setEmailBusy(false);
@@ -221,7 +271,6 @@ export default function Settings() {
 
   const validateEmail = (v: string) => {
     const s = v.trim().toLowerCase();
-    // simple email check (backend is strict anyway)
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
   };
 
@@ -315,6 +364,111 @@ export default function Settings() {
       ? "Verify code"
       : "Done";
 
+  // ---------- Password reset (send link) ----------
+  const openPassModal = () => {
+    setPassError(null);
+    setPassBusy(false);
+    setPassStep("confirm");
+    setCaptchaToken("");
+    setPassOpen(true);
+  };
+
+  const closePassModal = () => {
+    if (passBusy) return;
+    setPassOpen(false);
+  };
+
+  // ✅ render real reCAPTCHA when modal opens
+  useEffect(() => {
+    let cancelled = false;
+
+    async function ensureWidget() {
+      if (!passOpen) return;
+      if (!RECAPTCHA_SITE_KEY) {
+        setPassError("Missing VITE_RECAPTCHA_SITE_KEY in .env");
+        return;
+      }
+
+      try {
+        await loadRecaptchaScript();
+        if (cancelled) return;
+
+        if (!recaptchaBoxRef.current) return;
+
+        // render only once per open cycle
+        if (recaptchaReadyRef.current && recaptchaWidgetIdRef.current !== null) {
+          // reset on open
+          window.grecaptcha?.reset(recaptchaWidgetIdRef.current);
+          setCaptchaToken("");
+          return;
+        }
+
+        const id = window.grecaptcha.render(recaptchaBoxRef.current, {
+          sitekey: RECAPTCHA_SITE_KEY,
+          theme: "dark",
+          callback: (token: string) => {
+            setCaptchaToken(token || "");
+          },
+          "expired-callback": () => {
+            setCaptchaToken("");
+          },
+          "error-callback": () => {
+            setCaptchaToken("");
+          },
+        });
+
+        recaptchaWidgetIdRef.current = id;
+        recaptchaReadyRef.current = true;
+        setCaptchaToken("");
+      } catch (e) {
+        setPassError("Failed to load reCAPTCHA.");
+      }
+    }
+
+    ensureWidget();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [passOpen]);
+
+  // reset captcha token if modal closed
+  useEffect(() => {
+    if (!passOpen) {
+      setCaptchaToken("");
+      setPassError(null);
+      recaptchaReadyRef.current = false;
+      recaptchaWidgetIdRef.current = null;
+      // clear container content to re-render next time
+      if (recaptchaBoxRef.current) recaptchaBoxRef.current.innerHTML = "";
+    }
+  }, [passOpen]);
+
+  const sendResetLink = async () => {
+    setPassError(null);
+    const target = (me?.email || "").trim().toLowerCase();
+
+    if (!target || !validateEmail(target)) {
+      setPassError("Your account email is missing or invalid.");
+      return;
+    }
+
+    if (!captchaToken) {
+      setPassError("Please complete reCAPTCHA first.");
+      return;
+    }
+
+    setPassBusy(true);
+    try {
+      await requestPasswordReset(target, captchaToken);
+      setPassStep("sent");
+    } catch (err: any) {
+      setPassError(err?.response?.data?.message || "Failed to send reset link.");
+    } finally {
+      setPassBusy(false);
+    }
+  };
+
   return (
     <main className="su-main">
       <div className="container settings-container">
@@ -340,7 +494,7 @@ export default function Settings() {
 
         {!loading && !error && (
           <>
-            {/* ✅ Avatar */}
+            {/* Avatar */}
             <section className="settings-section">
               <h2 className="settings-section-title">Avatar</h2>
 
@@ -406,7 +560,7 @@ export default function Settings() {
               </div>
             </section>
 
-            {/* ✅ Account info */}
+            {/* Account info */}
             <section className="settings-section">
               <h2 className="settings-section-title">Account info</h2>
 
@@ -435,7 +589,7 @@ export default function Settings() {
               </div>
             </section>
 
-            {/* ✅ Manage */}
+            {/* Manage */}
             <section className="settings-section">
               <h2 className="settings-section-title">Manage</h2>
 
@@ -452,7 +606,6 @@ export default function Settings() {
                   >
                     Change nickname
                   </button>
-
                 </div>
 
                 <div className="settings-card">
@@ -472,10 +625,14 @@ export default function Settings() {
                 <div className="settings-card">
                   <h3 className="settings-card-title">Password</h3>
                   <p className="settings-card-text">
-                    Change your password (recommended regularly).
+                    We will send a password reset link to your email.
                   </p>
-                  <button className="btn" type="button" disabled>
-                    Coming soon
+                  <button
+                    className="settings-action-btn settings-action-btn--gold"
+                    type="button"
+                    onClick={openPassModal}
+                  >
+                    Change password
                   </button>
                 </div>
 
@@ -494,216 +651,293 @@ export default function Settings() {
         )}
       </div>
 
-{/* ✅ Nickname modal */}
-{nickOpen && (
-  <div className="su-modal-backdrop" onClick={closeNickModal}>
-    <div className="su-modal" onClick={(e) => e.stopPropagation()}>
-      <div className="su-modal-header">
-        <h3 className="su-modal-title">Change nickname</h3>
-        <button
-          className="su-modal-close"
-          type="button"
-          onClick={closeNickModal}
-          aria-label="Close"
-        >
-          ×
-        </button>
-      </div>
-
-      <div className="su-modal-body">
-        <label className="su-field">
-          <span className="su-field-label">New nickname</span>
-          <input
-            className="su-input"
-            value={nickValue}
-            onChange={(e) => setNickValue(e.target.value)}
-            placeholder="e.g. Anastasiya B."
-            disabled={nickBusy}
-            autoFocus
-          />
-        </label>
-
-        <div className="su-hint">
-          Preview: <strong>{nickValue.trim() || "—"}</strong>{" "}
-          <span className="su-hint-muted">(@{slugify(nickValue) || "slug"})</span>
-        </div>
-
-        {nickError && <div className="su-error">{nickError}</div>}
-      </div>
-
-      <div className="su-modal-footer">
-        <button
-          className="su-btn su-btn--ghost"
-          type="button"
-          onClick={closeNickModal}
-          disabled={nickBusy}
-        >
-          Cancel
-        </button>
-        <button
-          className="su-btn su-btn--primary"
-          type="button"
-          onClick={saveNickname}
-          disabled={nickBusy}
-        >
-          {nickBusy ? "Saving…" : "Save"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
-      {/* ✅ Change email modal */}
-{emailOpen && (
-  <div className="su-modal-backdrop" onClick={closeEmailModal}>
-    <div className="su-modal" onClick={(e) => e.stopPropagation()}>
-      <div className="su-modal-header">
-        <h3 className="su-modal-title">Change email</h3>
-        <button
-          className="su-modal-close"
-          type="button"
-          onClick={closeEmailModal}
-          aria-label="Close"
-        >
-          ×
-        </button>
-      </div>
-
-      <div className="su-modal-body">
-        <div className="su-hint" style={{ marginBottom: 10 }}>
-          Step: <strong>{emailStepTitle}</strong>
-        </div>
-
-        {emailStep === "password" && (
-          <>
-            <label className="su-field">
-              <span className="su-field-label">Current password</span>
-              <input
-                className="su-input"
-                type="password"
-                value={emailPassword}
-                onChange={(e) => setEmailPassword(e.target.value)}
-                placeholder="Enter your password"
-                disabled={emailBusy}
-                autoFocus
-              />
-            </label>
-            <div className="su-hint su-hint-muted">
-              We need your password to protect your account.
-            </div>
-          </>
-        )}
-
-        {emailStep === "newEmail" && (
-          <>
-            <label className="su-field">
-              <span className="su-field-label">New email</span>
-              <input
-                className="su-input"
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="new@email.com"
-                disabled={emailBusy}
-                autoFocus
-              />
-            </label>
-            <div className="su-hint su-hint-muted">
-              We will send a 6-digit code to this email.
-            </div>
-          </>
-        )}
-
-        {emailStep === "code" && (
-          <>
-            <div className="su-hint">
-              Code sent to: <strong>{newEmail.trim().toLowerCase()}</strong>
+      {/* Nickname modal */}
+      {nickOpen && (
+        <div className="su-modal-backdrop" onClick={closeNickModal}>
+          <div className="su-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="su-modal-header">
+              <h3 className="su-modal-title">Change nickname</h3>
+              <button
+                className="su-modal-close"
+                type="button"
+                onClick={closeNickModal}
+                aria-label="Close"
+              >
+                ×
+              </button>
             </div>
 
-            <label className="su-field" style={{ marginTop: 10 }}>
-              <span className="su-field-label">Verification code</span>
-              <input
-                className="su-input"
-                value={emailCode}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^\d]/g, "");
-                  setEmailCode(v.slice(0, 6));
-                }}
-                placeholder="123456"
-                inputMode="numeric"
-                disabled={emailBusy}
-                autoFocus
-              />
-            </label>
+            <div className="su-modal-body">
+              <label className="su-field">
+                <span className="su-field-label">New nickname</span>
+                <input
+                  className="su-input"
+                  value={nickValue}
+                  onChange={(e) => setNickValue(e.target.value)}
+                  placeholder="e.g. Anastasiya B."
+                  disabled={nickBusy}
+                  autoFocus
+                />
+              </label>
 
-            <div className="su-hint su-hint-muted">
-              Enter the 6-digit code (valid for a limited time).
+              <div className="su-hint">
+                Preview: <strong>{nickValue.trim() || "—"}</strong>{" "}
+                <span className="su-hint-muted">
+                  (@{slugify(nickValue) || "slug"})
+                </span>
+              </div>
+
+              {nickError && <div className="su-error">{nickError}</div>}
             </div>
-          </>
-        )}
 
-        {emailStep === "done" && (
-          <div className="su-hint">
-            ✅ Email updated successfully to <strong>{me?.email}</strong>
-          </div>
-        )}
-
-        {emailError && <div className="su-error">{emailError}</div>}
-      </div>
-
-      <div className="su-modal-footer">
-        <button
-          className="su-btn su-btn--ghost"
-          type="button"
-          onClick={closeEmailModal}
-          disabled={emailBusy}
-        >
-          {emailStep === "done" ? "Close" : "Cancel"}
-        </button>
-
-        {emailStep !== "done" && (
-          <div style={{ display: "flex", gap: 8 }}>
-            {(emailStep === "newEmail" || emailStep === "code") && (
+            <div className="su-modal-footer">
               <button
                 className="su-btn su-btn--ghost"
                 type="button"
-                onClick={() => {
-                  if (emailBusy) return;
-                  setEmailError(null);
-                  setEmailStep(emailStep === "newEmail" ? "password" : "newEmail");
-                }}
+                onClick={closeNickModal}
+                disabled={nickBusy}
+              >
+                Cancel
+              </button>
+              <button
+                className="su-btn su-btn--primary"
+                type="button"
+                onClick={saveNickname}
+                disabled={nickBusy}
+              >
+                {nickBusy ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email modal */}
+      {emailOpen && (
+        <div className="su-modal-backdrop" onClick={closeEmailModal}>
+          <div className="su-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="su-modal-header">
+              <h3 className="su-modal-title">Change email</h3>
+              <button
+                className="su-modal-close"
+                type="button"
+                onClick={closeEmailModal}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="su-modal-body">
+              <div className="su-hint" style={{ marginBottom: 10 }}>
+                Step: <strong>{emailStepTitle}</strong>
+              </div>
+
+              {emailStep === "password" && (
+                <>
+                  <label className="su-field">
+                    <span className="su-field-label">Current password</span>
+                    <input
+                      className="su-input"
+                      type="password"
+                      value={emailPassword}
+                      onChange={(e) => setEmailPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      disabled={emailBusy}
+                      autoFocus
+                    />
+                  </label>
+                  <div className="su-hint su-hint-muted">
+                    We need your password to protect your account.
+                  </div>
+                </>
+              )}
+
+              {emailStep === "newEmail" && (
+                <>
+                  <label className="su-field">
+                    <span className="su-field-label">New email</span>
+                    <input
+                      className="su-input"
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="new@email.com"
+                      disabled={emailBusy}
+                      autoFocus
+                    />
+                  </label>
+                  <div className="su-hint su-hint-muted">
+                    We will send a 6-digit code to this email.
+                  </div>
+                </>
+              )}
+
+              {emailStep === "code" && (
+                <>
+                  <div className="su-hint">
+                    Code sent to:{" "}
+                    <strong>{newEmail.trim().toLowerCase()}</strong>
+                  </div>
+
+                  <label className="su-field" style={{ marginTop: 10 }}>
+                    <span className="su-field-label">Verification code</span>
+                    <input
+                      className="su-input"
+                      value={emailCode}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^\d]/g, "");
+                        setEmailCode(v.slice(0, 6));
+                      }}
+                      placeholder="123456"
+                      inputMode="numeric"
+                      disabled={emailBusy}
+                      autoFocus
+                    />
+                  </label>
+
+                  <div className="su-hint su-hint-muted">
+                    Enter the 6-digit code (valid for a limited time).
+                  </div>
+                </>
+              )}
+
+              {emailStep === "done" && (
+                <div className="su-hint">
+                  ✅ Email updated successfully to <strong>{me?.email}</strong>
+                </div>
+              )}
+
+              {emailError && <div className="su-error">{emailError}</div>}
+            </div>
+
+            <div className="su-modal-footer">
+              <button
+                className="su-btn su-btn--ghost"
+                type="button"
+                onClick={closeEmailModal}
                 disabled={emailBusy}
               >
-                Back
+                {emailStep === "done" ? "Close" : "Cancel"}
               </button>
-            )}
 
-            <button
-              className="su-btn su-btn--primary"
-              type="button"
-              onClick={() => {
-                if (emailStep === "password") return submitEmailPassword();
-                if (emailStep === "newEmail") return submitNewEmail();
-                if (emailStep === "code") return submitEmailCode();
-              }}
-              disabled={emailBusy}
-            >
-              {emailBusy
-                ? "Please wait…"
-                : emailStep === "password"
-                ? "Continue"
-                : emailStep === "newEmail"
-                ? "Send code"
-                : "Verify"}
-            </button>
+              {emailStep !== "done" && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  {(emailStep === "newEmail" || emailStep === "code") && (
+                    <button
+                      className="su-btn su-btn--ghost"
+                      type="button"
+                      onClick={() => {
+                        if (emailBusy) return;
+                        setEmailError(null);
+                        setEmailStep(
+                          emailStep === "newEmail" ? "password" : "newEmail"
+                        );
+                      }}
+                      disabled={emailBusy}
+                    >
+                      Back
+                    </button>
+                  )}
+
+                  <button
+                    className="su-btn su-btn--primary"
+                    type="button"
+                    onClick={() => {
+                      if (emailStep === "password") return submitEmailPassword();
+                      if (emailStep === "newEmail") return submitNewEmail();
+                      if (emailStep === "code") return submitEmailCode();
+                    }}
+                    disabled={emailBusy}
+                  >
+                    {emailBusy
+                      ? "Please wait…"
+                      : emailStep === "password"
+                      ? "Continue"
+                      : emailStep === "newEmail"
+                      ? "Send code"
+                      : "Verify"}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
 
+      {/* ✅ Password modal (real reCAPTCHA v2 checkbox) */}
+      {passOpen && (
+        <div className="su-modal-backdrop" onClick={closePassModal}>
+          <div className="su-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="su-modal-header">
+              <h3 className="su-modal-title">Change password</h3>
+              <button
+                className="su-modal-close"
+                type="button"
+                onClick={closePassModal}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="su-modal-body">
+              {passStep === "confirm" && (
+                <>
+                  <div className="su-hint" style={{ marginTop: 0 }}>
+                    We’ll send a secure password reset link to:
+                  </div>
+                  <div className="su-hint" style={{ marginTop: 6 }}>
+                    <strong>{me?.email}</strong>
+                  </div>
+
+                  <div className="su-hint su-hint-muted">
+                    Complete reCAPTCHA and press “Send reset link”.
+                  </div>
+
+                  {/* ✅ Real checkbox */}
+                  <div style={{ marginTop: 12 }}>
+                    <div ref={recaptchaBoxRef} />
+                  </div>
+                </>
+              )}
+
+              {passStep === "sent" && (
+                <div className="su-hint">
+                  ✅ If this email exists, we’ve sent reset instructions.
+                  <div className="su-hint su-hint-muted" style={{ marginTop: 6 }}>
+                    Check inbox (and spam) and follow the link to set a new password.
+                  </div>
+                </div>
+              )}
+
+              {passError && <div className="su-error">{passError}</div>}
+            </div>
+
+            <div className="su-modal-footer">
+              <button
+                className="su-btn su-btn--ghost"
+                type="button"
+                onClick={closePassModal}
+                disabled={passBusy}
+              >
+                {passStep === "sent" ? "Close" : "Cancel"}
+              </button>
+
+              {passStep === "confirm" && (
+                <button
+                  className="su-btn su-btn--primary"
+                  type="button"
+                  onClick={sendResetLink}
+                  disabled={passBusy}
+                >
+                  {passBusy ? "Please wait…" : "Send reset link"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -185,6 +185,17 @@ export function submitPasswordReset(token: string, newPassword: string) {
 }
 
 // ----------------------------------------------------
+// Change password via email link (Settings)
+// ----------------------------------------------------
+export function requestChangePasswordLink() {
+  return api.post<{ ok: boolean; message?: string; error?: string }>(
+    "/auth/change-password/request",
+    {}
+  );
+}
+
+
+// ----------------------------------------------------
 // Types
 // ----------------------------------------------------
 export interface ApiUserSummary {
