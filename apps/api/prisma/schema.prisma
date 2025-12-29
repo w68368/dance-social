@@ -289,14 +289,15 @@ model ConversationParticipant {
   id             String       @id @default(cuid())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-
-  createdAt DateTime @default(now())
+  // ✅ read receipts
+  lastReadAt     DateTime?    // when user last viewed this conversation
 
   @@unique([conversationId, userId])
   @@index([userId])
+  @@index([conversationId])
 }
 
 model Message {

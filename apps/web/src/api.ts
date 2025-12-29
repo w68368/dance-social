@@ -696,7 +696,3 @@ export async function sendConversationMedia(
   // backend returns { ok: true, messages: [...] }
   return data.messages as ChatMessage[];
 }
-
-
-
-
