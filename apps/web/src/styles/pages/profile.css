@@ -519,6 +519,40 @@
   box-shadow: none;
 }
 
+/* =========================
+   PROFILE ACTION BUTTONS
+========================= */
+
+/* actions row (Follow + Message) */
+.profile-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px; /* вместо margin-top на кнопке */
+}
+
+/* make buttons identical in height */
+.btn-follow,
+.btn-message {
+  height: 36px;
+  padding: 0 18px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  line-height: 1;
+  box-sizing: border-box; /* важно: чтобы border не менял высоту */
+  margin: 0; /* убираем любые случайные отступы */
+}
+
+/* убери это из старого .btn-follow, если есть */
+.btn-follow {
+  margin-top: 0; /* раньше было 10px — оно и ломало “ровно” */
+}
+
+
+
 
 /* responsive */
 

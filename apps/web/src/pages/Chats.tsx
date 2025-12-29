@@ -1,3 +1,4 @@
+// apps/web/src/pages/Chats.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -5,6 +6,7 @@ import {
   fetchConversationMessages,
   openDm,
   sendConversationMessage,
+  deleteChatMessage,
   type ChatConversationListItem,
   type ChatMessage,
   type ChatPeer,
@@ -22,7 +24,9 @@ export default function Chats() {
   const navigate = useNavigate();
   const { userId } = useParams<{ userId: string }>();
 
-  const [conversations, setConversations] = useState<ChatConversationListItem[]>([]);
+  const [conversations, setConversations] = useState<ChatConversationListItem[]>(
+    []
+  );
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
 
@@ -36,6 +40,11 @@ export default function Chats() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
+  // --- message menu (⋯)
+  const [openMsgMenuId, setOpenMsgMenuId] = useState<string | null>(null);
+  const msgMenuRef = useRef<HTMLDivElement | null>(null);
+  const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
+
   const listLoadedRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -43,6 +52,28 @@ export default function Chats() {
     () => conversations.find((c) => c.id === activeConvId) ?? null,
     [conversations, activeConvId]
   );
+
+  // --- close message menu on outside click / Esc
+  useEffect(() => {
+    function onDocMouseDown(e: MouseEvent) {
+      if (!openMsgMenuId) return;
+      const t = e.target as Node;
+      if (msgMenuRef.current && !msgMenuRef.current.contains(t)) {
+        setOpenMsgMenuId(null);
+      }
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpenMsgMenuId(null);
+    }
+
+    document.addEventListener("mousedown", onDocMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openMsgMenuId]);
 
   // --- load conversations list
   const loadList = async () => {
@@ -120,6 +151,7 @@ export default function Chats() {
     setActivePeer(c.peer ?? null);
     setMessages([]);
     setText("");
+    setOpenMsgMenuId(null);
     // keep URL friendly
     if (c.peer?.id) navigate(`/chats/${c.peer.id}`);
     else navigate(`/chats`);
@@ -146,7 +178,9 @@ export default function Chats() {
     try {
       const real = await sendConversationMessage(activeConvId, trimmed);
       // replace tmp with real
-      setMessages((prev) => prev.map((m) => (m.id === optimistic.id ? real : m)));
+      setMessages((prev) =>
+        prev.map((m) => (m.id === optimistic.id ? real : m))
+      );
 
       // update list preview (last message + ordering)
       setConversations((prev) => {
@@ -178,6 +212,43 @@ export default function Chats() {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!messageId) return;
+    if (deletingMsgId) return;
+
+    // don't try to delete optimistic tmp message from DB
+    if (messageId.startsWith("tmp_")) {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setOpenMsgMenuId(null);
+      return;
+    }
+
+    setDeletingMsgId(messageId);
+    setChatError(null);
+    setOpenMsgMenuId(null);
+
+    const prev = messages;
+    // optimistic remove
+    setMessages((cur) => cur.filter((m) => m.id !== messageId));
+
+    try {
+      await deleteChatMessage(messageId);
+
+      // if the deleted message was used as lastMessage in list -> refresh list (simple & safe)
+      // optional but nice:
+      if (activeConvId && activeConv?.lastMessage?.id === messageId) {
+        await loadList();
+      }
+    } catch (e: any) {
+      console.error(e);
+      setChatError(e?.message || "Failed to delete message.");
+      // rollback
+      setMessages(prev);
+    } finally {
+      setDeletingMsgId(null);
+    }
+  };
+
   return (
     <main className="su-main">
       <div className="container chats-wrap">
@@ -185,7 +256,12 @@ export default function Chats() {
         <aside className="chats-sidebar">
           <div className="chats-sidebar-header">
             <div className="chats-title">Chats</div>
-            <button className="chats-refresh" type="button" onClick={loadList} title="Refresh">
+            <button
+              className="chats-refresh"
+              type="button"
+              onClick={loadList}
+              title="Refresh"
+            >
               ↻
             </button>
           </div>
@@ -256,7 +332,9 @@ export default function Chats() {
                       />
                     ) : (
                       <span>
-                        {(activePeer?.displayName || activePeer?.username || "U")
+                        {(activePeer?.displayName ||
+                          activePeer?.username ||
+                          "U")
                           .slice(0, 1)
                           .toUpperCase()}
                       </span>
@@ -264,10 +342,14 @@ export default function Chats() {
                   </div>
                   <div>
                     <div className="chats-chat-peer-name">
-                      {activePeer?.displayName || activePeer?.username || "Chat"}
+                      {activePeer?.displayName ||
+                        activePeer?.username ||
+                        "Chat"}
                     </div>
                     {activePeer?.username && (
-                      <div className="chats-chat-peer-handle">@{activePeer.username}</div>
+                      <div className="chats-chat-peer-handle">
+                        @{activePeer.username}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -285,18 +367,74 @@ export default function Chats() {
 
               {/* messages */}
               <div className="chats-messages">
-                {loadingChat && <div className="chats-muted">Loading messages…</div>}
+                {loadingChat && (
+                  <div className="chats-muted">Loading messages…</div>
+                )}
                 {chatError && <div className="chats-error">{chatError}</div>}
 
                 {!loadingChat &&
                   !chatError &&
                   messages.map((m) => {
-                    const mine = me && m.senderId === me.id;
+                    const mine = !!me && m.senderId === me.id;
+                    const menuOpen = openMsgMenuId === m.id;
+                    const canMenu =
+                      mine && !m.id.startsWith("tmp_"); // show dots only for persisted messages
+
                     return (
-                      <div key={m.id} className={`msg ${mine ? "msg--mine" : "msg--theirs"}`}>
+                      <div
+                        key={m.id}
+                        className={`msg ${mine ? "msg--mine" : "msg--theirs"}`}
+                      >
                         <div className="msg-bubble">
+                          {/* ⋯ menu for my messages */}
+                          {canMenu && (
+                            <div
+                              className="msg-more"
+                              ref={(el) => {
+                                if (menuOpen) msgMenuRef.current = el;
+                              }}
+                            >
+                              <button
+                                type="button"
+                                className="msg-more-btn"
+                                aria-label="Message menu"
+                                aria-haspopup="menu"
+                                aria-expanded={menuOpen}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMsgMenuId((cur) =>
+                                    cur === m.id ? null : m.id
+                                  );
+                                }}
+                              >
+                                ⋯
+                              </button>
+
+                              {menuOpen && (
+                                <div className="msg-menu" role="menu">
+                                  <button
+                                    type="button"
+                                    className="msg-menu-item msg-menu-danger"
+                                    role="menuitem"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteMessage(m.id);
+                                    }}
+                                    disabled={deletingMsgId === m.id}
+                                  >
+                                    {deletingMsgId === m.id
+                                      ? "Deleting…"
+                                      : "Delete message"}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <div className="msg-text">{m.text}</div>
-                          <div className="msg-time">{formatTime(m.createdAt)}</div>
+                          <div className="msg-time">
+                            {formatTime(m.createdAt)}
+                          </div>
                         </div>
                       </div>
                     );

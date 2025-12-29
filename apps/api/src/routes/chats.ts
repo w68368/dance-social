@@ -161,4 +161,45 @@ router.post("/conversations/:id/messages", requireAuth, async (req: AuthedReques
   return res.json({ ok: true, message: msg });
 });
 
+/**
+ * DELETE own message
+ * DELETE /api/chats/messages/:messageId
+ */
+router.delete(
+  "/messages/:messageId",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const messageId = req.params.messageId;
+
+    try {
+      const msg = await prisma.message.findUnique({
+        where: { id: messageId },
+        select: { id: true, senderId: true, conversationId: true },
+      });
+
+      if (!msg) {
+        return res.status(404).json({ ok: false, message: "Message not found" });
+      }
+
+      // only sender can delete
+      if (msg.senderId !== req.userId) {
+        return res.status(403).json({ ok: false, message: "Forbidden" });
+      }
+
+      // (optional safety) ensure sender still participant — usually true
+      // await prisma.conversationParticipant.findUnique({
+      //   where: { conversationId_userId: { conversationId: msg.conversationId, userId: req.userId } },
+      // });
+
+      await prisma.message.delete({ where: { id: messageId } });
+
+      return res.json({ ok: true, deletedId: messageId });
+    } catch (err) {
+      console.error("Delete message error", err);
+      return res.status(500).json({ ok: false, message: "Failed to delete message" });
+    }
+  }
+);
+
+
 export default router;

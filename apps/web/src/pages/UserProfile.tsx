@@ -331,33 +331,26 @@ export default function UserProfile() {
 
             {/* Actions */}
             {showFollow && (
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div className="profile-actions">
                 <button
                   type="button"
-                  className={
-                    "btn-follow" + (followStats.isFollowing ? " following" : "")
-                  }
+                  className={"btn-follow" + (followStats.isFollowing ? " following" : "")}
                   disabled={followLoading}
                   onClick={handleFollowToggle}
                 >
-                  {followLoading
-                    ? "..."
-                    : followStats.isFollowing
-                    ? "Following"
-                    : "Follow"}
+                  {followLoading ? "..." : followStats.isFollowing ? "Following" : "Follow"}
                 </button>
 
-                  {showMessage && (
-                    <button
-                      type="button"
-                      className="btn-message"
-                      disabled={messageLoading}
-                      onClick={handleMessage}
-                    >
-                      {messageLoading ? "Opening…" : "Message"}
-                    </button>
-                  )}
-
+                {showMessage && (
+                  <button
+                    type="button"
+                    className="btn-message"
+                    disabled={messageLoading}
+                    onClick={handleMessage}
+                  >
+                    {messageLoading ? "Opening…" : "Message"}
+                  </button>
+                )}
               </div>
             )}
 

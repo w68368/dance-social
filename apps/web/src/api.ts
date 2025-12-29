@@ -624,3 +624,10 @@ export async function sendConversationMessage(
   return data.message;
 }
 
+export async function deleteChatMessage(messageId: string) {
+  const { data } = await api.delete<{ ok: boolean; deletedId?: string; message?: string }>(
+    `/chats/messages/${messageId}`
+  );
+  if (!data.ok) throw new Error(data.message || "Failed to delete message");
+  return data;
+}
