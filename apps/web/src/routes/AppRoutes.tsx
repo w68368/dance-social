@@ -1,4 +1,3 @@
-// apps/web/src/routes/AppRoutes.tsx
 import { Routes, Route } from "react-router-dom";
 
 // public pages
@@ -18,6 +17,7 @@ import Profile from "../pages/Profile";
 import UserProfile from "../pages/UserProfile";
 import AddVideo from "../pages/AddVideo";
 import Settings from "../pages/Settings";
+import Chats from "../pages/Chats";
 
 // system
 import NotFound from "../pages/NotFound";
@@ -44,8 +44,13 @@ export default function AppRoutes() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/add-video" element={<AddVideo />} />
+
         {/* profile of any user by id */}
         <Route path="/users/:userId" element={<UserProfile />} />
+
+        {/* chats */}
+        <Route path="/chats" element={<Chats />} />
+        <Route path="/chats/:userId" element={<Chats />} />
       </Route>
 
       {/* 404 */}

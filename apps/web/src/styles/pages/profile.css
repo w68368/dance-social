@@ -461,6 +461,63 @@
   background: rgba(255, 107, 107, 0.12);
 }
 
+/* =========================
+   MESSAGE BUTTON
+========================= */
+
+.btn-message {
+  height: 36px;
+  padding: 0 18px;
+  margin-left: 10px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+
+  color: #f5f3ff;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02)
+  );
+
+  border: 1px solid rgba(255, 215, 120, 0.55);
+  border-radius: 10px;
+
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: all 0.18s ease;
+}
+
+/* hover */
+.btn-message:hover:not(:disabled) {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 215, 120, 0.18),
+    rgba(255, 215, 120, 0.08)
+  );
+  border-color: #ffd778;
+  box-shadow:
+    0 0 0 1px rgba(255, 215, 120, 0.35),
+    0 6px 20px rgba(255, 215, 120, 0.25);
+  transform: translateY(-1px);
+}
+
+/* active */
+.btn-message:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* disabled (loading) */
+.btn-message:disabled {
+  opacity: 0.55;
+  cursor: default;
+  box-shadow: none;
+}
 
 
 /* responsive */

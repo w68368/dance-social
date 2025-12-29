@@ -1,3 +1,4 @@
+// apps/web/src/api.ts
 import axios, { AxiosError } from "axios";
 import {
   getAccessToken,
@@ -23,9 +24,7 @@ api.interceptors.request.use((config) => {
   const token = getAccessToken();
   if (token) {
     config.headers = config.headers ?? {};
-    (config.headers as Record<string, string>)[
-      "Authorization"
-    ] = `Bearer ${token}`;
+    (config.headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
   return config;
 });
@@ -174,7 +173,9 @@ export async function logoutOtherDevices() {
   // keep current session, revoke others
   const { data } = await api.post("/auth/logout-others");
   if (!data?.ok) {
-    throw new Error(data?.error || data?.message || "Failed to logout other devices.");
+    throw new Error(
+      data?.error || data?.message || "Failed to logout other devices."
+    );
   }
   return data as { ok: true; revoked: number };
 }
@@ -386,7 +387,6 @@ export async function updatePostCaption(postId: string, caption: string) {
   return data;
 }
 
-
 // ----------------------------------------------------
 // Comments + likes/pin/edit/delete
 // ----------------------------------------------------
@@ -544,3 +544,83 @@ export async function searchHashtags(query: string): Promise<HashtagDto[]> {
 export function fetchUserPublic(userId: string) {
   return api.get<{ ok: boolean; user: ApiUserSummary }>(`/users/${userId}`);
 }
+
+// ----------------------------------------------------
+// Chats (DM)
+// ----------------------------------------------------
+export type ChatPeer = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
+
+export type ChatLastMessage = {
+  id: string;
+  text: string;
+  createdAt: string;
+  senderId: string;
+} | null;
+
+export type ChatConversationListItem = {
+  id: string;
+  updatedAt: string;
+  peer: ChatPeer | null;
+  lastMessage: ChatLastMessage;
+};
+
+export type ChatMessage = {
+  id: string;
+  text: string;
+  createdAt: string;
+  senderId: string;
+};
+
+export async function openDm(userId: string) {
+  const { data } = await api.post<{
+    ok: boolean;
+    conversationId: string;
+    peer: ChatPeer;
+    message?: string;
+  }>(`/chats/dm/${userId}`);
+
+  if (!data.ok) throw new Error(data.message || "Failed to open DM");
+  return data;
+}
+
+export async function fetchConversations() {
+  const { data } = await api.get<{
+    ok: boolean;
+    conversations: ChatConversationListItem[];
+    error?: string;
+  }>("/chats/conversations");
+
+  if (!data.ok) throw new Error(data.error || "Failed to load conversations");
+  return data.conversations ?? [];
+}
+
+export async function fetchConversationMessages(conversationId: string) {
+  const { data } = await api.get<{
+    ok: boolean;
+    messages: ChatMessage[];
+    error?: string;
+  }>(`/chats/conversations/${conversationId}/messages`);
+
+  if (!data.ok) throw new Error(data.error || "Failed to load messages");
+  return data.messages ?? [];
+}
+
+export async function sendConversationMessage(
+  conversationId: string,
+  text: string
+) {
+  const { data } = await api.post<{
+    ok: boolean;
+    message: ChatMessage;
+    error?: string;
+  }>(`/chats/conversations/${conversationId}/messages`, { text });
+
+  if (!data.ok) throw new Error(data.error || "Failed to send message");
+  return data.message;
+}
+

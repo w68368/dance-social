@@ -1,3 +1,4 @@
+// apps/api/src/index.ts
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -7,6 +8,7 @@ import cookieParser from "cookie-parser";
 import authRouter from "./routes/auth.js";
 import postsRouter from "./routes/posts.js";
 import followRouter from "./routes/follow.js";
+import chatsRouter from "./routes/chats.js";
 import { prisma } from "./lib/prisma.js";
 
 dotenv.config();
@@ -81,6 +83,11 @@ app.use("/api/posts", postsRouter);
 // FOLLOW ROUTES (follows)
 // -----------------------
 app.use("/api/follow", followRouter);
+
+// -----------------------
+// CHATS ROUTES (DM)
+// -----------------------
+app.use("/api/chats", chatsRouter);
 
 // -----------------------
 // USERS LIST (optional)

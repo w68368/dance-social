@@ -191,7 +191,17 @@ export default function Header() {
                     My profile
                   </button>
 
-                  {/* ✅ NEW: Settings */}
+                  {/* 🆕 Chats */}
+                  <button
+                    className="user-dropdown-item"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate("/chats");
+                    }}
+                  >
+                    Chats
+                  </button>
+
                   <button
                     className="user-dropdown-item"
                     onClick={() => {
@@ -209,6 +219,7 @@ export default function Header() {
                   </button>
                 </div>
               )}
+
             </div>
           )}
         </div>
@@ -249,12 +260,12 @@ export default function Header() {
               <Link className="mobile-link" to="/recommendations">
                 Recommendations
               </Link>
-
-              {/* ✅ NEW: Settings in mobile menu (shown always; route is protected anyway) */}
+              <Link className="mobile-link" to="/chats">
+                Chats
+              </Link>
               <Link className="mobile-link" to="/settings">
                 Settings
               </Link>
-
               <Link className="mobile-btn" to="/add-video">
                 Add post
               </Link>

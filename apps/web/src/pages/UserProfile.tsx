@@ -1,6 +1,6 @@
 // apps/web/src/pages/UserProfile.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   fetchUserPosts,
   fetchFollowStats,
@@ -8,6 +8,7 @@ import {
   unfollowUser,
   fetchFollowers,
   fetchUserPublic,
+  openDm,
   type Post,
   type ApiUserSummary,
   type FollowStatsResponse,
@@ -20,6 +21,7 @@ import PostCommentsModal from "../components/PostCommentsModal";
 
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
+  const navigate = useNavigate();
 
   const [owner, setOwner] = useState<ApiUserSummary | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -32,6 +34,9 @@ export default function UserProfile() {
     null
   );
   const [followLoading, setFollowLoading] = useState(false);
+
+  // message button state
+  const [messageLoading, setMessageLoading] = useState(false);
 
   // followers modal
   const [followersOpen, setFollowersOpen] = useState(false);
@@ -75,8 +80,7 @@ export default function UserProfile() {
         if (!alive) return;
 
         const message =
-          err?.response?.data?.message ??
-          "Failed to load user profile.";
+          err?.response?.data?.message ?? "Failed to load user profile.";
         setError(message);
       } finally {
         if (!alive) return;
@@ -184,6 +188,23 @@ export default function UserProfile() {
   }
 
   // -----------------------------
+  // Message button
+  // -----------------------------
+  async function handleMessage() {
+    if (!userId || messageLoading) return;
+    try {
+      setMessageLoading(true);
+      await openDm(userId); // create/get DM on backend
+      navigate(`/chats/${userId}`);
+    } catch (err: any) {
+      console.error("Open DM error", err);
+      setError(err?.message || "Failed to open chat.");
+    } finally {
+      setMessageLoading(false);
+    }
+  }
+
+  // -----------------------------
   // Followers modal
   // -----------------------------
   async function openFollowersModal() {
@@ -262,6 +283,9 @@ export default function UserProfile() {
     );
   }
 
+  const showFollow = followStats && !isOwnProfile;
+  const showMessage = showFollow && !!followStats?.isFollowing;
+
   return (
     <main className="profile-page">
       <div className="profile-container">
@@ -305,29 +329,41 @@ export default function UserProfile() {
               </div>
             </div>
 
-            {/* Follow button only for other users' profiles */}
-            {followStats && !isOwnProfile && (
-              <button
-                type="button"
-                className={
-                  "btn-follow" + (followStats.isFollowing ? " following" : "")
-                }
-                disabled={followLoading}
-                onClick={handleFollowToggle}
-              >
-                {followLoading
-                  ? "..."
-                  : followStats.isFollowing
-                  ? "Following"
-                  : "Follow"}
-              </button>
+            {/* Actions */}
+            {showFollow && (
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <button
+                  type="button"
+                  className={
+                    "btn-follow" + (followStats.isFollowing ? " following" : "")
+                  }
+                  disabled={followLoading}
+                  onClick={handleFollowToggle}
+                >
+                  {followLoading
+                    ? "..."
+                    : followStats.isFollowing
+                    ? "Following"
+                    : "Follow"}
+                </button>
+
+                  {showMessage && (
+                    <button
+                      type="button"
+                      className="btn-message"
+                      disabled={messageLoading}
+                      onClick={handleMessage}
+                    >
+                      {messageLoading ? "Opening…" : "Message"}
+                    </button>
+                  )}
+
+              </div>
             )}
 
             <div className="profile-meta">
               {loading && <span>Loading posts…</span>}
-              {!loading && posts.length === 0 && (
-                <span>No posts yet.</span>
-              )}
+              {!loading && posts.length === 0 && <span>No posts yet.</span>}
             </div>
           </div>
         </section>
