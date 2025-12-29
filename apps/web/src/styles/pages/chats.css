@@ -1,3 +1,9 @@
+/* apps/web/src/styles/pages/chats.css */
+
+/* ============================
+   Layout
+============================ */
+
 .chats-wrap {
   display: grid;
   grid-template-columns: 360px 1fr;
@@ -14,6 +20,10 @@
   backdrop-filter: blur(18px);
   overflow: hidden;
 }
+
+/* ============================
+   Sidebar
+============================ */
 
 .chats-sidebar {
   height: calc(100vh - 140px);
@@ -144,7 +154,10 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
-/* MAIN CHAT */
+/* ============================
+   Main chat
+============================ */
+
 .chats-main {
   height: calc(100vh - 140px);
 }
@@ -176,9 +189,10 @@
 }
 
 .chats-chat {
+  overflow: hidden;
   height: 100%;
   display: grid;
-  grid-template-rows: 64px 1fr 64px;
+  grid-template-rows: 64px 1fr auto; /* ✅ composer auto height */
 }
 
 .chats-chat-header {
@@ -237,28 +251,41 @@
   background: rgba(255, 255, 255, 0.10);
 }
 
-/* messages area */
-.chats-messages {
+/* ============================
+   Messages area
+============================ */
+
+.chats-messages{
   padding: 14px;
   overflow: auto;
+  position: relative;
 }
 
-/* message bubbles */
+/* ============================
+   Message bubbles
+============================ */
+
 .msg {
   display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
+/* mine: bubble справа, меню слева от bubble */
 .msg--mine {
   justify-content: flex-end;
 }
 
+/* theirs: bubble слева, меню справа от bubble */
 .msg--theirs {
   justify-content: flex-start;
 }
 
+/* bubble */
 .msg-bubble {
-  max-width: min(640px, 78%);
+  max-width: 420px;
+  width: fit-content;
   border-radius: 16px;
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.10);
@@ -267,6 +294,14 @@
 
 .msg--mine .msg-bubble {
   background: rgba(255, 255, 255, 0.10);
+}
+
+.msg--mine .msg-bubble {
+  max-width: 440px;
+}
+
+.msg--theirs .msg-bubble {
+  max-width: 360px;
 }
 
 .msg-text {
@@ -281,17 +316,292 @@
   text-align: right;
 }
 
-/* composer */
-.chats-compose {
+.msg-edited {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+/* ============================
+   Message menu (⋯) — same for mine + theirs
+============================ */
+
+.msg-more {
+  position: relative; /* anchor dropdown */
+  margin-top: 6px;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* show dots on hover for BOTH mine and theirs */
+.msg-bubble:hover .msg-more {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* button */
+.msg-more-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1, #fff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  backdrop-filter: blur(12px);
+}
+
+.msg-more-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.msg-menu {
+  position: absolute;
+  top: 34px;
+  z-index: 80;
+
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(18, 12, 28, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+
   display: grid;
-  grid-template-columns: 1fr 110px;
+  gap: 6px;
+
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.msg--mine .msg-menu {
+  right: 0;
+}
+.msg--theirs .msg-menu {
+  left: 0;
+}
+
+.msg-menu-item {
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1, #fff);
+
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: left;
+  padding: 0 10px;
+
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.msg-menu-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.msg-menu-item:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.msg-menu-danger {
+  border-color: rgba(255, 107, 107, 0.28);
+  background: rgba(255, 107, 107, 0.10);
+  color: #ff6b6b;
+}
+
+.msg-menu-danger:hover:not(:disabled) {
+  border-color: rgba(255, 107, 107, 0.42);
+  background: rgba(255, 107, 107, 0.14);
+}
+
+/* ============================
+   Reply UI inside message (Telegram-like)
+============================ */
+
+.msg-reply {
+  display: grid;
+  grid-template-columns: 3px 1fr;
   gap: 10px;
+  align-items: stretch;
+
+  margin-bottom: 8px;
+  padding: 8px 10px;
+
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.msg-reply-bar {
+  border-radius: 999px;
+  background: rgba(255, 211, 107, 0.75);
+}
+
+.msg-reply-title {
+  font-weight: 700;
+  font-size: 12px;
+  opacity: 0.95;
+}
+
+.msg-reply-text {
+  font-size: 12px;
+  opacity: 0.82;
+  margin-top: 2px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================
+   Message edit UI (inline)
+============================ */
+
+
+
+.msg-edit {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.msg-edit-input {
+  max-width: 100%;
+  min-width: 0;
+  resize: none;
+
+  padding: 10px 12px;
+  border-radius: 10px;
+
+  color: var(--text-1, #fff);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.msg--mine .msg-edit-input {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.msg-edit-input:focus {
+  border-color: rgba(255, 211, 107, 0.55);
+  box-shadow: 0 0 0 3px rgba(255, 211, 107, 0.12);
+}
+
+.msg-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.msg-edit-btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 10px;
+
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1, #fff);
+
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.msg-edit-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.msg-edit-btn:active {
+  transform: translateY(1px);
+}
+
+.msg:hover .msg-more,
+.msg-more.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.msg--mine .msg-more {
+  order: 0;
+}
+.msg--mine .msg-bubble {
+  order: 1;
+}
+
+.msg-edit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.msg-edit-cancel {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.msg-edit-save {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 211, 107, 0.22),
+    rgba(255, 211, 107, 0.12)
+  );
+  border-color: rgba(255, 211, 107, 0.35);
+}
+
+.msg-edit-save:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 211, 107, 0.28),
+    rgba(255, 211, 107, 0.16)
+  );
+  border-color: rgba(255, 211, 107, 0.5);
+}
+
+/* ============================
+   Composer (Reply bar + input row)
+============================ */
+
+.chats-compose {
   padding: 10px 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chats-compose-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .chats-input {
+  flex: 1 1 auto; /* ✅ take remaining space */
+  min-width: 0;   /* ✅ prevent overflow */
   height: 44px;
+
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
@@ -305,7 +615,9 @@
 }
 
 .chats-send {
+  flex: 0 0 110px; /* ✅ fixed width like before */
   height: 44px;
+
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.10);
@@ -324,102 +636,81 @@
   cursor: not-allowed;
 }
 
-/* message menu */
-.msg-bubble {
-  position: relative;
-}
+/* Reply bar above input */
+.chats-replybar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 
-/* dots appear only when hovering my bubble */
-.msg--mine .msg-more {
-  position: absolute;
-  top: -10px;
-  right: 10px;
-  opacity: 0;
-  transform: translateY(2px);
-  pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.msg--mine .msg-bubble:hover .msg-more {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-.msg-more-btn {
-  width: 32px;
-  height: 28px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(20, 12, 32, 0.55);
-  color: var(--text, #f1ecff);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  font-size: 20px;
-  line-height: 1;
-  backdrop-filter: blur(12px);
-}
-
-.msg-more-btn:hover {
-  background: rgba(20, 12, 32, 0.75);
-}
-
-.msg-menu {
-  position: absolute;
-  top: 32px;
-  right: 0;
-  min-width: 180px;
-  padding: 8px;
+  padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(20, 12, 32, 0.92);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-  z-index: 50;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
-.msg-menu-item {
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
-  color: var(--text, #f1ecff);
-  padding: 10px 10px;
-  border-radius: 10px;
-  cursor: pointer;
+.chats-replybar-left {
+  min-width: 0;
+}
+
+.chats-replybar-title {
+  font-size: 12px;
   font-weight: 700;
-  font-size: 14px;
+  opacity: 0.95;
 }
 
-.msg-menu-item:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+.chats-replybar-text {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 2px;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.msg-menu-danger {
-  color: #ff6b6b;
+.chats-replybar-close {
+  flex: 0 0 auto;
+
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.msg-menu-danger:hover:not(:disabled) {
-  background: rgba(255, 107, 107, 0.12);
+.chats-replybar-close:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
-.msg-menu-item:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
+/* ============================
+   Responsive
+============================ */
 
-
-/* responsive */
 @media (max-width: 980px) {
   .chats-wrap {
     grid-template-columns: 1fr;
   }
+
   .chats-sidebar {
     height: auto;
     max-height: 46vh;
   }
+
   .chats-main {
     height: calc(100vh - 220px);
+  }
+
+  .chats-send {
+    flex-basis: 96px;
   }
 }

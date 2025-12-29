@@ -559,6 +559,7 @@ export type ChatLastMessage = {
   id: string;
   text: string;
   createdAt: string;
+  editedAt?: string | null; // ✅ NEW
   senderId: string;
 } | null;
 
@@ -573,7 +574,16 @@ export type ChatMessage = {
   id: string;
   text: string;
   createdAt: string;
+  editedAt?: string | null;
   senderId: string;
+
+  replyToId?: string | null; // ✅
+  replyTo?: {
+    id: string;
+    text: string;
+    createdAt: string;
+    senderId: string;
+  } | null; // ✅
 };
 
 export async function openDm(userId: string) {
@@ -593,9 +603,10 @@ export async function fetchConversations() {
     ok: boolean;
     conversations: ChatConversationListItem[];
     error?: string;
+    message?: string;
   }>("/chats/conversations");
 
-  if (!data.ok) throw new Error(data.error || "Failed to load conversations");
+  if (!data.ok) throw new Error(data.error || data.message || "Failed to load conversations");
   return data.conversations ?? [];
 }
 
@@ -604,25 +615,36 @@ export async function fetchConversationMessages(conversationId: string) {
     ok: boolean;
     messages: ChatMessage[];
     error?: string;
+    message?: string;
   }>(`/chats/conversations/${conversationId}/messages`);
 
-  if (!data.ok) throw new Error(data.error || "Failed to load messages");
-  return data.messages ?? [];
+  if (!data.ok) throw new Error(data.error || data.message || "Failed to load messages");
+  return { messages: data.messages ?? [] };
 }
+
 
 export async function sendConversationMessage(
   conversationId: string,
-  text: string
+  text: string,
+  replyToId?: string | null
 ) {
   const { data } = await api.post<{
     ok: boolean;
     message: ChatMessage;
     error?: string;
-  }>(`/chats/conversations/${conversationId}/messages`, { text });
+  }>(`/chats/conversations/${conversationId}/messages`, {
+    text: text.trim(),
+    replyToId: replyToId || undefined,
+  });
 
-  if (!data.ok) throw new Error(data.error || "Failed to send message");
+  if (!data.ok) {
+    throw new Error(data.error || "Failed to send message");
+  }
+
   return data.message;
 }
+
+
 
 export async function deleteChatMessage(messageId: string) {
   const { data } = await api.delete<{ ok: boolean; deletedId?: string; message?: string }>(
@@ -631,3 +653,20 @@ export async function deleteChatMessage(messageId: string) {
   if (!data.ok) throw new Error(data.message || "Failed to delete message");
   return data;
 }
+
+// ✅ NEW: Edit message
+export async function editConversationMessage(messageId: string, text: string) {
+  const { data } = await api.patch<{
+    ok: boolean;
+    message?: ChatMessage; // backend: ok + message (объект)
+    error?: string;
+  }>(`/chats/messages/${messageId}`, { text: text.trim() });
+
+  if (!data.ok || !data.message) {
+    throw new Error(data.error || "Failed to edit message");
+  }
+
+  return data.message;
+}
+
+

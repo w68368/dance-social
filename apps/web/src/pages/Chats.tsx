@@ -7,6 +7,7 @@ import {
   openDm,
   sendConversationMessage,
   deleteChatMessage,
+  editConversationMessage,
   type ChatConversationListItem,
   type ChatMessage,
   type ChatPeer,
@@ -17,6 +18,12 @@ import "../styles/pages/chats.css";
 function formatTime(ts: string) {
   const d = new Date(ts);
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function clip(s: string, n = 80) {
+  const t = (s || "").trim();
+  if (t.length <= n) return t;
+  return t.slice(0, n - 1) + "…";
 }
 
 export default function Chats() {
@@ -45,6 +52,15 @@ export default function Chats() {
   const msgMenuRef = useRef<HTMLDivElement | null>(null);
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
 
+  // --- edit state
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const editInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // ✅ reply state
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+
   const listLoadedRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -53,18 +69,32 @@ export default function Chats() {
     [conversations, activeConvId]
   );
 
-  // --- close message menu on outside click / Esc
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // --- close message menu + edit on outside click / Esc
   useEffect(() => {
     function onDocMouseDown(e: MouseEvent) {
-      if (!openMsgMenuId) return;
       const t = e.target as Node;
-      if (msgMenuRef.current && !msgMenuRef.current.contains(t)) {
+      if (
+        openMsgMenuId &&
+        msgMenuRef.current &&
+        !msgMenuRef.current.contains(t)
+      ) {
         setOpenMsgMenuId(null);
       }
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpenMsgMenuId(null);
+      if (e.key === "Escape") {
+        setOpenMsgMenuId(null);
+        if (editingMsgId) {
+          setEditingMsgId(null);
+          setEditValue("");
+        }
+        if (replyTo) setReplyTo(null);
+      }
     }
 
     document.addEventListener("mousedown", onDocMouseDown);
@@ -73,7 +103,21 @@ export default function Chats() {
       document.removeEventListener("mousedown", onDocMouseDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [openMsgMenuId]);
+  }, [openMsgMenuId, editingMsgId, replyTo]);
+
+  // focus edit input when start editing
+  useEffect(() => {
+    if (editingMsgId) {
+      setTimeout(() => {
+        editInputRef.current?.focus();
+        const el = editInputRef.current;
+        if (el) {
+          const len = el.value.length;
+          el.setSelectionRange(len, len);
+        }
+      }, 0);
+    }
+  }, [editingMsgId]);
 
   // --- load conversations list
   const loadList = async () => {
@@ -103,11 +147,10 @@ export default function Chats() {
     (async () => {
       try {
         setChatError(null);
-        const dm = await openDm(userId); // {conversationId, peer}
+        const dm = await openDm(userId);
         setActiveConvId(dm.conversationId);
         setActivePeer(dm.peer);
 
-        // if conversation is not in list yet, refresh list
         if (listLoadedRef.current) {
           const exists = conversations.some((c) => c.id === dm.conversationId);
           if (!exists) await loadList();
@@ -127,23 +170,28 @@ export default function Chats() {
       try {
         setLoadingChat(true);
         setChatError(null);
-        const msgs = await fetchConversationMessages(activeConvId);
-        setMessages(msgs);
+        const { messages } = await fetchConversationMessages(activeConvId);
+        setMessages(messages);
 
-        // if peer not set (clicked from list), compute from list item
+        // reset ephemeral UI on chat switch
+        setEditingMsgId(null);
+        setEditValue("");
+        setOpenMsgMenuId(null);
+        setReplyTo(null);
+
         const fromList = conversations.find((c) => c.id === activeConvId);
         if (fromList?.peer) setActivePeer(fromList.peer);
       } catch (e: any) {
         setChatError(e?.message || "Failed to load messages.");
       } finally {
         setLoadingChat(false);
+        setTimeout(scrollToBottom, 0);
       }
     })();
   }, [activeConvId, conversations]);
 
-  // --- autoscroll to bottom on new messages
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottom();
   }, [messages.length]);
 
   const selectConversation = (c: ChatConversationListItem) => {
@@ -152,7 +200,10 @@ export default function Chats() {
     setMessages([]);
     setText("");
     setOpenMsgMenuId(null);
-    // keep URL friendly
+    setEditingMsgId(null);
+    setEditValue("");
+    setReplyTo(null);
+
     if (c.peer?.id) navigate(`/chats/${c.peer.id}`);
     else navigate(`/chats`);
   };
@@ -165,24 +216,38 @@ export default function Chats() {
     setSending(true);
     setChatError(null);
 
-    // optimistic message
     const optimistic: ChatMessage = {
       id: `tmp_${Date.now()}`,
       text: trimmed,
       createdAt: new Date().toISOString(),
+      editedAt: null,
       senderId: me?.id || "me",
+      replyToId: replyTo?.id ?? null,
+      replyTo: replyTo
+        ? {
+            id: replyTo.id,
+            text: replyTo.text,
+            createdAt: replyTo.createdAt,
+            senderId: replyTo.senderId,
+          }
+        : null,
     };
+
     setMessages((prev) => [...prev, optimistic]);
     setText("");
+    setReplyTo(null);
 
     try {
-      const real = await sendConversationMessage(activeConvId, trimmed);
-      // replace tmp with real
+      const real = await sendConversationMessage(
+        activeConvId,
+        trimmed,
+        optimistic.replyToId ?? null
+      );
+
       setMessages((prev) =>
         prev.map((m) => (m.id === optimistic.id ? real : m))
       );
 
-      // update list preview (last message + ordering)
       setConversations((prev) => {
         const next = prev.map((x) =>
           x.id === activeConvId
@@ -193,18 +258,17 @@ export default function Chats() {
                   id: real.id,
                   text: real.text,
                   createdAt: real.createdAt,
+                  editedAt: real.editedAt ?? null,
                   senderId: real.senderId,
                 },
               }
             : x
         );
-        // move active chat to top
         next.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
         return next;
       });
     } catch (e: any) {
       setChatError(e?.message || "Failed to send message.");
-      // rollback optimistic
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       setText(trimmed);
     } finally {
@@ -216,11 +280,15 @@ export default function Chats() {
     if (!messageId) return;
     if (deletingMsgId) return;
 
-    // don't try to delete optimistic tmp message from DB
     if (messageId.startsWith("tmp_")) {
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
       setOpenMsgMenuId(null);
       return;
+    }
+
+    if (editingMsgId === messageId) {
+      setEditingMsgId(null);
+      setEditValue("");
     }
 
     setDeletingMsgId(messageId);
@@ -228,25 +296,117 @@ export default function Chats() {
     setOpenMsgMenuId(null);
 
     const prev = messages;
-    // optimistic remove
     setMessages((cur) => cur.filter((m) => m.id !== messageId));
 
     try {
       await deleteChatMessage(messageId);
-
-      // if the deleted message was used as lastMessage in list -> refresh list (simple & safe)
-      // optional but nice:
       if (activeConvId && activeConv?.lastMessage?.id === messageId) {
         await loadList();
       }
     } catch (e: any) {
-      console.error(e);
       setChatError(e?.message || "Failed to delete message.");
-      // rollback
       setMessages(prev);
     } finally {
       setDeletingMsgId(null);
     }
+  };
+
+  const beginEdit = (m: ChatMessage) => {
+    if (!me) return;
+    if (m.senderId !== me.id) return;
+    if (m.id.startsWith("tmp_")) return;
+
+    setOpenMsgMenuId(null);
+    setReplyTo(null);
+    setEditingMsgId(m.id);
+    setEditValue(m.text);
+  };
+
+  const cancelEdit = () => {
+    setEditingMsgId(null);
+    setEditValue("");
+  };
+
+  const saveEdit = async (messageId: string) => {
+    if (!messageId) return;
+    if (!me) return;
+    if (savingEditId) return;
+
+    const newText = editValue.trim();
+    if (!newText) return;
+
+    const current = messages.find((x) => x.id === messageId);
+    if (!current) return;
+    if (current.senderId !== me.id) return;
+
+    if (current.text === newText) {
+      cancelEdit();
+      return;
+    }
+
+    setSavingEditId(messageId);
+    setChatError(null);
+
+    const prev = messages;
+    const nowIso = new Date().toISOString();
+
+    setMessages((cur) =>
+      cur.map((m) =>
+        m.id === messageId ? { ...m, text: newText, editedAt: nowIso } : m
+      )
+    );
+
+    try {
+      const updated = await editConversationMessage(messageId, newText);
+
+      setMessages((cur) =>
+        cur.map((m) => (m.id === messageId ? updated : m))
+      );
+
+      if (activeConvId) {
+        setConversations((cur) =>
+          cur.map((c) => {
+            if (c.id !== activeConvId) return c;
+            if (!c.lastMessage || c.lastMessage.id !== messageId) return c;
+            return {
+              ...c,
+              lastMessage: {
+                id: updated.id,
+                text: updated.text,
+                createdAt: updated.createdAt,
+                editedAt: updated.editedAt ?? null,
+                senderId: updated.senderId,
+              },
+            };
+          })
+        );
+      }
+
+      cancelEdit();
+    } catch (e: any) {
+      setChatError(e?.message || "Failed to edit message.");
+      setMessages(prev);
+    } finally {
+      setSavingEditId(null);
+    }
+  };
+
+  // ✅ Reply start (for any message)
+  const beginReply = (m: ChatMessage) => {
+    if (m.id.startsWith("tmp_")) return;
+    setOpenMsgMenuId(null);
+    setEditingMsgId(null);
+    setEditValue("");
+    setReplyTo(m);
+  };
+
+  const cancelReply = () => setReplyTo(null);
+
+  // helper to display reply author label
+  const getReplyAuthorLabel = (senderId: string) => {
+    if (me && senderId === me.id) return "You";
+    const peerName = activePeer?.displayName || activePeer?.username;
+    return peerName || "User";
   };
 
   return (
@@ -298,7 +458,9 @@ export default function Chats() {
                   <div className="chats-item-mid">
                     <div className="chats-item-top">
                       <div className="chats-name">{name}</div>
-                      <div className="chats-time">{formatTime(c.updatedAt)}</div>
+                      <div className="chats-time">
+                        {formatTime(c.updatedAt)}
+                      </div>
                     </div>
                     <div className="chats-last">{last}</div>
                   </div>
@@ -332,9 +494,7 @@ export default function Chats() {
                       />
                     ) : (
                       <span>
-                        {(activePeer?.displayName ||
-                          activePeer?.username ||
-                          "U")
+                        {(activePeer?.displayName || activePeer?.username || "U")
                           .slice(0, 1)
                           .toUpperCase()}
                       </span>
@@ -377,41 +537,74 @@ export default function Chats() {
                   messages.map((m) => {
                     const mine = !!me && m.senderId === me.id;
                     const menuOpen = openMsgMenuId === m.id;
-                    const canMenu =
-                      mine && !m.id.startsWith("tmp_"); // show dots only for persisted messages
+                    const canMenu = !m.id.startsWith("tmp_");
+                    const isEditing = editingMsgId === m.id;
+                    const isSaving = savingEditId === m.id;
+
+                    // for display reply data
+                    const reply = m.replyTo ?? null;
 
                     return (
                       <div
                         key={m.id}
                         className={`msg ${mine ? "msg--mine" : "msg--theirs"}`}
                       >
-                        <div className="msg-bubble">
-                          {/* ⋯ menu for my messages */}
-                          {canMenu && (
-                            <div
-                              className="msg-more"
-                              ref={(el) => {
-                                if (menuOpen) msgMenuRef.current = el;
+                        {/* ✅ MENU рядом с bubble (НЕ внутри) */}
+                        {canMenu && !isEditing && (
+                          <div
+                            className={`msg-more ${menuOpen ? "is-open" : ""}`}
+                            ref={(el) => {
+                              if (menuOpen) msgMenuRef.current = el;
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="msg-more-btn"
+                              aria-label="Message menu"
+                              aria-haspopup="menu"
+                              aria-expanded={menuOpen}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMsgMenuId((cur) =>
+                                  cur === m.id ? null : m.id
+                                );
                               }}
                             >
-                              <button
-                                type="button"
-                                className="msg-more-btn"
-                                aria-label="Message menu"
-                                aria-haspopup="menu"
-                                aria-expanded={menuOpen}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMsgMenuId((cur) =>
-                                    cur === m.id ? null : m.id
-                                  );
-                                }}
-                              >
-                                ⋯
-                              </button>
+                              ⋯
+                            </button>
 
-                              {menuOpen && (
-                                <div className="msg-menu" role="menu">
+                            {menuOpen && (
+                              <div className="msg-menu" role="menu">
+                                {/* ✅ Reply always */}
+                                <button
+                                  type="button"
+                                  className="msg-menu-item"
+                                  role="menuitem"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    beginReply(m);
+                                  }}
+                                >
+                                  Reply
+                                </button>
+
+                                {/* ✅ Edit only mine */}
+                                {mine ? (
+                                  <button
+                                    type="button"
+                                    className="msg-menu-item"
+                                    role="menuitem"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      beginEdit(m);
+                                    }}
+                                  >
+                                    Edit
+                                  </button>
+                                ) : null}
+
+                                {/* ✅ Delete only mine */}
+                                {mine ? (
                                   <button
                                     type="button"
                                     className="msg-menu-item msg-menu-danger"
@@ -426,15 +619,80 @@ export default function Chats() {
                                       ? "Deleting…"
                                       : "Delete message"}
                                   </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          <div className="msg-text">{m.text}</div>
-                          <div className="msg-time">
-                            {formatTime(m.createdAt)}
+                                ) : null}
+                              </div>
+                            )}
                           </div>
+                        )}
+
+                        <div className="msg-bubble">
+                          {isEditing ? (
+                            <div className="msg-edit">
+                              <textarea
+                                ref={editInputRef}
+                                className="msg-edit-input"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                rows={2}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    cancelEdit();
+                                  }
+                                  if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    saveEdit(m.id);
+                                  }
+                                }}
+                                disabled={isSaving}
+                              />
+
+                              <div className="msg-edit-actions">
+                                <button
+                                  type="button"
+                                  className="msg-edit-btn msg-edit-cancel"
+                                  onClick={cancelEdit}
+                                  disabled={isSaving}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  className="msg-edit-btn msg-edit-save"
+                                  onClick={() => saveEdit(m.id)}
+                                  disabled={isSaving || !editValue.trim()}
+                                >
+                                  {isSaving ? "Saving…" : "Save"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              {/* ✅ reply block */}
+                              {reply ? (
+                                <div className="msg-reply">
+                                  <div className="msg-reply-bar" />
+                                  <div className="msg-reply-content">
+                                    <div className="msg-reply-title">
+                                      {getReplyAuthorLabel(reply.senderId)}
+                                    </div>
+                                    {/* NOTE: clip only for UI, full fix in CSS (2 lines) */}
+                                    <div className="msg-reply-text">
+                                      {clip(reply.text, 140)}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              <div className="msg-text">{m.text}</div>
+                              <div className="msg-time">
+                                {formatTime(m.createdAt)}
+                                {m.editedAt ? (
+                                  <span className="msg-edited"> • edited</span>
+                                ) : null}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -445,27 +703,59 @@ export default function Chats() {
 
               {/* composer */}
               <div className="chats-compose">
-                <input
-                  className="chats-input"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Message…"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  disabled={sending}
-                />
-                <button
-                  type="button"
-                  className="chats-send"
-                  onClick={handleSend}
-                  disabled={sending || !text.trim()}
-                >
-                  {sending ? "…" : "Send"}
-                </button>
+                {/* ✅ Reply bar (Telegram-style) */}
+                {replyTo ? (
+                  <div className="chats-replybar">
+                    <div className="chats-replybar-left">
+                      <div className="chats-replybar-title">
+                        Reply to{" "}
+                        {replyTo.senderId === me?.id
+                          ? "yourself"
+                          : activePeer?.displayName ||
+                            activePeer?.username ||
+                            "user"}
+                      </div>
+                      <div className="chats-replybar-text">
+                        {clip(replyTo.text, 220)}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="chats-replybar-close"
+                      onClick={cancelReply}
+                      aria-label="Cancel reply"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* ✅ input + send in one row */}
+                <div className="chats-compose-row">
+                  <input
+                    className="chats-input"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Message…"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    disabled={sending}
+                  />
+
+                  <button
+                    type="button"
+                    className="chats-send"
+                    onClick={handleSend}
+                    disabled={sending || !text.trim()}
+                  >
+                    {sending ? "…" : "Send"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
