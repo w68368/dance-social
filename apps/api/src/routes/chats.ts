@@ -1,10 +1,28 @@
 // apps/api/src/routes/chats.ts
 import { Router } from "express";
 import { z } from "zod";
+import path from "path";
+import fs from "fs";
+import multer from "multer";
+
 import { prisma } from "../lib/prisma.js";
+import { cloudinary } from "../lib/cloudinary.js";
 import { requireAuth, type AuthedRequest } from "../middlewares/requireAuth.js";
 
 const router = Router();
+
+/**
+ * Chat media upload (local temp -> Cloudinary)
+ */
+const chatMediaDir = path.join(process.cwd(), "uploads", "chat-media");
+if (!fs.existsSync(chatMediaDir)) fs.mkdirSync(chatMediaDir, { recursive: true });
+
+const uploadChatMedia = multer({
+  dest: chatMediaDir,
+  limits: {
+    fileSize: (Number(process.env.MAX_CHAT_UPLOAD_MB) || 30) * 1024 * 1024, // default 30MB
+  },
+});
 
 /**
  * Reply payload (short preview)
@@ -15,6 +33,8 @@ const replySelect = {
   createdAt: true,
   editedAt: true,
   senderId: true,
+  mediaType: true,
+  mediaUrl: true,
 } as const;
 
 /**
@@ -26,9 +46,39 @@ const messageSelect = {
   createdAt: true,
   editedAt: true,
   senderId: true,
+  mediaType: true,
+  mediaUrl: true,
   replyToId: true,
   replyTo: { select: replySelect },
 } as const;
+
+async function ensureMember(conversationId: string, userId: string) {
+  const isMember = await prisma.conversationParticipant.findFirst({
+    where: { conversationId, userId },
+    select: { id: true },
+  });
+  return Boolean(isMember);
+}
+
+async function validateReplyTarget(replyToId: string, convId: string) {
+  const target = await prisma.message.findUnique({
+    where: { id: replyToId },
+    select: { id: true, conversationId: true },
+  });
+  return Boolean(target && target.conversationId === convId);
+}
+
+function safeUnlink(filePath: string) {
+  try {
+    fs.unlinkSync(filePath);
+  } catch {}
+}
+
+function getMulterFiles(req: AuthedRequest): Express.Multer.File[] {
+  // multer adds req.files dynamically; keep handler signature compatible with express overloads
+  const anyReq = req as unknown as { files?: Express.Multer.File[] };
+  return anyReq.files ?? [];
+}
 
 /**
  * Create or get DM conversation with userId.
@@ -101,7 +151,12 @@ router.get("/conversations", requireAuth, async (req: AuthedRequest, res) => {
       participants: {
         include: {
           user: {
-            select: { id: true, username: true, displayName: true, avatarUrl: true },
+            select: {
+              id: true,
+              username: true,
+              displayName: true,
+              avatarUrl: true,
+            },
           },
         },
       },
@@ -114,7 +169,9 @@ router.get("/conversations", requireAuth, async (req: AuthedRequest, res) => {
           createdAt: true,
           editedAt: true,
           senderId: true,
-          replyToId: true, // ✅
+          replyToId: true,
+          mediaType: true,
+          mediaUrl: true,
         },
       },
     },
@@ -147,16 +204,14 @@ router.get(
     const meId = req.userId;
     const convId = req.params.id;
 
-    const isMember = await prisma.conversationParticipant.findFirst({
-      where: { conversationId: convId, userId: meId },
-      select: { id: true },
-    });
-    if (!isMember) return res.status(403).json({ ok: false, message: "Forbidden" });
+    const isMember = await ensureMember(convId, meId);
+    if (!isMember)
+      return res.status(403).json({ ok: false, message: "Forbidden" });
 
     const messages = await prisma.message.findMany({
       where: { conversationId: convId },
       orderBy: { createdAt: "asc" },
-      select: messageSelect, // ✅ replyTo included
+      select: messageSelect,
     });
 
     return res.json({ ok: true, messages });
@@ -164,7 +219,7 @@ router.get(
 );
 
 /**
- * Send message (supports replyToId)
+ * Send text message (supports replyToId)
  */
 router.post(
   "/conversations/:id/messages",
@@ -184,26 +239,18 @@ router.post(
     if (!parsed.success)
       return res.status(400).json({ ok: false, message: "Invalid message" });
 
-    const isMember = await prisma.conversationParticipant.findFirst({
-      where: { conversationId: convId, userId: meId },
-      select: { id: true },
-    });
-    if (!isMember) return res.status(403).json({ ok: false, message: "Forbidden" });
+    const isMember = await ensureMember(convId, meId);
+    if (!isMember)
+      return res.status(403).json({ ok: false, message: "Forbidden" });
 
     const replyToId = parsed.data.replyToId;
 
-    // ✅ validate reply target belongs to the same conversation
     if (replyToId) {
-      const target = await prisma.message.findUnique({
-        where: { id: replyToId },
-        select: { id: true, conversationId: true },
-      });
-
-      if (!target || target.conversationId !== convId) {
+      const ok = await validateReplyTarget(replyToId, convId);
+      if (!ok)
         return res
           .status(400)
           .json({ ok: false, message: "Invalid reply target" });
-      }
     }
 
     const msg = await prisma.message.create({
@@ -212,11 +259,12 @@ router.post(
         senderId: meId,
         text: parsed.data.text,
         replyToId: replyToId ?? null,
+        mediaType: null,
+        mediaUrl: null,
       },
-      select: messageSelect, // ✅ includes replyTo
+      select: messageSelect,
     });
 
-    // bump updatedAt
     await prisma.conversation.update({
       where: { id: convId },
       data: { updatedAt: new Date() },
@@ -224,6 +272,126 @@ router.post(
     });
 
     return res.json({ ok: true, message: msg });
+  }
+);
+
+/**
+ * Send media message(s) (image/video), multiple files in one request.
+ * POST /api/chats/conversations/:id/messages/media
+ * multipart/form-data:
+ * - media: File[] (required)
+ * - text: string (optional)  -> goes into the FIRST created message
+ * - replyToId: string (optional)
+ */
+router.post(
+  "/conversations/:id/messages/media",
+  requireAuth,
+  uploadChatMedia.array("media", 10),
+  async (req: AuthedRequest, res) => {
+    if (!req.userId)
+      return res.status(401).json({ ok: false, message: "Unauthorized" });
+
+    const meId = req.userId;
+    const convId = req.params.id;
+
+    const isMember = await ensureMember(convId, meId);
+    if (!isMember)
+      return res.status(403).json({ ok: false, message: "Forbidden" });
+
+    const files = getMulterFiles(req);
+    if (!files.length) {
+      return res
+        .status(400)
+        .json({ ok: false, message: "No media files provided" });
+    }
+
+    const schema = z.object({
+      text: z.string().trim().max(2000).optional(),
+      replyToId: z.string().trim().min(1).optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      for (const f of files) safeUnlink(f.path);
+      return res.status(400).json({ ok: false, message: "Invalid payload" });
+    }
+
+    const replyToId = parsed.data.replyToId;
+    if (replyToId) {
+      const ok = await validateReplyTarget(replyToId, convId);
+      if (!ok) {
+        for (const f of files) safeUnlink(f.path);
+        return res
+          .status(400)
+          .json({ ok: false, message: "Invalid reply target" });
+      }
+    }
+
+    // validate mimetypes
+    for (const f of files) {
+      const ok =
+        f.mimetype.startsWith("image/") || f.mimetype.startsWith("video/");
+      if (!ok) {
+        for (const x of files) safeUnlink(x.path);
+        return res.status(400).json({
+          ok: false,
+          message: "Only images and videos are supported",
+        });
+      }
+    }
+
+    try {
+      const uploads = await Promise.all(
+        files.map((f) =>
+          cloudinary.uploader.upload(f.path, {
+            resource_type: "auto",
+            folder: process.env.CLOUDINARY_UPLOAD_FOLDER || "stepunity/chats",
+          })
+        )
+      );
+
+      const text = (parsed.data.text ?? "").trim();
+
+      const created = await prisma.$transaction(async (tx) => {
+        const msgs = [];
+
+        for (let i = 0; i < uploads.length; i++) {
+          const u = uploads[i];
+          const isVideo = files[i].mimetype.startsWith("video/");
+
+          const msg = await tx.message.create({
+            data: {
+              conversationId: convId,
+              senderId: meId,
+              // put optional text only on the first message
+              text: i === 0 ? text : "",
+              replyToId: replyToId ?? null,
+              mediaType: isVideo ? "video" : "image",
+              mediaUrl: u.secure_url,
+            },
+            select: messageSelect,
+          });
+
+          msgs.push(msg);
+        }
+
+        await tx.conversation.update({
+          where: { id: convId },
+          data: { updatedAt: new Date() },
+          select: { id: true },
+        });
+
+        return msgs;
+      });
+
+      return res.json({ ok: true, messages: created });
+    } catch (err) {
+      console.error("Send multi media message error", err);
+      return res
+        .status(500)
+        .json({ ok: false, message: "Failed to upload media" });
+    } finally {
+      for (const f of files) safeUnlink(f.path);
+    }
   }
 );
 
@@ -247,17 +415,15 @@ router.delete(
       });
 
       if (!msg) {
-        return res.status(404).json({ ok: false, message: "Message not found" });
+        return res
+          .status(404)
+          .json({ ok: false, message: "Message not found" });
       }
 
-      // safety: ensure deleter is still a participant
-      const isMember = await prisma.conversationParticipant.findFirst({
-        where: { conversationId: msg.conversationId, userId: req.userId },
-        select: { id: true },
-      });
-      if (!isMember) return res.status(403).json({ ok: false, message: "Forbidden" });
+      const isMember = await ensureMember(msg.conversationId, req.userId);
+      if (!isMember)
+        return res.status(403).json({ ok: false, message: "Forbidden" });
 
-      // only sender can delete
       if (msg.senderId !== req.userId) {
         return res.status(403).json({ ok: false, message: "Forbidden" });
       }
@@ -275,7 +441,7 @@ router.delete(
 );
 
 /**
- * PATCH edit own message
+ * PATCH edit own message (text only)
  * PATCH /api/chats/messages/:messageId
  */
 router.patch(
@@ -299,17 +465,15 @@ router.patch(
       });
 
       if (!msg) {
-        return res.status(404).json({ ok: false, message: "Message not found" });
+        return res
+          .status(404)
+          .json({ ok: false, message: "Message not found" });
       }
 
-      // safety: ensure editor is still a participant
-      const isMember = await prisma.conversationParticipant.findFirst({
-        where: { conversationId: msg.conversationId, userId: req.userId },
-        select: { id: true },
-      });
-      if (!isMember) return res.status(403).json({ ok: false, message: "Forbidden" });
+      const isMember = await ensureMember(msg.conversationId, req.userId);
+      if (!isMember)
+        return res.status(403).json({ ok: false, message: "Forbidden" });
 
-      // only sender can edit
       if (msg.senderId !== req.userId) {
         return res.status(403).json({ ok: false, message: "Forbidden" });
       }
@@ -317,10 +481,9 @@ router.patch(
       const updated = await prisma.message.update({
         where: { id: messageId },
         data: { text: parsed.data.text, editedAt: new Date() },
-        select: messageSelect, // ✅ includes replyTo
+        select: messageSelect,
       });
 
-      // bump updatedAt
       await prisma.conversation.update({
         where: { id: msg.conversationId },
         data: { updatedAt: new Date() },

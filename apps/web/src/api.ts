@@ -677,24 +677,26 @@ export async function editConversationMessage(messageId: string, text: string) {
 // ✅ Send message with media (image/video) - multipart/form-data
 export async function sendConversationMedia(
   conversationId: string,
-  file: File,
+  files: File[],
   text?: string,
-  replyToId?: string | null
-) {
-  const form = new FormData();
-  form.append("media", file);
-  if (text && text.trim()) form.append("text", text.trim());
-  if (replyToId) form.append("replyToId", replyToId);
+  replyToId?: string
+): Promise<ChatMessage[]> {
+  const fd = new FormData();
 
-  const { data } = await api.post<{
-    ok: boolean;
-    message: ChatMessage;
-    error?: string;
-  }>(`/chats/conversations/${conversationId}/messages/media`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  for (const f of files) fd.append("media", f); // ✅ same key as backend
+  if (text && text.trim()) fd.append("text", text.trim());
+  if (replyToId) fd.append("replyToId", replyToId);
 
-  if (!data.ok) throw new Error(data.error || "Failed to send media");
-  return data.message;
+  const { data } = await api.post(
+    `/chats/conversations/${conversationId}/messages/media`,
+    fd,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+
+  // backend returns { ok: true, messages: [...] }
+  return data.messages as ChatMessage[];
 }
+
+
+
 

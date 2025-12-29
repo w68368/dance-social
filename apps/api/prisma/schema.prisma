@@ -308,9 +308,14 @@ model Message {
   sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
   senderId       String
 
-  text           String
+  // Text (может быть пустым/опциональным, если сообщение только с медиа)
+  text           String       @default("")
   createdAt      DateTime     @default(now())
   editedAt       DateTime?
+
+  // ✅ Media (image/video)
+  mediaType      String?
+  mediaUrl       String?
 
   // Reply
   replyToId      String?
@@ -319,5 +324,7 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([replyToId])
+  @@index([senderId, createdAt])
 }
+
 

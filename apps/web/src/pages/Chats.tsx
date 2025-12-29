@@ -6,7 +6,7 @@ import {
   fetchConversationMessages,
   openDm,
   sendConversationMessage,
-  sendConversationMedia, // ✅ media
+  sendConversationMedia, // ✅ now should support multiple files + text + replyToId
   deleteChatMessage,
   editConversationMessage,
   type ChatConversationListItem,
@@ -91,6 +91,15 @@ function extractMedia(m: any): { url: string | null; type: "image" | "video" | n
   return { url: null, type: null };
 }
 
+type PendingFile = {
+  id: string;
+  file: File;
+  localUrl: string;
+  kind: "image" | "video";
+  name: string;
+  size: number;
+};
+
 export default function Chats() {
   const me = getUser();
   const navigate = useNavigate();
@@ -110,8 +119,9 @@ export default function Chats() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
-  // ✅ upload state
-  const [uploading, setUploading] = useState(false);
+  // ✅ upload state (now: pending attachments)
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [uploading, setUploading] = useState(false); // sending attachments
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // --- message menu
@@ -157,6 +167,16 @@ export default function Chats() {
           setEditValue("");
         }
         if (replyTo) setReplyTo(null);
+
+        // close pending attachments too (like Telegram)
+        if (pendingFiles.length) {
+          for (const p of pendingFiles) {
+            try {
+              URL.revokeObjectURL(p.localUrl);
+            } catch {}
+          }
+          setPendingFiles([]);
+        }
       }
     }
 
@@ -166,7 +186,7 @@ export default function Chats() {
       document.removeEventListener("mousedown", onDocMouseDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [openMsgMenuId, editingMsgId, replyTo]);
+  }, [openMsgMenuId, editingMsgId, replyTo, pendingFiles]);
 
   // focus edit input when start editing
   useEffect(() => {
@@ -242,6 +262,16 @@ export default function Chats() {
         setOpenMsgMenuId(null);
         setReplyTo(null);
 
+        // clear pending attachments when switching chats
+        if (pendingFiles.length) {
+          for (const p of pendingFiles) {
+            try {
+              URL.revokeObjectURL(p.localUrl);
+            } catch {}
+          }
+          setPendingFiles([]);
+        }
+
         const fromList = conversations.find((c) => c.id === activeConvId);
         if (fromList?.peer) setActivePeer(fromList.peer);
       } catch (e: any) {
@@ -251,7 +281,7 @@ export default function Chats() {
         setTimeout(scrollToBottom, 0);
       }
     })();
-  }, [activeConvId, conversations]);
+  }, [activeConvId, conversations]); // keep your behavior
 
   useEffect(() => {
     scrollToBottom();
@@ -266,6 +296,16 @@ export default function Chats() {
     setEditingMsgId(null);
     setEditValue("");
     setReplyTo(null);
+
+    // clear pending attachments
+    if (pendingFiles.length) {
+      for (const p of pendingFiles) {
+        try {
+          URL.revokeObjectURL(p.localUrl);
+        } catch {}
+      }
+      setPendingFiles([]);
+    }
 
     if (c.peer?.id) navigate(`/chats/${c.peer.id}`);
     else navigate(`/chats`);
@@ -288,10 +328,8 @@ export default function Chats() {
     return peerName || "User";
   };
 
-  const handleSend = async () => {
+  const handleSendTextOnly = async (trimmed: string) => {
     if (!activeConvId) return;
-    const trimmed = text.trim();
-    if (!trimmed) return;
 
     setSending(true);
     setChatError(null);
@@ -351,6 +389,146 @@ export default function Chats() {
       setText(trimmed);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!activeConvId) return;
+
+    const trimmed = text.trim();
+    const hasText = trimmed.length > 0;
+    const hasFiles = pendingFiles.length > 0;
+
+    if (!hasText && !hasFiles) return;
+
+    // if no files -> old behavior
+    if (!hasFiles) {
+      await handleSendTextOnly(trimmed);
+      return;
+    }
+
+    // ✅ files exist -> send attachments (and optional text as caption)
+    setUploading(true);
+    setChatError(null);
+
+    const replyToId = replyTo?.id ?? null;
+
+    // optimistic: create temporary messages for each pending file
+    const tmpBase = Date.now();
+    const optimisticMedia: MessageVM[] = pendingFiles.map((p, idx) => ({
+      id: `tmp_${tmpBase}_${idx}`,
+      text: idx === 0 ? trimmed : "",
+      createdAt: new Date().toISOString(),
+      editedAt: null,
+      senderId: me?.id || "me",
+      replyToId,
+      replyTo: replyTo
+        ? {
+            id: replyTo.id,
+            text: replyTo.text,
+            createdAt: replyTo.createdAt,
+            senderId: replyTo.senderId,
+          }
+        : null,
+      mediaType: p.kind,
+      mediaUrl: p.localUrl,
+    }));
+
+    setMessages((prev) => [...prev, ...optimisticMedia]);
+
+    // clear composer immediately (like Telegram)
+    setText("");
+    setReplyTo(null);
+
+    try {
+        const files = pendingFiles.map((p) => p.file);
+
+        // backend returns { ok: true, messages: Message[] }
+        const created = (await sendConversationMedia(
+          activeConvId,
+          files,
+          trimmed,
+          replyToId ?? undefined // ✅ FIX: null -> undefined
+        )) as any as MessageVM[];
+
+
+      // replace temporary messages with real ones (by order)
+      setMessages((prev) => {
+        const next = [...prev];
+        for (let i = 0; i < optimisticMedia.length; i++) {
+          const tmpId = optimisticMedia[i].id;
+          const real = created[i];
+          const idx = next.findIndex((m) => m.id === tmpId);
+          if (idx >= 0) {
+            // merge to keep preview if server doesn't return media fields for some reason
+            const serverMedia = extractMedia(real);
+            const optMedia = extractMedia(optimisticMedia[i]);
+            next[idx] = {
+              ...optimisticMedia[i],
+              ...real,
+              mediaUrl: serverMedia.url ?? optMedia.url,
+              mediaType: serverMedia.type ?? optMedia.type,
+            };
+          } else if (real) {
+            next.push(real);
+          }
+        }
+        return next;
+      });
+
+      // update conversations list preview with LAST created message
+      const lastCreated = created[created.length - 1] ?? null;
+      if (lastCreated) {
+        const lastMedia = extractMedia(lastCreated);
+        const previewText =
+          (lastCreated.text && lastCreated.text.trim()) ||
+          (lastMedia.type === "image"
+            ? "📷 Photo"
+            : lastMedia.type === "video"
+            ? "🎥 Video"
+            : "Media");
+
+        setConversations((prev) => {
+          const next = prev.map((x) =>
+            x.id === activeConvId
+              ? {
+                  ...x,
+                  updatedAt: new Date().toISOString(),
+                  lastMessage: {
+                    id: lastCreated.id,
+                    text: previewText,
+                    createdAt: lastCreated.createdAt,
+                    editedAt: (lastCreated as any)?.editedAt ?? null,
+                    senderId: lastCreated.senderId,
+                  },
+                }
+              : x
+          );
+          next.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+          return next;
+        });
+      }
+
+      // ✅ clear pending attachments and revoke local blob urls
+      for (const p of pendingFiles) {
+        try {
+          URL.revokeObjectURL(p.localUrl);
+        } catch {}
+      }
+      setPendingFiles([]);
+    } catch (e: any) {
+      setChatError(e?.message || "Failed to send media.");
+
+      // rollback optimistic media messages
+      const tmpIds = new Set(optimisticMedia.map((m) => m.id));
+      setMessages((prev) => prev.filter((m) => !tmpIds.has(m.id)));
+
+      // keep attachments + text so user can retry
+      setText(trimmed);
+      setReplyTo(replyTo); // leave as-is
+    } finally {
+      setUploading(false);
+      setTimeout(scrollToBottom, 0);
     }
   };
 
@@ -466,132 +644,75 @@ export default function Chats() {
   };
 
   // ==========================
-  // ✅ MEDIA SENDING
+  // ✅ MEDIA PICKING (draft attachments)
   // ==========================
   const pickMedia = () => {
     if (!activeConvId) return;
     fileInputRef.current?.click();
   };
 
-  const handlePickFile = async (file: File) => {
-    if (!activeConvId) return;
+  const addPickedFiles = (files: File[]) => {
+    if (!files.length) return;
 
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-    if (!isImage && !isVideo) {
+    // validate & map
+    const next: PendingFile[] = [];
+    for (const file of files) {
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+      if (!isImage && !isVideo) continue;
+
+      const localUrl = URL.createObjectURL(file);
+      next.push({
+        id: `pf_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        file,
+        localUrl,
+        kind: isImage ? "image" : "video",
+        name: file.name,
+        size: file.size,
+      });
+    }
+
+    if (!next.length) {
       setChatError("Please select an image or video file.");
       return;
     }
 
-    setUploading(true);
     setChatError(null);
+    setPendingFiles((prev) => {
+      const merged = [...prev, ...next];
+      // limit to 10
+      if (merged.length <= 10) return merged;
 
-    const localUrl = URL.createObjectURL(file);
-
-    const optimistic: MessageVM = {
-      id: `tmp_${Date.now()}`,
-      text: text.trim(), // caption
-      createdAt: new Date().toISOString(),
-      editedAt: null,
-      senderId: me?.id || "me",
-      replyToId: replyTo?.id ?? null,
-      replyTo: replyTo
-        ? {
-            id: replyTo.id,
-            text: replyTo.text,
-            createdAt: replyTo.createdAt,
-            senderId: replyTo.senderId,
-          }
-        : null,
-      mediaType: isImage ? "image" : "video",
-      mediaUrl: localUrl,
-    };
-
-    setMessages((prev) => [...prev, optimistic]);
-    setText("");
-    setReplyTo(null);
-
-    let realMsg: MessageVM | null = null;
-
-    try {
-      realMsg = (await sendConversationMedia(
-        activeConvId,
-        file,
-        optimistic.text,
-        optimistic.replyToId ?? null
-      )) as any as MessageVM;
-
-      // ✅ FIX: merge instead of raw replace (keeps local preview if server doesn't return url/type)
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (m.id !== optimistic.id) return m;
-
-          const serverMedia = extractMedia(realMsg);
-          const optimisticMedia = extractMedia(optimistic);
-
-          const merged: MessageVM = {
-            ...optimistic,
-            ...realMsg,
-
-            // keep media visible no matter what server returns
-            mediaUrl: serverMedia.url ?? optimisticMedia.url,
-            mediaType: serverMedia.type ?? optimisticMedia.type,
-
-            // also keep alternates if server uses them
-            imageUrl: (realMsg as any).imageUrl ?? (optimistic as any).imageUrl ?? null,
-            videoUrl: (realMsg as any).videoUrl ?? (optimistic as any).videoUrl ?? null,
-            fileUrl: (realMsg as any).fileUrl ?? (optimistic as any).fileUrl ?? null,
-            fileType: (realMsg as any).fileType ?? (optimistic as any).fileType ?? null,
-          };
-
-          return merged;
-        })
-      );
-
-      // ✅ update list preview
-      setConversations((prev) => {
-        const previewText =
-          (realMsg?.text && realMsg.text.trim()) ||
-          (extractMedia(realMsg).type === "image" ? "📷 Photo" : extractMedia(realMsg).type === "video" ? "🎥 Video" : "Media");
-
-        const next = prev.map((x) =>
-          x.id === activeConvId
-            ? {
-                ...x,
-                updatedAt: new Date().toISOString(),
-                lastMessage: {
-                  id: realMsg!.id,
-                  text: previewText,
-                  createdAt: realMsg!.createdAt,
-                  editedAt: (realMsg as any)?.editedAt ?? null,
-                  senderId: realMsg!.senderId,
-                },
-              }
-            : x
-        );
-
-        next.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
-        return next;
-      });
-    } catch (e: any) {
-      setChatError(e?.message || "Failed to send media.");
-      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-      // cleanup local URL on failure
-      try {
-        URL.revokeObjectURL(localUrl);
-      } catch {}
-    } finally {
-      setUploading(false);
-
-      // ✅ If server returned its own url, we can revoke local blob url safely.
-      // If not, keep it (so preview keeps working).
-      const serverHasUrl = !!extractMedia(realMsg).url;
-      if (serverHasUrl) {
+      // revoke extra urls
+      const extra = merged.slice(10);
+      for (const p of extra) {
         try {
-          URL.revokeObjectURL(localUrl);
+          URL.revokeObjectURL(p.localUrl);
         } catch {}
       }
+      return merged.slice(0, 10);
+    });
+  };
+
+  const removePending = (id: string) => {
+    setPendingFiles((prev) => {
+      const found = prev.find((x) => x.id === id);
+      if (found) {
+        try {
+          URL.revokeObjectURL(found.localUrl);
+        } catch {}
+      }
+      return prev.filter((x) => x.id !== id);
+    });
+  };
+
+  const clearPending = () => {
+    for (const p of pendingFiles) {
+      try {
+        URL.revokeObjectURL(p.localUrl);
+      } catch {}
     }
+    setPendingFiles([]);
   };
 
   return (
@@ -718,7 +839,7 @@ export default function Chats() {
 
                     return (
                       <div key={m.id} className={`msg ${mine ? "msg--mine" : "msg--theirs"}`}>
-                        {/* ✅ menu near bubble */}
+                        {/* menu near bubble */}
                         {canMenu && !isEditing && (
                           <div
                             className={`msg-more ${menuOpen ? "is-open" : ""}`}
@@ -830,7 +951,7 @@ export default function Chats() {
                             </div>
                           ) : (
                             <>
-                              {/* ✅ reply block */}
+                              {/* reply block */}
                               {reply ? (
                                 <div className="msg-reply">
                                   <div className="msg-reply-bar" />
@@ -843,9 +964,14 @@ export default function Chats() {
                                 </div>
                               ) : null}
 
-                              {/* ✅ media (universal) */}
+                              {/* media */}
                               {media.url && media.type === "image" ? (
-                                <a className="msg-media" href={media.url} target="_blank" rel="noreferrer">
+                                <a
+                                  className="msg-media"
+                                  href={media.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
                                   <img className="msg-media-img" src={media.url} alt="image" />
                                 </a>
                               ) : null}
@@ -859,7 +985,9 @@ export default function Chats() {
                               <div className="msg-text">{m.text}</div>
                               <div className="msg-time">
                                 {formatTime(m.createdAt)}
-                                {(m as any).editedAt ? <span className="msg-edited"> • edited</span> : null}
+                                {(m as any).editedAt ? (
+                                  <span className="msg-edited"> • edited</span>
+                                ) : null}
                               </div>
                             </>
                           )}
@@ -873,7 +1001,7 @@ export default function Chats() {
 
               {/* composer */}
               <div className="chats-compose">
-                {/* ✅ Reply bar (Telegram-style) */}
+                {/* Reply bar */}
                 {replyTo ? (
                   <div className="chats-replybar">
                     <div className="chats-replybar-left">
@@ -897,9 +1025,51 @@ export default function Chats() {
                   </div>
                 ) : null}
 
-                {/* ✅ input + send in one row */}
+                {/* ✅ Attachments draft (only shows when user picked files) */}
+                {pendingFiles.length > 0 ? (
+                  <div className="chat-attachments">
+                    <div className="chat-attachments-head">
+                      <div className="chat-attachments-title">
+                        Attachments ({pendingFiles.length})
+                      </div>
+                      <button
+                        type="button"
+                        className="chat-attachments-clear"
+                        onClick={clearPending}
+                        disabled={sending || uploading}
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    <div className="chat-attachments-list">
+                      {pendingFiles.map((p) => (
+                        <div className="chat-attachment" key={p.id}>
+                          {p.kind === "image" ? (
+                            <img className="chat-attachment-img" src={p.localUrl} alt={p.name} />
+                          ) : (
+                            <video className="chat-attachment-video" src={p.localUrl} />
+                          )}
+
+                          <button
+                            type="button"
+                            className="chat-attachment-remove"
+                            onClick={() => removePending(p.id)}
+                            disabled={sending || uploading}
+                            aria-label="Remove attachment"
+                            title="Remove"
+                          >
+                            <FiX />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* input + send in one row */}
                 <div className="chats-compose-row">
-                  {/* ✅ attach */}
+                  {/* attach */}
                   <button
                     type="button"
                     className="chats-attach"
@@ -915,12 +1085,13 @@ export default function Chats() {
                     ref={fileInputRef}
                     type="file"
                     accept="image/*,video/*"
+                    multiple
                     className="chats-file"
                     hidden
                     onChange={(e) => {
-                      const f = e.target.files?.[0];
+                      const picked = Array.from(e.target.files ?? []);
                       e.currentTarget.value = "";
-                      if (f) handlePickFile(f);
+                      if (picked.length) addPickedFiles(picked);
                     }}
                   />
 
@@ -928,7 +1099,7 @@ export default function Chats() {
                     className="chats-input"
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder={uploading ? "Uploading…" : "Message…"}
+                    placeholder={uploading ? "Sending…" : pendingFiles.length ? "Add a caption…" : "Message…"}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -942,7 +1113,7 @@ export default function Chats() {
                     type="button"
                     className="chats-send"
                     onClick={handleSend}
-                    disabled={sending || uploading || !text.trim()}
+                    disabled={sending || uploading || (!text.trim() && pendingFiles.length === 0)}
                     title="Send"
                     aria-label="Send"
                   >

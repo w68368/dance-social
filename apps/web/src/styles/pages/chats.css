@@ -739,6 +739,156 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+/* ==========================
+   Attachments (draft preview)
+========================== */
+
+.chat-attachments {
+  margin: 10px 0 8px;
+  padding: 10px 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+}
+
+.chat-attachments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.chat-attachments-title {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.92;
+}
+
+.chat-attachments-clear {
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
+}
+
+.chat-attachments-clear:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.chat-attachments-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* horizontal scroller */
+.chat-attachments-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.chat-attachments-list::-webkit-scrollbar {
+  height: 8px;
+}
+.chat-attachments-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+}
+.chat-attachments-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+/* single thumb */
+.chat-attachment {
+  position: relative;
+  flex: 0 0 auto;
+  width: 104px;
+  height: 104px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+}
+
+.chat-attachment::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.35),
+    rgba(0, 0, 0, 0.0) 55%
+  );
+  pointer-events: none;
+}
+
+.chat-attachment-img,
+.chat-attachment-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* videos should not autoplay in preview */
+.chat-attachment-video {
+  pointer-events: none;
+}
+
+/* remove button (top-right) */
+.chat-attachment-remove {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.45);
+  color: inherit;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
+}
+
+.chat-attachment-remove:hover {
+  transform: scale(1.06);
+  background: rgba(0, 0, 0, 0.60);
+}
+
+.chat-attachment-remove:active {
+  transform: scale(0.98);
+}
+
+.chat-attachment-remove:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Make composer spacing nicer when attachments shown */
+.chats-compose {
+  padding-top: 8px;
+}
+
+/* Optional: a bit nicer placeholder when attachments exist */
+.chats-input::placeholder {
+  opacity: 0.7;
+}
 
 
 /* ============================
