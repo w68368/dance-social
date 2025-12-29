@@ -692,6 +692,55 @@
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+/* attach button */
+.chats-attach {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  flex: 0 0 auto;
+}
+
+.chats-attach:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.chats-attach:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* media in message */
+.msg-media {
+  display: block;
+  margin-bottom: 8px;
+  max-width: 100%;
+}
+
+.msg-media-img {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 14px;
+  display: block;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.msg-media-video {
+  width: 100%;
+  max-width: 360px;
+  border-radius: 14px;
+  display: block;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+
+
 /* ============================
    Responsive
 ============================ */

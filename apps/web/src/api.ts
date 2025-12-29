@@ -574,16 +574,21 @@ export type ChatMessage = {
   id: string;
   text: string;
   createdAt: string;
-  editedAt?: string | null;
   senderId: string;
+  editedAt?: string | null;
 
-  replyToId?: string | null; // ✅
+  // ✅ reply
+  replyToId?: string | null;
   replyTo?: {
     id: string;
     text: string;
     createdAt: string;
     senderId: string;
-  } | null; // ✅
+  } | null;
+
+  // ✅ media
+  mediaType?: "image" | "video" | null;
+  mediaUrl?: string | null;
 };
 
 export async function openDm(userId: string) {
@@ -669,4 +674,27 @@ export async function editConversationMessage(messageId: string, text: string) {
   return data.message;
 }
 
+// ✅ Send message with media (image/video) - multipart/form-data
+export async function sendConversationMedia(
+  conversationId: string,
+  file: File,
+  text?: string,
+  replyToId?: string | null
+) {
+  const form = new FormData();
+  form.append("media", file);
+  if (text && text.trim()) form.append("text", text.trim());
+  if (replyToId) form.append("replyToId", replyToId);
+
+  const { data } = await api.post<{
+    ok: boolean;
+    message: ChatMessage;
+    error?: string;
+  }>(`/chats/conversations/${conversationId}/messages/media`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+  if (!data.ok) throw new Error(data.error || "Failed to send media");
+  return data.message;
+}
 

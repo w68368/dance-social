@@ -6,6 +6,7 @@ import {
   fetchConversationMessages,
   openDm,
   sendConversationMessage,
+  sendConversationMedia, // ✅ media
   deleteChatMessage,
   editConversationMessage,
   type ChatConversationListItem,
@@ -14,6 +15,18 @@ import {
 } from "../api";
 import { getUser } from "../lib/auth";
 import "../styles/pages/chats.css";
+
+// ✅ react-icons
+import {
+  FiMoreHorizontal,
+  FiPaperclip,
+  FiSend,
+  FiX,
+  FiTrash2,
+  FiEdit2,
+  FiCornerUpLeft,
+  FiRefreshCcw,
+} from "react-icons/fi";
 
 function formatTime(ts: string) {
   const d = new Date(ts);
@@ -26,28 +39,82 @@ function clip(s: string, n = 80) {
   return t.slice(0, n - 1) + "…";
 }
 
+/**
+ * ✅ We keep the imported ChatMessage, but the server may return different fields for media:
+ * - mediaUrl/mediaType
+ * - imageUrl/videoUrl
+ * - fileUrl/fileType
+ *
+ * This UI type allows any of them.
+ */
+type MessageVM = ChatMessage & {
+  editedAt?: string | null;
+  replyToId?: string | null;
+  replyTo?: any | null;
+
+  mediaUrl?: string | null;
+  mediaType?: "image" | "video" | null;
+
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+
+  fileUrl?: string | null;
+  fileType?: "image" | "video" | null;
+};
+
+/** ✅ Universal media extractor (works with any backend shape) */
+function extractMedia(m: any): { url: string | null; type: "image" | "video" | null } {
+  if (!m) return { url: null, type: null };
+
+  // preferred fields
+  if (typeof m.mediaUrl === "string" && m.mediaUrl) {
+    const t = m.mediaType === "image" || m.mediaType === "video" ? m.mediaType : null;
+    return { url: m.mediaUrl, type: t };
+  }
+
+  // common alternates
+  if (typeof m.imageUrl === "string" && m.imageUrl) return { url: m.imageUrl, type: "image" };
+  if (typeof m.videoUrl === "string" && m.videoUrl) return { url: m.videoUrl, type: "video" };
+
+  // generic file fields
+  if (typeof m.fileUrl === "string" && m.fileUrl) {
+    const t = m.fileType === "image" || m.fileType === "video" ? m.fileType : null;
+    return { url: m.fileUrl, type: t };
+  }
+
+  // sometimes server nests media: { url, type }
+  if (m.media && typeof m.media.url === "string" && m.media.url) {
+    const t = m.media.type === "image" || m.media.type === "video" ? m.media.type : null;
+    return { url: m.media.url, type: t };
+  }
+
+  return { url: null, type: null };
+}
+
 export default function Chats() {
   const me = getUser();
   const navigate = useNavigate();
   const { userId } = useParams<{ userId: string }>();
 
-  const [conversations, setConversations] = useState<ChatConversationListItem[]>(
-    []
-  );
+  const [conversations, setConversations] = useState<ChatConversationListItem[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
 
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [activePeer, setActivePeer] = useState<ChatPeer | null>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<MessageVM[]>([]);
   const [loadingChat, setLoadingChat] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
-  // --- message menu (⋯)
+  // ✅ upload state
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // --- message menu
   const [openMsgMenuId, setOpenMsgMenuId] = useState<string | null>(null);
   const msgMenuRef = useRef<HTMLDivElement | null>(null);
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
@@ -59,7 +126,7 @@ export default function Chats() {
   const editInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // ✅ reply state
-  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [replyTo, setReplyTo] = useState<MessageVM | null>(null);
 
   const listLoadedRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -77,11 +144,7 @@ export default function Chats() {
   useEffect(() => {
     function onDocMouseDown(e: MouseEvent) {
       const t = e.target as Node;
-      if (
-        openMsgMenuId &&
-        msgMenuRef.current &&
-        !msgMenuRef.current.contains(t)
-      ) {
+      if (openMsgMenuId && msgMenuRef.current && !msgMenuRef.current.contains(t)) {
         setOpenMsgMenuId(null);
       }
     }
@@ -171,7 +234,7 @@ export default function Chats() {
         setLoadingChat(true);
         setChatError(null);
         const { messages } = await fetchConversationMessages(activeConvId);
-        setMessages(messages);
+        setMessages((messages as any) ?? []);
 
         // reset ephemeral UI on chat switch
         setEditingMsgId(null);
@@ -208,6 +271,23 @@ export default function Chats() {
     else navigate(`/chats`);
   };
 
+  // ✅ Reply start (for any message)
+  const beginReply = (m: MessageVM) => {
+    if (m.id.startsWith("tmp_")) return;
+    setOpenMsgMenuId(null);
+    setEditingMsgId(null);
+    setEditValue("");
+    setReplyTo(m);
+  };
+  const cancelReply = () => setReplyTo(null);
+
+  // helper to display reply author label
+  const getReplyAuthorLabel = (senderId: string) => {
+    if (me && senderId === me.id) return "You";
+    const peerName = activePeer?.displayName || activePeer?.username;
+    return peerName || "User";
+  };
+
   const handleSend = async () => {
     if (!activeConvId) return;
     const trimmed = text.trim();
@@ -216,7 +296,7 @@ export default function Chats() {
     setSending(true);
     setChatError(null);
 
-    const optimistic: ChatMessage = {
+    const optimistic: MessageVM = {
       id: `tmp_${Date.now()}`,
       text: trimmed,
       createdAt: new Date().toISOString(),
@@ -238,15 +318,13 @@ export default function Chats() {
     setReplyTo(null);
 
     try {
-      const real = await sendConversationMessage(
+      const real = (await sendConversationMessage(
         activeConvId,
         trimmed,
         optimistic.replyToId ?? null
-      );
+      )) as any as MessageVM;
 
-      setMessages((prev) =>
-        prev.map((m) => (m.id === optimistic.id ? real : m))
-      );
+      setMessages((prev) => prev.map((m) => (m.id === optimistic.id ? real : m)));
 
       setConversations((prev) => {
         const next = prev.map((x) =>
@@ -258,7 +336,7 @@ export default function Chats() {
                   id: real.id,
                   text: real.text,
                   createdAt: real.createdAt,
-                  editedAt: real.editedAt ?? null,
+                  editedAt: (real as any).editedAt ?? null,
                   senderId: real.senderId,
                 },
               }
@@ -311,7 +389,7 @@ export default function Chats() {
     }
   };
 
-  const beginEdit = (m: ChatMessage) => {
+  const beginEdit = (m: MessageVM) => {
     if (!me) return;
     if (m.senderId !== me.id) return;
     if (m.id.startsWith("tmp_")) return;
@@ -351,17 +429,13 @@ export default function Chats() {
     const nowIso = new Date().toISOString();
 
     setMessages((cur) =>
-      cur.map((m) =>
-        m.id === messageId ? { ...m, text: newText, editedAt: nowIso } : m
-      )
+      cur.map((m) => (m.id === messageId ? { ...m, text: newText, editedAt: nowIso } : m))
     );
 
     try {
-      const updated = await editConversationMessage(messageId, newText);
+      const updated = (await editConversationMessage(messageId, newText)) as any as MessageVM;
 
-      setMessages((cur) =>
-        cur.map((m) => (m.id === messageId ? updated : m))
-      );
+      setMessages((cur) => cur.map((m) => (m.id === messageId ? updated : m)));
 
       if (activeConvId) {
         setConversations((cur) =>
@@ -374,7 +448,7 @@ export default function Chats() {
                 id: updated.id,
                 text: updated.text,
                 createdAt: updated.createdAt,
-                editedAt: updated.editedAt ?? null,
+                editedAt: (updated as any).editedAt ?? null,
                 senderId: updated.senderId,
               },
             };
@@ -391,22 +465,133 @@ export default function Chats() {
     }
   };
 
-  // ✅ Reply start (for any message)
-  const beginReply = (m: ChatMessage) => {
-    if (m.id.startsWith("tmp_")) return;
-    setOpenMsgMenuId(null);
-    setEditingMsgId(null);
-    setEditValue("");
-    setReplyTo(m);
+  // ==========================
+  // ✅ MEDIA SENDING
+  // ==========================
+  const pickMedia = () => {
+    if (!activeConvId) return;
+    fileInputRef.current?.click();
   };
 
-  const cancelReply = () => setReplyTo(null);
+  const handlePickFile = async (file: File) => {
+    if (!activeConvId) return;
 
-  // helper to display reply author label
-  const getReplyAuthorLabel = (senderId: string) => {
-    if (me && senderId === me.id) return "You";
-    const peerName = activePeer?.displayName || activePeer?.username;
-    return peerName || "User";
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      setChatError("Please select an image or video file.");
+      return;
+    }
+
+    setUploading(true);
+    setChatError(null);
+
+    const localUrl = URL.createObjectURL(file);
+
+    const optimistic: MessageVM = {
+      id: `tmp_${Date.now()}`,
+      text: text.trim(), // caption
+      createdAt: new Date().toISOString(),
+      editedAt: null,
+      senderId: me?.id || "me",
+      replyToId: replyTo?.id ?? null,
+      replyTo: replyTo
+        ? {
+            id: replyTo.id,
+            text: replyTo.text,
+            createdAt: replyTo.createdAt,
+            senderId: replyTo.senderId,
+          }
+        : null,
+      mediaType: isImage ? "image" : "video",
+      mediaUrl: localUrl,
+    };
+
+    setMessages((prev) => [...prev, optimistic]);
+    setText("");
+    setReplyTo(null);
+
+    let realMsg: MessageVM | null = null;
+
+    try {
+      realMsg = (await sendConversationMedia(
+        activeConvId,
+        file,
+        optimistic.text,
+        optimistic.replyToId ?? null
+      )) as any as MessageVM;
+
+      // ✅ FIX: merge instead of raw replace (keeps local preview if server doesn't return url/type)
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== optimistic.id) return m;
+
+          const serverMedia = extractMedia(realMsg);
+          const optimisticMedia = extractMedia(optimistic);
+
+          const merged: MessageVM = {
+            ...optimistic,
+            ...realMsg,
+
+            // keep media visible no matter what server returns
+            mediaUrl: serverMedia.url ?? optimisticMedia.url,
+            mediaType: serverMedia.type ?? optimisticMedia.type,
+
+            // also keep alternates if server uses them
+            imageUrl: (realMsg as any).imageUrl ?? (optimistic as any).imageUrl ?? null,
+            videoUrl: (realMsg as any).videoUrl ?? (optimistic as any).videoUrl ?? null,
+            fileUrl: (realMsg as any).fileUrl ?? (optimistic as any).fileUrl ?? null,
+            fileType: (realMsg as any).fileType ?? (optimistic as any).fileType ?? null,
+          };
+
+          return merged;
+        })
+      );
+
+      // ✅ update list preview
+      setConversations((prev) => {
+        const previewText =
+          (realMsg?.text && realMsg.text.trim()) ||
+          (extractMedia(realMsg).type === "image" ? "📷 Photo" : extractMedia(realMsg).type === "video" ? "🎥 Video" : "Media");
+
+        const next = prev.map((x) =>
+          x.id === activeConvId
+            ? {
+                ...x,
+                updatedAt: new Date().toISOString(),
+                lastMessage: {
+                  id: realMsg!.id,
+                  text: previewText,
+                  createdAt: realMsg!.createdAt,
+                  editedAt: (realMsg as any)?.editedAt ?? null,
+                  senderId: realMsg!.senderId,
+                },
+              }
+            : x
+        );
+
+        next.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+        return next;
+      });
+    } catch (e: any) {
+      setChatError(e?.message || "Failed to send media.");
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      // cleanup local URL on failure
+      try {
+        URL.revokeObjectURL(localUrl);
+      } catch {}
+    } finally {
+      setUploading(false);
+
+      // ✅ If server returned its own url, we can revoke local blob url safely.
+      // If not, keep it (so preview keeps working).
+      const serverHasUrl = !!extractMedia(realMsg).url;
+      if (serverHasUrl) {
+        try {
+          URL.revokeObjectURL(localUrl);
+        } catch {}
+      }
+    }
   };
 
   return (
@@ -416,13 +601,8 @@ export default function Chats() {
         <aside className="chats-sidebar">
           <div className="chats-sidebar-header">
             <div className="chats-title">Chats</div>
-            <button
-              className="chats-refresh"
-              type="button"
-              onClick={loadList}
-              title="Refresh"
-            >
-              ↻
+            <button className="chats-refresh" type="button" onClick={loadList} title="Refresh">
+              <FiRefreshCcw />
             </button>
           </div>
 
@@ -458,9 +638,7 @@ export default function Chats() {
                   <div className="chats-item-mid">
                     <div className="chats-item-top">
                       <div className="chats-name">{name}</div>
-                      <div className="chats-time">
-                        {formatTime(c.updatedAt)}
-                      </div>
+                      <div className="chats-time">{formatTime(c.updatedAt)}</div>
                     </div>
                     <div className="chats-last">{last}</div>
                   </div>
@@ -502,14 +680,10 @@ export default function Chats() {
                   </div>
                   <div>
                     <div className="chats-chat-peer-name">
-                      {activePeer?.displayName ||
-                        activePeer?.username ||
-                        "Chat"}
+                      {activePeer?.displayName || activePeer?.username || "Chat"}
                     </div>
                     {activePeer?.username && (
-                      <div className="chats-chat-peer-handle">
-                        @{activePeer.username}
-                      </div>
+                      <div className="chats-chat-peer-handle">@{activePeer.username}</div>
                     )}
                   </div>
                 </div>
@@ -527,9 +701,7 @@ export default function Chats() {
 
               {/* messages */}
               <div className="chats-messages">
-                {loadingChat && (
-                  <div className="chats-muted">Loading messages…</div>
-                )}
+                {loadingChat && <div className="chats-muted">Loading messages…</div>}
                 {chatError && <div className="chats-error">{chatError}</div>}
 
                 {!loadingChat &&
@@ -540,16 +712,13 @@ export default function Chats() {
                     const canMenu = !m.id.startsWith("tmp_");
                     const isEditing = editingMsgId === m.id;
                     const isSaving = savingEditId === m.id;
+                    const reply = (m as any).replyTo ?? null;
 
-                    // for display reply data
-                    const reply = m.replyTo ?? null;
+                    const media = extractMedia(m);
 
                     return (
-                      <div
-                        key={m.id}
-                        className={`msg ${mine ? "msg--mine" : "msg--theirs"}`}
-                      >
-                        {/* ✅ MENU рядом с bubble (НЕ внутри) */}
+                      <div key={m.id} className={`msg ${mine ? "msg--mine" : "msg--theirs"}`}>
+                        {/* ✅ menu near bubble */}
                         {canMenu && !isEditing && (
                           <div
                             className={`msg-more ${menuOpen ? "is-open" : ""}`}
@@ -565,17 +734,14 @@ export default function Chats() {
                               aria-expanded={menuOpen}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setOpenMsgMenuId((cur) =>
-                                  cur === m.id ? null : m.id
-                                );
+                                setOpenMsgMenuId((cur) => (cur === m.id ? null : m.id));
                               }}
                             >
-                              ⋯
+                              <FiMoreHorizontal />
                             </button>
 
                             {menuOpen && (
                               <div className="msg-menu" role="menu">
-                                {/* ✅ Reply always */}
                                 <button
                                   type="button"
                                   className="msg-menu-item"
@@ -585,10 +751,9 @@ export default function Chats() {
                                     beginReply(m);
                                   }}
                                 >
-                                  Reply
+                                  <FiCornerUpLeft /> Reply
                                 </button>
 
-                                {/* ✅ Edit only mine */}
                                 {mine ? (
                                   <button
                                     type="button"
@@ -599,11 +764,10 @@ export default function Chats() {
                                       beginEdit(m);
                                     }}
                                   >
-                                    Edit
+                                    <FiEdit2 /> Edit
                                   </button>
                                 ) : null}
 
-                                {/* ✅ Delete only mine */}
                                 {mine ? (
                                   <button
                                     type="button"
@@ -615,9 +779,7 @@ export default function Chats() {
                                     }}
                                     disabled={deletingMsgId === m.id}
                                   >
-                                    {deletingMsgId === m.id
-                                      ? "Deleting…"
-                                      : "Delete message"}
+                                    <FiTrash2 /> {deletingMsgId === m.id ? "Deleting…" : "Delete"}
                                   </button>
                                 ) : null}
                               </div>
@@ -676,20 +838,28 @@ export default function Chats() {
                                     <div className="msg-reply-title">
                                       {getReplyAuthorLabel(reply.senderId)}
                                     </div>
-                                    {/* NOTE: clip only for UI, full fix in CSS (2 lines) */}
-                                    <div className="msg-reply-text">
-                                      {clip(reply.text, 140)}
-                                    </div>
+                                    <div className="msg-reply-text">{clip(reply.text, 140)}</div>
                                   </div>
+                                </div>
+                              ) : null}
+
+                              {/* ✅ media (universal) */}
+                              {media.url && media.type === "image" ? (
+                                <a className="msg-media" href={media.url} target="_blank" rel="noreferrer">
+                                  <img className="msg-media-img" src={media.url} alt="image" />
+                                </a>
+                              ) : null}
+
+                              {media.url && media.type === "video" ? (
+                                <div className="msg-media">
+                                  <video className="msg-media-video" src={media.url} controls />
                                 </div>
                               ) : null}
 
                               <div className="msg-text">{m.text}</div>
                               <div className="msg-time">
                                 {formatTime(m.createdAt)}
-                                {m.editedAt ? (
-                                  <span className="msg-edited"> • edited</span>
-                                ) : null}
+                                {(m as any).editedAt ? <span className="msg-edited"> • edited</span> : null}
                               </div>
                             </>
                           )}
@@ -711,13 +881,9 @@ export default function Chats() {
                         Reply to{" "}
                         {replyTo.senderId === me?.id
                           ? "yourself"
-                          : activePeer?.displayName ||
-                            activePeer?.username ||
-                            "user"}
+                          : activePeer?.displayName || activePeer?.username || "user"}
                       </div>
-                      <div className="chats-replybar-text">
-                        {clip(replyTo.text, 220)}
-                      </div>
+                      <div className="chats-replybar-text">{clip(replyTo.text, 220)}</div>
                     </div>
 
                     <button
@@ -726,34 +892,61 @@ export default function Chats() {
                       onClick={cancelReply}
                       aria-label="Cancel reply"
                     >
-                      ✕
+                      <FiX />
                     </button>
                   </div>
                 ) : null}
 
                 {/* ✅ input + send in one row */}
                 <div className="chats-compose-row">
+                  {/* ✅ attach */}
+                  <button
+                    type="button"
+                    className="chats-attach"
+                    onClick={pickMedia}
+                    disabled={!activeConvId || sending || uploading}
+                    title="Attach photo or video"
+                    aria-label="Attach"
+                  >
+                    <FiPaperclip />
+                  </button>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    className="chats-file"
+                    hidden
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.currentTarget.value = "";
+                      if (f) handlePickFile(f);
+                    }}
+                  />
+
                   <input
                     className="chats-input"
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder="Message…"
+                    placeholder={uploading ? "Uploading…" : "Message…"}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         handleSend();
                       }
                     }}
-                    disabled={sending}
+                    disabled={sending || uploading}
                   />
 
                   <button
                     type="button"
                     className="chats-send"
                     onClick={handleSend}
-                    disabled={sending || !text.trim()}
+                    disabled={sending || uploading || !text.trim()}
+                    title="Send"
+                    aria-label="Send"
                   >
-                    {sending ? "…" : "Send"}
+                    <FiSend />
                   </button>
                 </div>
               </div>
