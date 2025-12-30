@@ -294,9 +294,8 @@
    USER CHIP – basic view
 ================================ */
 .user-chip {
-  display: inline-grid;
-  grid-auto-flow: column;
-  align-items: center;
+  display: inline-flex;        /* 🔥 flex вместо grid */
+  align-items: center;         /* вертикальный центр */
   justify-content: center;
   gap: 10px;
 
@@ -307,10 +306,10 @@
   background: rgba(255, 255, 255, 0.04);
   cursor: pointer;
   color: var(--text);
-  text-align: left;
   transition: background 0.18s ease, transform 0.08s ease,
     border-color 0.18s ease, box-shadow 0.18s ease;
 }
+
 .user-chip * {
   line-height: 1;
 }
@@ -344,21 +343,26 @@
 }
 
 .user-chip .meta {
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  row-gap: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;   /* 🔥 центр по вертикали */
+  line-height: 1.1;
 }
+
 
 .user-chip .name {
   font-weight: 700;
   font-size: 14px;
+  line-height: 1.2;
   color: var(--text);
 }
+
 .user-chip .sub {
   font-size: 11px;
+  line-height: 1.1;
   color: var(--muted);
 }
+
 
 .user-chip .status-dot {
   width: 8px;
@@ -379,7 +383,7 @@
 ================================ */
 .user-chip.has-dropdown {
   position: relative;
-  padding-bottom: 12px;
+  padding-bottom: 0;
 }
 .user-chip .chev {
   opacity: 0.85;
@@ -395,9 +399,9 @@
 .user-dropdown {
   position: absolute;
   right: 0;
-  top: 100%;
-  margin-top: 4px;
+  top: calc(100% + 8px); /* ✅ dropdown ниже без padding-bottom */
   min-width: 180px;
+
   background: rgba(23, 16, 40, 0.9);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -411,6 +415,7 @@
   transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
   z-index: 50;
 }
+
 
 .user-chip.has-dropdown.open .user-dropdown {
   opacity: 1;
@@ -453,6 +458,291 @@
   background: rgba(255, 255, 255, 0.08);
   border-radius: 1px;
 }
+
+/* =========================
+   Notifications (Header) — LIGHT UI
+========================= */
+
+.su-notif {
+  position: relative;
+  margin-right: 10px;
+}
+
+/* bell button */
+.su-notif__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease,
+    transform 0.08s ease;
+}
+
+.su-notif__btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.su-notif__btn:active {
+  transform: translateY(0);
+}
+
+.su-notif__btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* unread badge */
+.su-notif__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff4d4d, #ff7a7a);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--bg-1);
+}
+
+/* dropdown */
+.su-notif__dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 340px;
+  max-height: 420px;
+
+  background: rgba(26, 18, 38, 0.92);
+  backdrop-filter: blur(12px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.38);
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  z-index: 40;
+
+  animation: notifFade 0.14s ease;
+}
+
+@keyframes notifFade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* header row */
+.su-notif__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.su-notif__title {
+  font-weight: 650;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.2px;
+}
+
+.su-notif__mini {
+  margin-left: 6px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+/* actions (icon-only) */
+.su-notif__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative; /* for menu */
+}
+
+.su-notif__iconBtn {
+  width: 34px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.su-notif__iconBtn:hover {
+  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.su-notif__iconBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* actions menu (three dots) */
+.su-notif__menu {
+  position: absolute;
+  top: 38px;
+  right: 40px;
+  width: 180px;
+
+  background: rgba(18, 12, 24, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  z-index: 5;
+}
+
+.su-notif__menuItem {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.90);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.su-notif__menuItem:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.su-notif__menuItem.danger {
+  color: rgba(255, 140, 140, 0.95);
+}
+
+.su-notif__menuItem.danger:hover {
+  background: rgba(255, 80, 80, 0.12);
+}
+
+/* list */
+.su-notif__list {
+  overflow-y: auto;
+  max-height: 340px;
+}
+
+.su-notif__empty {
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+/* item */
+.su-notif__item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.su-notif__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.su-notif__item.is-unread {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* row */
+.su-notif__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.su-notif__rowRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.su-notif__itemTitle {
+  font-weight: 600;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.su-notif__body {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.su-notif__time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+
+/* delete (x) */
+.su-notif__del {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.62);
+  cursor: pointer;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.su-notif__del:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.90);
+}
+
+.su-notif__del svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* scrollbar */
+.su-notif__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.su-notif__list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+}
+
 
 /* MOBILE USER BLOCK */
 .mobile-user {

@@ -10,6 +10,8 @@ import postsRouter from "./routes/posts.js";
 import followRouter from "./routes/follow.js";
 import chatsRouter from "./routes/chats.js";
 import { prisma } from "./lib/prisma.js";
+import notificationsRouter from "./routes/notifications.js";
+
 
 dotenv.config();
 
@@ -88,6 +90,8 @@ app.use("/api/follow", followRouter);
 // CHATS ROUTES (DM)
 // -----------------------
 app.use("/api/chats", chatsRouter);
+
+app.use("/api/notifications", notificationsRouter);
 
 // -----------------------
 // USERS LIST (optional)

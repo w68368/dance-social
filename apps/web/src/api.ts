@@ -299,6 +299,74 @@ export interface FeedPage {
 export type FeedScope = "all" | "following";
 
 // ----------------------------------------------------
+// ✅ Notifications (NEW)
+// ----------------------------------------------------
+export type NotificationType = "CHAT_MESSAGE";
+
+export type NotificationItem = {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body?: string | null;
+  url?: string | null;
+  entityId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  readAt?: string | null;
+};
+
+export async function fetchNotifications(params?: {
+  unreadOnly?: boolean;
+  take?: number;
+}) {
+  const unreadOnly = params?.unreadOnly ? 1 : 0;
+  const take = params?.take ?? 20;
+
+  const { data } = await api.get<{ items: NotificationItem[] }>(
+    `/notifications?unreadOnly=${unreadOnly}&take=${take}`
+  );
+  return data;
+}
+
+export async function fetchUnreadNotificationsCount() {
+  const { data } = await api.get<{ count: number }>(`/notifications/unread-count`);
+  return data;
+}
+
+export async function markNotificationsRead(ids: string[]) {
+  const { data } = await api.post<{ ok: true }>(`/notifications/mark-read`, { ids });
+  return data;
+}
+
+export async function markAllNotificationsRead() {
+  const { data } = await api.post<{ ok: true }>(`/notifications/mark-all-read`, {});
+  return data;
+}
+
+export async function deleteNotification(id: string) {
+  const { data } = await api.delete<{ ok: boolean; deletedId?: string; message?: string }>(
+    `/notifications/${id}`
+  );
+  if (!data.ok) throw new Error(data.message || "Failed to delete notification");
+  return data;
+}
+
+export async function deleteAllNotifications() {
+  const { data } = await api.delete<{ ok: boolean; deleted: number }>(`/notifications`);
+  if (!data.ok) throw new Error("Failed to delete notifications");
+  return data;
+}
+
+export async function deleteReadNotifications() {
+  const { data } = await api.delete<{ ok: boolean; deleted: number }>(
+    `/notifications/read/all`
+  );
+  if (!data.ok) throw new Error("Failed to delete read notifications");
+  return data;
+}
+
+
+// ----------------------------------------------------
 // Posts
 // ----------------------------------------------------
 
@@ -627,7 +695,6 @@ export async function fetchConversationMessages(conversationId: string) {
   return { messages: data.messages ?? [] };
 }
 
-
 export async function sendConversationMessage(
   conversationId: string,
   text: string,
@@ -648,8 +715,6 @@ export async function sendConversationMessage(
 
   return data.message;
 }
-
-
 
 export async function deleteChatMessage(messageId: string) {
   const { data } = await api.delete<{ ok: boolean; deletedId?: string; message?: string }>(

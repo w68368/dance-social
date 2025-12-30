@@ -81,6 +81,56 @@ function getMulterFiles(req: AuthedRequest): Express.Multer.File[] {
 }
 
 /**
+ * Create notifications for chat message to all participants except sender.
+ * Creates one notification per recipient.
+ */
+async function notifyChatMessage(opts: {
+  conversationId: string;
+  senderId: string;
+  bodyText?: string; // preview
+  entityId?: string; // messageId
+}) {
+  const conv = await prisma.conversation.findUnique({
+    where: { id: opts.conversationId },
+    include: { participants: true },
+  });
+  if (!conv) return;
+
+  const recipientIds = conv.participants
+    .map((p) => p.userId)
+    .filter((uid) => uid !== opts.senderId);
+
+  if (!recipientIds.length) return;
+
+  // Optional: include sender username in title (nice UX)
+  let senderLabel = "New message";
+  try {
+    const sender = await prisma.user.findUnique({
+      where: { id: opts.senderId },
+      select: { username: true, displayName: true },
+    });
+    if (sender) {
+      const name = sender.displayName?.trim() || `@${sender.username}`;
+      senderLabel = `Message from ${name}`;
+    }
+  } catch {}
+
+  const body = (opts.bodyText ?? "").trim();
+  const preview = body.length ? body.slice(0, 120) : "Media message";
+
+  await prisma.notification.createMany({
+    data: recipientIds.map((uid) => ({
+      userId: uid,
+      type: "CHAT_MESSAGE",
+      title: senderLabel,
+      body: preview,
+      url: `/chats/${opts.senderId}`, // открываем DM с отправителем
+      entityId: opts.entityId ?? null,
+    })),
+  });
+}
+
+/**
  * Create or get DM conversation with userId.
  * Returns conversation + basic peer user.
  */
@@ -271,6 +321,19 @@ router.post(
       select: { id: true },
     });
 
+    // ✅ create notifications for recipients
+    try {
+      await notifyChatMessage({
+        conversationId: convId,
+        senderId: meId,
+        bodyText: msg.text,
+        entityId: msg.id,
+      });
+    } catch (e) {
+      console.error("notifyChatMessage (text) error", e);
+      // don't fail message sending due to notifications
+    }
+
     return res.json({ ok: true, message: msg });
   }
 );
@@ -339,6 +402,8 @@ router.post(
       }
     }
 
+    const text = (parsed.data.text ?? "").trim();
+
     try {
       const uploads = await Promise.all(
         files.map((f) =>
@@ -348,8 +413,6 @@ router.post(
           })
         )
       );
-
-      const text = (parsed.data.text ?? "").trim();
 
       const created = await prisma.$transaction(async (tx) => {
         const msgs = [];
@@ -382,6 +445,18 @@ router.post(
 
         return msgs;
       });
+
+      // ✅ create notifications once (use first message as entityId)
+      try {
+        await notifyChatMessage({
+          conversationId: convId,
+          senderId: meId,
+          bodyText: text || "Media message",
+          entityId: created[0]?.id,
+        });
+      } catch (e) {
+        console.error("notifyChatMessage (media) error", e);
+      }
 
       return res.json({ ok: true, messages: created });
     } catch (err) {
