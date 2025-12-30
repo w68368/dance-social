@@ -214,6 +214,7 @@ router.post(
 // -----------------------------
 // 🆕 POST /api/posts/:id/react
 // Set / change / remove reaction
+// + create notification when someone likes a post
 // -----------------------------
 router.post("/:id/react", requireAuth, async (req: AuthedRequest, res) => {
   if (!req.userId) {
@@ -232,38 +233,87 @@ router.post("/:id/react", requireAuth, async (req: AuthedRequest, res) => {
   const { type } = parsed.data;
 
   try {
-    const existing = await prisma.postReaction.findUnique({
-      where: {
-        postId_userId: {
-          postId,
-          userId: req.userId,
-        },
-      },
+    // ✅ make sure post exists and we know authorId
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { id: true, authorId: true },
     });
+
+    if (!post) {
+      return res.status(404).json({ ok: false, message: "Post not found" });
+    }
 
     let myReaction: ReactionType | null = null;
 
-    if (existing && existing.type === type) {
-      await prisma.postReaction.delete({
-        where: { id: existing.id },
-      });
-      myReaction = null;
-    } else if (existing) {
-      const updated = await prisma.postReaction.update({
-        where: { id: existing.id },
-        data: { type },
-      });
-      myReaction = updated.type as ReactionType;
-    } else {
-      const created = await prisma.postReaction.create({
-        data: {
-          postId,
-          userId: req.userId,
-          type,
+    // ✅ use transaction to avoid duplicates in race conditions
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.postReaction.findUnique({
+        where: {
+          postId_userId: {
+            postId,
+            userId: req.userId!,
+          },
         },
+        select: { id: true, type: true },
       });
-      myReaction = created.type as ReactionType;
-    }
+
+      // we will create notif ONLY when the result becomes LIKE
+      const prevType = (existing?.type as ReactionType | undefined) ?? null;
+
+      if (existing && existing.type === type) {
+        // toggle off
+        await tx.postReaction.delete({
+          where: { id: existing.id },
+        });
+        myReaction = null;
+        return;
+      }
+
+      if (existing) {
+        const updated = await tx.postReaction.update({
+          where: { id: existing.id },
+          data: { type },
+          select: { type: true },
+        });
+        myReaction = updated.type as ReactionType;
+      } else {
+        const created = await tx.postReaction.create({
+          data: {
+            postId,
+            userId: req.userId!,
+            type,
+          },
+          select: { type: true },
+        });
+        myReaction = created.type as ReactionType;
+      }
+
+      // ✅ create notification ONLY if reaction became LIKE and user is not author
+      const becameLike = type === "LIKE" && prevType !== "LIKE";
+      const shouldNotify = becameLike && post.authorId !== req.userId;
+
+      if (shouldNotify) {
+        const liker = await tx.user.findUnique({
+          where: { id: req.userId! },
+          select: { username: true, displayName: true },
+        });
+
+        const name = liker?.displayName || liker?.username || "Someone";
+
+        // IMPORTANT: make sure NotificationType enum includes POST_LIKE
+        await tx.notification.create({
+          data: {
+            userId: post.authorId,
+            type: "POST_LIKE",
+            title: "New like",
+            body: `${name} liked your post`,
+            url: `/?post=${postId}`, // ✅ open feed and later scroll/highlight this post
+            entityId: postId,
+            isRead: false,
+          },
+        });
+      }
+    });
 
     const grouped = await prisma.postReaction.groupBy({
       where: { postId },
@@ -373,6 +423,20 @@ router.post(
     const commentId = req.params.commentId;
 
     try {
+      // ✅ load comment with author + postId
+      const comment = await prisma.postComment.findUnique({
+        where: { id: commentId },
+        select: {
+          id: true,
+          postId: true,
+          authorId: true,
+        },
+      });
+
+      if (!comment) {
+        return res.status(404).json({ ok: false, message: "Comment not found" });
+      }
+
       const existing = await prisma.commentLike.findUnique({
         where: {
           userId_commentId: {
@@ -397,6 +461,23 @@ router.post(
           },
         });
         liked = true;
+
+        // ✅ notify only on "like" (not on unlike) and not self-like
+        if (comment.authorId !== req.userId) {
+          prisma.notification
+            .create({
+              data: {
+                userId: comment.authorId,
+                type: "COMMENT_LIKE",
+                title: "New like",
+                body: "Someone liked your comment",
+                url: `/?post=${comment.postId}`,
+                entityId: commentId,
+                isRead: false,
+              },
+            })
+            .catch((e) => console.error("Notify comment like error:", e));
+        }
       }
 
       const likesCount = await prisma.commentLike.count({
@@ -614,10 +695,10 @@ router.post(
   }
 );
 
-
 // -----------------------------
 // POST /api/posts/:id/comments
 // Add a comment to a post (optionally a reply to another comment)
+// + create notification for post author
 // -----------------------------
 router.post(
   "/:id/comments",
@@ -645,6 +726,7 @@ router.post(
     }
 
     try {
+      // ✅ validate parent comment
       if (parentId) {
         const parent = await prisma.postComment.findUnique({
           where: { id: parentId },
@@ -660,6 +742,18 @@ router.post(
         }
       }
 
+      // ✅ load post author for notification (and validate post exists)
+      const post = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { id: true, authorId: true },
+      });
+
+      if (!post) {
+        res.status(404).json({ ok: false, message: "Post not found" });
+        return;
+      }
+
+      // ✅ create comment
       const comment = await prisma.postComment.create({
         data: {
           text: parsed.data,
@@ -679,6 +773,28 @@ router.post(
         },
       });
 
+      // ✅ notify post author (if not self)
+      if (post.authorId !== req.userId) {
+        prisma.notification
+          .create({
+            data: {
+              userId: post.authorId,
+              type: "POST_COMMENT", // IMPORTANT: add to NotificationType enum
+              title: `New comment from ${
+                comment.author.displayName || comment.author.username
+              }`,
+              body:
+                parsed.data.length > 140
+                  ? parsed.data.slice(0, 140) + "…"
+                  : parsed.data,
+              url: `/?post=${postId}`, // ✅ open feed and later scroll/highlight this post
+              entityId: comment.id,
+              isRead: false,
+            },
+          })
+          .catch((e) => console.error("Notify post comment error:", e));
+      }
+
       const shaped = {
         id: comment.id,
         text: comment.text,
@@ -693,9 +809,7 @@ router.post(
       res.json({ ok: true, comment: shaped });
     } catch (err) {
       console.error("Create comment error:", err);
-      res
-        .status(500)
-        .json({ ok: false, message: "Failed to add comment" });
+      res.status(500).json({ ok: false, message: "Failed to add comment" });
     }
   }
 );
@@ -804,12 +918,14 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
   try {
     const currentUserId = req.userId ?? null;
 
-    const scopeRaw = typeof req.query.scope === "string" ? req.query.scope : "all";
+    const scopeRaw =
+      typeof req.query.scope === "string" ? req.query.scope : "all";
     const scope = scopeRaw === "following" ? "following" : "all";
 
     const rawLimit = Number(req.query.limit) || 5;
     const limit = Math.min(Math.max(rawLimit, 1), 50);
-    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : null;
+    const cursor =
+      typeof req.query.cursor === "string" ? req.query.cursor : null;
 
     // ✅ WHERE для "Только подписки"
     let where: any = undefined;
@@ -828,10 +944,7 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
 
       // показываем посты тех, на кого подписан + свои
       where = {
-        OR: [
-          { authorId: currentUserId },
-          { authorId: { in: followingIds } },
-        ],
+        OR: [{ authorId: currentUserId }, { authorId: { in: followingIds } }],
       };
     }
 
@@ -842,7 +955,12 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       include: {
         author: {
-          select: { id: true, username: true, displayName: true, avatarUrl: true },
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
         },
         _count: { select: { reactions: true, comments: true } },
         reactions: currentUserId
@@ -889,7 +1007,6 @@ router.get("/", optionalAuth, async (req: AuthedRequest, res) => {
     return res.status(500).json({ ok: false, message: "Failed to load posts" });
   }
 });
-
 
 // -----------------------------
 // GET /api/posts/user/:userId
@@ -1008,7 +1125,7 @@ router.delete("/:id", requireAuth, async (req: AuthedRequest, res) => {
         if (publicId) {
           const resourceType =
             existing.mediaType === "video" ? "video" : "image";
-          
+
           await cloudinary.uploader.destroy(publicId, {
             resource_type: resourceType,
           });
@@ -1117,7 +1234,5 @@ router.patch("/:id", requireAuth, async (req: AuthedRequest, res) => {
     return res.status(500).json({ ok: false, message: "Server error" });
   }
 });
-
-
 
 export default router;

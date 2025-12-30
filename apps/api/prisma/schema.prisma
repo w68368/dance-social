@@ -333,6 +333,9 @@ model Message {
 
 enum NotificationType {
   CHAT_MESSAGE
+  POST_COMMENT
+  POST_LIKE
+  COMMENT_LIKE
 }
 
 model Notification {

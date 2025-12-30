@@ -438,6 +438,15 @@ export default function Header() {
                     >
                       Chats
                     </button>
+                    <button
+                    className="user-dropdown-item"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate("/dashboard");
+                    }}
+                  >
+                    Dashboard
+                  </button>
 
                     <button
                       className="user-dropdown-item"
