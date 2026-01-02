@@ -101,7 +101,9 @@ export default function Dashboard() {
   }, [acceptedActive]);
 
   // ✅ Keep your existing structure and style
-  const sections: Section[] = useMemo(
+  // ... выше код тот же
+
+const sections: Section[] = useMemo(
   () => [
     {
       key: "classes",
@@ -148,6 +150,7 @@ export default function Dashboard() {
   ],
   [challengeItems, me]
 );
+
 
   return (
     <div className="su-dash">
