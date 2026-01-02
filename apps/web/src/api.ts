@@ -501,6 +501,13 @@ export async function deleteChallenge(id: string) {
   return data;
 }
 
+export async function leaveChallenge(challengeId: string) {
+  const { data } = await api.delete<{ ok: true }>(
+    `/challenges/${challengeId}/accept`
+  );
+  return data;
+}
+
 // ----------------------------------------------------
 // Posts
 // ----------------------------------------------------

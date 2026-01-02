@@ -2,12 +2,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   acceptChallenge,
+  leaveChallenge,
   createChallenge,
-  deleteChallenge, // ✅ NEW
+  deleteChallenge,
   fetchMyAcceptedChallenges,
   fetchMyCreatedChallenges,
   fetchNewChallenges,
   fetchTrendingChallenges,
+  // ✅ NEW (должны быть в api.ts)
+  submitChallengeVideo,
+  fetchChallengeSubmissions,
   type ChallengeItem,
   type ChallengeLevel,
 } from "../api";
@@ -22,6 +26,9 @@ import {
   FiCheckCircle,
   FiMoreHorizontal,
   FiTrash2,
+  FiXCircle,
+  FiUploadCloud, // ✅ NEW
+  FiPlayCircle, // ✅ NEW
 } from "react-icons/fi";
 
 type CreateForm = {
@@ -69,6 +76,20 @@ const POPULAR_STYLES = [
   "Afro",
 ] as const;
 
+// ✅ minimal тип для сабмитов (если api.ts возвращает больше — не проблема)
+type ChallengeSubmission = {
+  id: string;
+  videoUrl: string;
+  caption?: string | null;
+  createdAt?: string;
+  user?: {
+    id: string;
+    username: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+  };
+};
+
 export default function Challenges() {
   const me = getUser();
 
@@ -96,6 +117,33 @@ export default function Challenges() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // confirm leave modal
+  const [confirmLeave, setConfirmLeave] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+
+  // ✅ NEW: submit modal (upload my video)
+  const [submitFor, setSubmitFor] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [submitFile, setSubmitFile] = useState<File | null>(null);
+  const [submitCaption, setSubmitCaption] = useState("");
+  const [submitBusy, setSubmitBusy] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // ✅ NEW: view submissions modal
+  const [viewFor, setViewFor] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState<string | null>(null);
+  const [submissions, setSubmissions] = useState<ChallengeSubmission[]>([]);
+
   const [form, setForm] = useState<CreateForm>({
     title: "",
     description: "",
@@ -105,7 +153,7 @@ export default function Challenges() {
     exampleFile: null,
   });
 
-  // ✅ For Accept → Accepted button
+  // For accept state
   const acceptedSet = useMemo(() => {
     return new Set(mineAccepted.map((c) => c.id));
   }, [mineAccepted]);
@@ -157,16 +205,12 @@ export default function Challenges() {
 
   async function onAccept(id: string) {
     if (!me) return;
-    if (acceptedSet.has(id)) return; // ✅ already accepted
+    if (acceptedSet.has(id)) return;
 
     try {
       await acceptChallenge(id);
-
-      // refresh accepted list
       const a = await fetchMyAcceptedChallenges(24);
       setMineAccepted(a.items);
-
-      // (optional) bump counts locally? easiest: let backend counts update later
     } catch (e: any) {
       alert(e?.response?.data?.error ?? "Failed to accept challenge.");
     }
@@ -236,6 +280,89 @@ export default function Challenges() {
     }
   }
 
+  function openLeaveConfirm(ch: ChallengeItem) {
+    setMenuOpenId(null);
+    setLeaveError(null);
+    setConfirmLeave({ id: ch.id, title: ch.title });
+  }
+
+  async function confirmLeaveChallenge() {
+    if (!confirmLeave || !me) return;
+    setLeaveBusy(true);
+    setLeaveError(null);
+
+    try {
+      await leaveChallenge(confirmLeave.id);
+      const a = await fetchMyAcceptedChallenges(24);
+      setMineAccepted(a.items);
+      setConfirmLeave(null);
+    } catch (e: any) {
+      setLeaveError(
+        e?.response?.data?.error ?? e?.message ?? "Failed to leave challenge."
+      );
+    } finally {
+      setLeaveBusy(false);
+    }
+  }
+
+  // ✅ NEW: open submit modal
+  function openSubmitModal(ch: ChallengeItem) {
+    setSubmitError(null);
+    setSubmitFor({ id: ch.id, title: ch.title });
+    setSubmitFile(null);
+    setSubmitCaption("");
+  }
+
+  // ✅ NEW: submit upload
+  async function doSubmit() {
+    if (!me || !submitFor) return;
+    if (!submitFile) {
+      setSubmitError("Please select a video file.");
+      return;
+    }
+
+    setSubmitBusy(true);
+    setSubmitError(null);
+
+    try {
+      await submitChallengeVideo(submitFor.id, submitFile, submitCaption.trim());
+
+      // refresh lists so _count.submissions updates
+      await loadAll();
+
+      setSubmitFor(null);
+    } catch (e: any) {
+      setSubmitError(
+        e?.response?.data?.error ?? e?.message ?? "Failed to upload video."
+      );
+    } finally {
+      setSubmitBusy(false);
+    }
+  }
+
+  // ✅ NEW: open view submissions
+  async function openViewModal(ch: ChallengeItem) {
+    setViewFor({ id: ch.id, title: ch.title });
+    setViewError(null);
+    setViewLoading(true);
+    setSubmissions([]);
+
+    try {
+      const res = await fetchChallengeSubmissions(ch.id, 50);
+      // ожидаем { items: [...] } или просто массив — поддержим оба формата
+      const items = Array.isArray(res) ? res : res?.items ?? [];
+      setSubmissions(items);
+    } catch (e: any) {
+      setViewError(
+        e?.response?.data?.error ??
+          e?.message ??
+          "Failed to load submissions."
+      );
+    } finally {
+      setViewLoading(false);
+    }
+  }
+
   return (
     <div className="chPage">
       <div className="chTop">
@@ -269,6 +396,8 @@ export default function Challenges() {
             menuOpenId={menuOpenId}
             setMenuOpenId={setMenuOpenId}
             onDelete={openDeleteConfirm}
+            onLeave={openLeaveConfirm}
+            onOpenView={openViewModal} // ✅ NEW
           />
 
           <Section
@@ -283,9 +412,10 @@ export default function Challenges() {
             menuOpenId={menuOpenId}
             setMenuOpenId={setMenuOpenId}
             onDelete={openDeleteConfirm}
+            onLeave={openLeaveConfirm}
+            onOpenView={openViewModal} // ✅ NEW
           />
 
-          {/* ✅ Nice separation */}
           <div className="chDivider" />
 
           <div className="chMyBlock">
@@ -295,6 +425,7 @@ export default function Challenges() {
             </div>
 
             <div className="chSplit">
+              {/* ✅ My Accepted: replace "Accepted" with Upload button */}
               <Section
                 icon={<FiCheckCircle />}
                 title="My Accepted"
@@ -312,6 +443,10 @@ export default function Challenges() {
                 menuOpenId={menuOpenId}
                 setMenuOpenId={setMenuOpenId}
                 onDelete={openDeleteConfirm}
+                onLeave={openLeaveConfirm}
+                variant="myAccepted" // ✅ NEW
+                onOpenSubmit={openSubmitModal} // ✅ NEW
+                onOpenView={openViewModal} // ✅ NEW
               />
 
               <Section
@@ -331,13 +466,15 @@ export default function Challenges() {
                 menuOpenId={menuOpenId}
                 setMenuOpenId={setMenuOpenId}
                 onDelete={openDeleteConfirm}
+                onLeave={openLeaveConfirm}
+                onOpenView={openViewModal} // ✅ NEW
               />
             </div>
           </div>
         </>
       )}
 
-      {/* CREATE MODAL */}
+      {/* CREATE MODAL (без изменений) */}
       {isCreateOpen && (
         <div
           className="chModalOverlay"
@@ -533,6 +670,188 @@ export default function Challenges() {
           </div>
         </div>
       )}
+
+      {/* CONFIRM LEAVE MODAL */}
+      {confirmLeave && (
+        <div
+          className="chModalOverlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !leaveBusy)
+              setConfirmLeave(null);
+          }}
+        >
+          <div className="chModal chConfirmModal">
+            <div className="chModalHead">
+              <div>
+                <h2>Leave challenge?</h2>
+                <p>
+                  You will leave <b>{confirmLeave.title}</b>.
+                </p>
+              </div>
+              <button
+                className="chModalClose"
+                onClick={() => !leaveBusy && setConfirmLeave(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            {leaveError && <div className="chError">{leaveError}</div>}
+
+            <div className="chActions">
+              <button
+                className="chBtnGhost"
+                onClick={() => setConfirmLeave(null)}
+                disabled={leaveBusy}
+              >
+                Cancel
+              </button>
+              <button
+                className="chBtnDanger"
+                onClick={confirmLeaveChallenge}
+                disabled={leaveBusy}
+              >
+                {leaveBusy ? "Leaving..." : "Leave"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ NEW: SUBMIT MODAL */}
+      {submitFor && (
+        <div
+          className="chModalOverlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !submitBusy) setSubmitFor(null);
+          }}
+        >
+          <div className="chModal">
+            <div className="chModalHead">
+              <div>
+                <h2>Upload your submission</h2>
+                <p>
+                  Challenge: <b>{submitFor.title}</b>
+                </p>
+              </div>
+              <button
+                className="chModalClose"
+                onClick={() => !submitBusy && setSubmitFor(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="chForm">
+              <label>
+                <span>Video</span>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setSubmitFile(e.target.files?.[0] ?? null)}
+                  disabled={submitBusy}
+                />
+                <small>Select a video with your performance.</small>
+              </label>
+
+              <label>
+                <span>Caption</span>
+                <textarea
+                  value={submitCaption}
+                  onChange={(e) => setSubmitCaption(e.target.value)}
+                  placeholder="Write a short caption (optional)…"
+                  rows={3}
+                  maxLength={300}
+                  disabled={submitBusy}
+                />
+              </label>
+
+              {submitError && <div className="chError">{submitError}</div>}
+
+              <div className="chActions">
+                <button
+                  className="chBtnGhost"
+                  onClick={() => setSubmitFor(null)}
+                  disabled={submitBusy}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="chBtnPrimary"
+                  onClick={doSubmit}
+                  disabled={submitBusy || !submitFile}
+                >
+                  {submitBusy ? "Uploading..." : "Upload"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ NEW: VIEW SUBMISSIONS MODAL */}
+      {viewFor && (
+        <div
+          className="chModalOverlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !viewLoading) setViewFor(null);
+          }}
+        >
+          <div className="chModal">
+            <div className="chModalHead">
+              <div>
+                <h2>Submissions</h2>
+                <p>
+                  Challenge: <b>{viewFor.title}</b>
+                </p>
+              </div>
+              <button
+                className="chModalClose"
+                onClick={() => !viewLoading && setViewFor(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            {viewLoading && <div className="chEmpty">Loading...</div>}
+            {!viewLoading && viewError && <div className="chError">{viewError}</div>}
+
+            {!viewLoading && !viewError && (
+            <div className="chSubmissionsList">
+              {submissions.length === 0 ? (
+                <div className="chEmpty">No submissions yet.</div>
+              ) : (
+                submissions.map((s) => (
+                  <div key={s.id} className="chSubmissionCard">
+                    <div className="chSubmissionAuthor">
+                      <span>{s.user?.displayName || s.user?.username || "Participant"}</span>
+                    </div>
+
+                    <video
+                      className="chSubmissionVideo"
+                      src={s.videoUrl}
+                      controls
+                      playsInline
+                    />
+
+                    {s.caption ? <div style={{ marginTop: 8, opacity: 0.92 }}>{s.caption}</div> : null}
+                  </div>
+                ))
+              )}
+            </div>
+            )}
+
+            <div className="chActions">
+              <button className="chBtnGhost" onClick={() => setViewFor(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -547,11 +866,16 @@ function Section(props: {
   acceptedSet: Set<string>;
   compact?: boolean;
 
-  // menu + owner delete
   meId?: string;
   menuOpenId: string | null;
   setMenuOpenId: (id: string | null) => void;
   onDelete: (ch: ChallengeItem) => void;
+  onLeave: (ch: ChallengeItem) => void;
+
+  // ✅ NEW
+  variant?: "default" | "myAccepted";
+  onOpenSubmit?: (ch: ChallengeItem) => void;
+  onOpenView: (ch: ChallengeItem) => void;
 }) {
   const {
     icon,
@@ -566,6 +890,10 @@ function Section(props: {
     menuOpenId,
     setMenuOpenId,
     onDelete,
+    onLeave,
+    variant = "default",
+    onOpenSubmit,
+    onOpenView,
   } = props;
 
   return (
@@ -587,11 +915,14 @@ function Section(props: {
           {items.map((c) => {
             const isOwner = !!meId && (c as any)?.creator?.id === meId;
             const isAccepted = acceptedSet.has(c.id);
+            const canLeave = me && isAccepted && !isOwner;
+            const showMenu = isOwner || canLeave;
+
+            const hasSubmissions = (c as any)?._count?.submissions > 0;
 
             return (
               <div className="chCard" key={c.id}>
-                {/* kebab menu (owner only) */}
-                {isOwner && (
+                {showMenu && (
                   <div className="chKebabWrap">
                     <button
                       className="chKebabBtn"
@@ -610,13 +941,25 @@ function Section(props: {
                         className="chKebabMenu"
                         onMouseDown={(e) => e.stopPropagation()}
                       >
-                        <button
-                          className="chKebabItem chKebabDanger"
-                          onClick={() => onDelete(c)}
-                        >
-                          <FiTrash2 />
-                          <span>Delete challenge</span>
-                        </button>
+                        {canLeave && (
+                          <button
+                            className="chKebabItem chKebabDanger"
+                            onClick={() => onLeave(c)}
+                          >
+                            <FiXCircle />
+                            <span>Leave challenge</span>
+                          </button>
+                        )}
+
+                        {isOwner && (
+                          <button
+                            className="chKebabItem chKebabDanger"
+                            onClick={() => onDelete(c)}
+                          >
+                            <FiTrash2 />
+                            <span>Delete challenge</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -637,13 +980,14 @@ function Section(props: {
                     <span>{Math.max(0, daysLeft(c.endsAt))} days left</span>
                   </div>
                   <div className="chMetaItem">
-                    <span>{c._count.participants} accepted</span>
+                    <span>{(c as any)._count?.participants ?? 0} accepted</span>
                     <span>•</span>
-                    <span>{c._count.submissions} videos</span>
+                    <span>{(c as any)._count?.submissions ?? 0} videos</span>
                   </div>
                 </div>
 
                 <div className="chCardActions">
+                  {/* 1) Example */}
                   {c.exampleVideoUrl ? (
                     <a
                       className="chBtnGhost"
@@ -663,21 +1007,43 @@ function Section(props: {
                     </button>
                   )}
 
-                  {/* ✅ Accept → Accepted */}
-                  <button
-                    className={isAccepted ? "chBtnAccepted" : "chBtnPrimary"}
-                    disabled={!me || isAccepted}
-                    onClick={() => (isAccepted ? null : onAccept(c.id))}
-                    title={
-                      !me
-                        ? "Please sign in to accept challenges"
-                        : isAccepted
-                        ? "Already accepted"
-                        : "Accept"
-                    }
-                  >
-                    {isAccepted ? "Accepted" : "Accept"}
-                  </button>
+                  {/* 2) View submissions (на всех карточках, когда есть видео) */}
+                  {hasSubmissions ? (
+                    <button
+                      className="chBtnGhost"
+                      onClick={() => onOpenView(c)}
+                      title="View submissions"
+                    >
+                      <FiPlayCircle /> View submissions
+                    </button>
+                  ) : null}
+
+                  {/* 3) Right-side action */}
+                  {variant === "myAccepted" ? (
+                    <button
+                      className="chBtnPrimary"
+                      onClick={() => onOpenSubmit?.(c)}
+                      disabled={!me}
+                      title={!me ? "Sign in to upload" : "Upload your video"}
+                    >
+                      <FiUploadCloud /> Upload my video
+                    </button>
+                  ) : (
+                    <button
+                      className={isAccepted ? "chBtnAccepted" : "chBtnPrimary"}
+                      disabled={!me || isAccepted}
+                      onClick={() => (isAccepted ? null : onAccept(c.id))}
+                      title={
+                        !me
+                          ? "Please sign in to accept challenges"
+                          : isAccepted
+                          ? "Already accepted"
+                          : "Accept"
+                      }
+                    >
+                      {isAccepted ? "Accepted" : "Accept"}
+                    </button>
+                  )}
                 </div>
               </div>
             );

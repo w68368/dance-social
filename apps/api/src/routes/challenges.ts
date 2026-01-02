@@ -218,6 +218,30 @@ router.post("/:id/accept", requireAuth, async (req: AuthedRequest, res) => {
   res.json({ ok: true, acceptedAt: row.acceptedAt });
 });
 
+// DELETE /api/challenges/:id/accept  -> leave / cancel participation
+router.delete("/:id/accept", requireAuth, async (req: AuthedRequest, res) => {
+  if (!req.userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const id = req.params.id;
+
+  const ch = await prisma.challenge.findUnique({ where: { id } });
+  if (!ch) return res.status(404).json({ error: "Challenge not found" });
+
+  await prisma.$transaction([
+    // удаляем видео-сабмиты этого юзера по этому челленджу
+    prisma.challengeSubmission.deleteMany({
+      where: { challengeId: id, userId: req.userId },
+    }),
+    // удаляем участие
+    prisma.challengeParticipant.deleteMany({
+      where: { challengeId: id, userId: req.userId },
+    }),
+  ]);
+
+  res.json({ ok: true });
+});
+
+
 // POST /api/challenges/:id/submissions (multipart: file "video", optional caption)
 router.post(
   "/:id/submissions",
