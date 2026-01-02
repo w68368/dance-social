@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   acceptChallenge,
   createChallenge,
+  deleteChallenge, // ✅ NEW
   fetchMyAcceptedChallenges,
   fetchMyCreatedChallenges,
   fetchNewChallenges,
@@ -19,6 +20,8 @@ import {
   FiTrendingUp,
   FiStar,
   FiCheckCircle,
+  FiMoreHorizontal,
+  FiTrash2,
 } from "react-icons/fi";
 
 type CreateForm = {
@@ -29,22 +32,6 @@ type CreateForm = {
   durationDays: number;
   exampleFile: File | null;
 };
-
-const POPULAR_STYLES = [
-  "Hip-Hop",
-  "High Heels",
-  "Contemporary",
-  "K-Pop",
-  "Jazz Funk",
-  "House",
-  "Popping",
-  "Locking",
-  "Breaking",
-  "Vogue",
-  "Waacking",
-  "Dancehall",
-  "Afro",
-] as const;
 
 function daysLeft(endsAt: string) {
   const end = new Date(endsAt).getTime();
@@ -66,6 +53,22 @@ function levelLabel(level: ChallengeLevel) {
   }
 }
 
+const POPULAR_STYLES = [
+  "Hip-Hop",
+  "High Heels",
+  "Contemporary",
+  "K-Pop",
+  "Jazz Funk",
+  "House",
+  "Popping",
+  "Locking",
+  "Breaking",
+  "Vogue",
+  "Waacking",
+  "Dancehall",
+  "Afro",
+] as const;
+
 export default function Challenges() {
   const me = getUser();
 
@@ -77,9 +80,21 @@ export default function Challenges() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // create modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // kebab menu
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
+  // confirm delete modal
+  const [confirmDelete, setConfirmDelete] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [form, setForm] = useState<CreateForm>({
     title: "",
@@ -89,6 +104,11 @@ export default function Challenges() {
     durationDays: 7,
     exampleFile: null,
   });
+
+  // ✅ For Accept → Accepted button
+  const acceptedSet = useMemo(() => {
+    return new Set(mineAccepted.map((c) => c.id));
+  }, [mineAccepted]);
 
   const canCreate = useMemo(() => {
     return (
@@ -125,15 +145,28 @@ export default function Challenges() {
 
   useEffect(() => {
     loadAll();
+
+    const onDocClick = (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement;
+      if (!target.closest(".chKebabWrap")) setMenuOpenId(null);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onAccept(id: string) {
     if (!me) return;
+    if (acceptedSet.has(id)) return; // ✅ already accepted
+
     try {
       await acceptChallenge(id);
+
+      // refresh accepted list
       const a = await fetchMyAcceptedChallenges(24);
       setMineAccepted(a.items);
+
+      // (optional) bump counts locally? easiest: let backend counts update later
     } catch (e: any) {
       alert(e?.response?.data?.error ?? "Failed to accept challenge.");
     }
@@ -156,7 +189,6 @@ export default function Challenges() {
 
       setMineCreated((prev) => [res.challenge, ...prev]);
       setLatest((prev) => [res.challenge, ...prev]);
-
       setIsCreateOpen(false);
       setForm({
         title: "",
@@ -170,6 +202,37 @@ export default function Challenges() {
       setCreateError(e?.response?.data?.error ?? "Failed to create challenge.");
     } finally {
       setCreateBusy(false);
+    }
+  }
+
+  function openDeleteConfirm(ch: ChallengeItem) {
+    setMenuOpenId(null);
+    setDeleteError(null);
+    setConfirmDelete({ id: ch.id, title: ch.title });
+  }
+
+  async function confirmDeleteChallenge() {
+    if (!confirmDelete) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await deleteChallenge(confirmDelete.id);
+
+      const remove = (arr: ChallengeItem[]) =>
+        arr.filter((x) => x.id !== confirmDelete.id);
+
+      setTrending((p) => remove(p));
+      setLatest((p) => remove(p));
+      setMineAccepted((p) => remove(p));
+      setMineCreated((p) => remove(p));
+
+      setConfirmDelete(null);
+    } catch (e: any) {
+      setDeleteError(
+        e?.response?.data?.error ?? e?.message ?? "Failed to delete challenge."
+      );
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -201,6 +264,11 @@ export default function Challenges() {
             items={trending}
             me={!!me}
             onAccept={onAccept}
+            acceptedSet={acceptedSet}
+            meId={me?.id}
+            menuOpenId={menuOpenId}
+            setMenuOpenId={setMenuOpenId}
+            onDelete={openDeleteConfirm}
           />
 
           <Section
@@ -210,40 +278,66 @@ export default function Challenges() {
             items={latest}
             me={!!me}
             onAccept={onAccept}
+            acceptedSet={acceptedSet}
+            meId={me?.id}
+            menuOpenId={menuOpenId}
+            setMenuOpenId={setMenuOpenId}
+            onDelete={openDeleteConfirm}
           />
 
-          <div className="chSplit">
-            <Section
-              icon={<FiCheckCircle />}
-              title="My Accepted"
-              subtitle={
-                me
-                  ? "Challenges you joined"
-                  : "Sign in to see your accepted challenges"
-              }
-              items={mineAccepted}
-              me={!!me}
-              onAccept={onAccept}
-              compact
-            />
+          {/* ✅ Nice separation */}
+          <div className="chDivider" />
 
-            <Section
-              icon={<FiPlus />}
-              title="My Created"
-              subtitle={
-                me
-                  ? "Challenges you created"
-                  : "Sign in to create and manage your challenges"
-              }
-              items={mineCreated}
-              me={!!me}
-              onAccept={onAccept}
-              compact
-            />
+          <div className="chMyBlock">
+            <div className="chMyHead">
+              <h2>My Challenges</h2>
+              <p>Your accepted and created challenges in one place.</p>
+            </div>
+
+            <div className="chSplit">
+              <Section
+                icon={<FiCheckCircle />}
+                title="My Accepted"
+                subtitle={
+                  me
+                    ? "Challenges you joined"
+                    : "Sign in to see your accepted challenges"
+                }
+                items={mineAccepted}
+                me={!!me}
+                onAccept={onAccept}
+                acceptedSet={acceptedSet}
+                compact
+                meId={me?.id}
+                menuOpenId={menuOpenId}
+                setMenuOpenId={setMenuOpenId}
+                onDelete={openDeleteConfirm}
+              />
+
+              <Section
+                icon={<FiPlus />}
+                title="My Created"
+                subtitle={
+                  me
+                    ? "Challenges you created"
+                    : "Sign in to create and manage your challenges"
+                }
+                items={mineCreated}
+                me={!!me}
+                onAccept={onAccept}
+                acceptedSet={acceptedSet}
+                compact
+                meId={me?.id}
+                menuOpenId={menuOpenId}
+                setMenuOpenId={setMenuOpenId}
+                onDelete={openDeleteConfirm}
+              />
+            </div>
           </div>
         </>
       )}
 
+      {/* CREATE MODAL */}
       {isCreateOpen && (
         <div
           className="chModalOverlay"
@@ -390,6 +484,55 @@ export default function Challenges() {
           </div>
         </div>
       )}
+
+      {/* CONFIRM DELETE MODAL */}
+      {confirmDelete && (
+        <div
+          className="chModalOverlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !deleteBusy)
+              setConfirmDelete(null);
+          }}
+        >
+          <div className="chModal chConfirmModal">
+            <div className="chModalHead">
+              <div>
+                <h2>Delete challenge?</h2>
+                <p>
+                  This will permanently delete <b>{confirmDelete.title}</b>.
+                  This action cannot be undone.
+                </p>
+              </div>
+              <button
+                className="chModalClose"
+                onClick={() => !deleteBusy && setConfirmDelete(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            {deleteError && <div className="chError">{deleteError}</div>}
+
+            <div className="chActions">
+              <button
+                className="chBtnGhost"
+                onClick={() => setConfirmDelete(null)}
+                disabled={deleteBusy}
+              >
+                Cancel
+              </button>
+              <button
+                className="chBtnDanger"
+                onClick={confirmDeleteChallenge}
+                disabled={deleteBusy}
+              >
+                {deleteBusy ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -401,9 +544,29 @@ function Section(props: {
   items: ChallengeItem[];
   me: boolean;
   onAccept: (id: string) => void;
+  acceptedSet: Set<string>;
   compact?: boolean;
+
+  // menu + owner delete
+  meId?: string;
+  menuOpenId: string | null;
+  setMenuOpenId: (id: string | null) => void;
+  onDelete: (ch: ChallengeItem) => void;
 }) {
-  const { icon, title, subtitle, items, me, onAccept, compact } = props;
+  const {
+    icon,
+    title,
+    subtitle,
+    items,
+    me,
+    onAccept,
+    acceptedSet,
+    compact,
+    meId,
+    menuOpenId,
+    setMenuOpenId,
+    onDelete,
+  } = props;
 
   return (
     <section className="chSection">
@@ -421,59 +584,104 @@ function Section(props: {
         <div className="chEmpty">No challenges yet.</div>
       ) : (
         <div className={compact ? "chGrid chGridCompact" : "chGrid"}>
-          {items.map((c) => (
-            <div className="chCard" key={c.id}>
-              <div className="chCardTop">
-                <div className="chCardTitle">{c.title}</div>
-                <div className="chBadge">
-                  {levelLabel(c.level)} • {c.style}
-                </div>
-              </div>
+          {items.map((c) => {
+            const isOwner = !!meId && (c as any)?.creator?.id === meId;
+            const isAccepted = acceptedSet.has(c.id);
 
-              <div className="chDesc">{c.description}</div>
+            return (
+              <div className="chCard" key={c.id}>
+                {/* kebab menu (owner only) */}
+                {isOwner && (
+                  <div className="chKebabWrap">
+                    <button
+                      className="chKebabBtn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpenId(menuOpenId === c.id ? null : c.id);
+                      }}
+                      aria-label="Challenge menu"
+                      title="More"
+                    >
+                      <FiMoreHorizontal />
+                    </button>
 
-              <div className="chMeta">
-                <div className="chMetaItem">
-                  <FiClock />
-                  <span>{Math.max(0, daysLeft(c.endsAt))} days left</span>
-                </div>
-                <div className="chMetaItem">
-                  <span>{c._count.participants} accepted</span>
-                  <span>•</span>
-                  <span>{c._count.submissions} videos</span>
-                </div>
-              </div>
-
-              <div className="chCardActions">
-                {c.exampleVideoUrl ? (
-                  <a
-                    className="chBtnGhost"
-                    href={c.exampleVideoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Watch Example
-                  </a>
-                ) : (
-                  <button
-                    className="chBtnGhost"
-                    disabled
-                    title="No example video provided"
-                  >
-                    Watch Example
-                  </button>
+                    {menuOpenId === c.id && (
+                      <div
+                        className="chKebabMenu"
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          className="chKebabItem chKebabDanger"
+                          onClick={() => onDelete(c)}
+                        >
+                          <FiTrash2 />
+                          <span>Delete challenge</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
-                <button
-                  className="chBtnPrimary"
-                  disabled={!me}
-                  onClick={() => onAccept(c.id)}
-                >
-                  Accept
-                </button>
+                <div className="chCardTop">
+                  <div className="chCardTitle">{c.title}</div>
+                  <div className="chBadge">
+                    {levelLabel(c.level)} • {c.style}
+                  </div>
+                </div>
+
+                <div className="chDesc">{c.description}</div>
+
+                <div className="chMeta">
+                  <div className="chMetaItem">
+                    <FiClock />
+                    <span>{Math.max(0, daysLeft(c.endsAt))} days left</span>
+                  </div>
+                  <div className="chMetaItem">
+                    <span>{c._count.participants} accepted</span>
+                    <span>•</span>
+                    <span>{c._count.submissions} videos</span>
+                  </div>
+                </div>
+
+                <div className="chCardActions">
+                  {c.exampleVideoUrl ? (
+                    <a
+                      className="chBtnGhost"
+                      href={c.exampleVideoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Watch Example
+                    </a>
+                  ) : (
+                    <button
+                      className="chBtnGhost"
+                      disabled
+                      title="No example video provided"
+                    >
+                      Watch Example
+                    </button>
+                  )}
+
+                  {/* ✅ Accept → Accepted */}
+                  <button
+                    className={isAccepted ? "chBtnAccepted" : "chBtnPrimary"}
+                    disabled={!me || isAccepted}
+                    onClick={() => (isAccepted ? null : onAccept(c.id))}
+                    title={
+                      !me
+                        ? "Please sign in to accept challenges"
+                        : isAccepted
+                        ? "Already accepted"
+                        : "Accept"
+                    }
+                  >
+                    {isAccepted ? "Accepted" : "Accept"}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

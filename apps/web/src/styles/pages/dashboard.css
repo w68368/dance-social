@@ -302,6 +302,18 @@
   line-height: 1.35;
 }
 
+.su-dashItem__meta{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.su-dashItem__metaIcon{
+  display: inline-flex;
+  opacity: .8;
+}
+
+
 /* responsive */
 @media (max-width: 920px) {
   .su-dash__grid {

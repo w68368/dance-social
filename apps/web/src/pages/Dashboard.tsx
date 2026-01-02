@@ -1,5 +1,5 @@
 // apps/web/src/pages/Dashboard.tsx
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import "../styles/pages/dashboard.css";
 
@@ -9,7 +9,11 @@ import {
   FiAward,
   FiHome,
   FiChevronRight,
+  FiClock,
 } from "react-icons/fi";
+
+import { getUser } from "../lib/auth";
+import { fetchMyAcceptedChallenges, type ChallengeItem } from "../api";
 
 type CardItem = {
   id: string;
@@ -30,53 +34,120 @@ type Section = {
   cta?: { label: string; href: string };
 };
 
+function daysLeft(endsAt: string) {
+  const end = new Date(endsAt).getTime();
+  const now = Date.now();
+  const diff = end - now;
+  return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
+}
+
 export default function Dashboard() {
-  // ✅ Later you will replace these with real API data
+  const me = getUser();
+
+  const [acceptedActive, setAcceptedActive] = useState<ChallengeItem[]>([]);
+  const [loadingChallenges, setLoadingChallenges] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      if (!me) {
+        setAcceptedActive([]);
+        return;
+      }
+
+      setLoadingChallenges(true);
+      try {
+        const res = await fetchMyAcceptedChallenges(20);
+        const now = Date.now();
+
+        const active = (res.items ?? [])
+          .filter((c) => new Date(c.endsAt).getTime() > now)
+          .sort(
+            (a, b) =>
+              new Date(a.endsAt).getTime() - new Date(b.endsAt).getTime()
+          )
+          .slice(0, 2);
+
+        if (alive) setAcceptedActive(active);
+      } catch {
+        if (alive) setAcceptedActive([]);
+      } finally {
+        if (alive) setLoadingChallenges(false);
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, [me]);
+
+  const challengeItems: CardItem[] = useMemo(() => {
+    return acceptedActive.map((ch) => {
+      const left = daysLeft(ch.endsAt);
+      const meta = `${left} day${left === 1 ? "" : "s"} left • ${
+        ch._count?.participants ?? 0
+      } accepted • ${ch._count?.submissions ?? 0} videos`;
+
+      return {
+        id: ch.id,
+        title: ch.title,
+        subtitle: `${ch.level} • ${ch.style}`,
+        meta,
+        href: "/challenges",
+      };
+    });
+  }, [acceptedActive]);
+
+  // ✅ Keep your existing structure and style
   const sections: Section[] = useMemo(
-    () => [
-      {
-        key: "classes",
-        title: "Classes",
-        subtitle: "Your recurring weekly schedule",
-        icon: <FiRepeat />,
-        items: [],
-        emptyText: "No classes yet",
-        emptyHint: "Join weekly classes and they will appear here.",
-        cta: { label: "Explore classes", href: "/recommendations" },
-      },
-      {
-        key: "events",
-        title: "Events",
-        subtitle: "Workshops & camps you joined",
-        icon: <FiCalendar />,
-        items: [],
-        emptyText: "No events yet",
-        emptyHint: "Workshops and camps you join will appear here.",
-        cta: { label: "Explore events", href: "/recommendations" },
-      },
-      {
-        key: "challenges",
-        title: "Challenges",
-        subtitle: "Accepted, in progress, or completed",
-        icon: <FiAward />,
-        items: [],
-        emptyText: "No challenges yet",
-        emptyHint: "Accept a challenge to start tracking it here.",
-        cta: { label: "Browse challenges", href: "/challenges" },
-      },
-      {
-        key: "studio",
-        title: "Studio Rental",
-        subtitle: "Your current booking status",
-        icon: <FiHome />,
-        items: [],
-        emptyText: "No active rental",
-        emptyHint: "Book a studio and it will show up here.",
-        // cta can be added later when you have a studio page
-      },
-    ],
-    []
-  );
+  () => [
+    {
+      key: "classes",
+      title: "Classes",
+      subtitle: "Your recurring weekly schedule",
+      icon: <FiRepeat />,
+      items: [],
+      emptyText: "No classes yet",
+      emptyHint: "Join weekly classes and they will appear here.",
+      cta: { label: "Explore classes", href: "/recommendations" },
+    },
+    {
+      key: "events",
+      title: "Events",
+      subtitle: "Workshops & camps you joined",
+      icon: <FiCalendar />,
+      items: [],
+      emptyText: "No events yet",
+      emptyHint: "Workshops and camps you join will appear here.",
+      cta: { label: "Explore events", href: "/recommendations" },
+    },
+    {
+      key: "challenges",
+      title: "Challenges",
+      subtitle: "Accepted, in progress, or completed",
+      icon: <FiAward />,
+      items: me ? challengeItems : [],
+      // ✅ фиксируем текст — НЕ меняем во время загрузки
+      emptyText: me ? "No active challenges" : "Sign in to track challenges",
+      emptyHint: me
+        ? "Accept a challenge to start tracking it here."
+        : "Your accepted challenges will appear here.",
+      cta: { label: "Browse challenges", href: "/challenges" },
+    },
+    {
+      key: "studio",
+      title: "Studio Rental",
+      subtitle: "Your current booking status",
+      icon: <FiHome />,
+      items: [],
+      emptyText: "No active rental",
+      emptyHint: "Book a studio and it will show up here.",
+    },
+  ],
+  [challengeItems, me]
+);
 
   return (
     <div className="su-dash">
@@ -130,7 +201,15 @@ export default function Dashboard() {
                           <div className="su-dashItem__sub">{it.subtitle}</div>
                         )}
                         {it.meta && (
-                          <div className="su-dashItem__meta">{it.meta}</div>
+                          <div className="su-dashItem__meta">
+                            {/* nice small icon only for challenges meta */}
+                            {s.key === "challenges" && (
+                              <span className="su-dashItem__metaIcon" aria-hidden="true">
+                                <FiClock />
+                              </span>
+                            )}
+                            <span>{it.meta}</span>
+                          </div>
                         )}
                       </div>
 
@@ -150,14 +229,6 @@ export default function Dashboard() {
             </div>
           </section>
         ))}
-      </div>
-
-      <div className="su-dash__note">
-        <div className="su-dash__noteTitle">Coming next</div>
-        <div className="su-dash__noteText">
-          When we connect backend data, these cards will fill automatically and
-          empty states will disappear.
-        </div>
       </div>
     </div>
   );

@@ -493,6 +493,14 @@ export async function submitChallengeVideo(
   return data;
 }
 
+export async function deleteChallenge(id: string) {
+  const { data } = await api.delete<{ ok: boolean; deletedId?: string; error?: string }>(
+    `/challenges/${id}`
+  );
+  if (!data.ok) throw new Error(data.error || "Failed to delete challenge");
+  return data;
+}
+
 // ----------------------------------------------------
 // Posts
 // ----------------------------------------------------

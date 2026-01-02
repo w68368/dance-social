@@ -289,4 +289,37 @@ router.get("/:id/submissions", async (req, res) => {
   res.json({ items });
 });
 
+// DELETE /api/challenges/:id (author only)
+router.delete("/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const userId = req.userId;
+  const id = req.params.id;
+
+  if (!userId) return res.status(401).json({ ok: false, error: "Unauthorized" });
+
+  try {
+    const ch = await prisma.challenge.findUnique({
+      where: { id },
+      select: { id: true, creatorId: true },
+    });
+
+    if (!ch) return res.status(404).json({ ok: false, error: "Challenge not found" });
+    if (ch.creatorId !== userId) {
+      return res.status(403).json({ ok: false, error: "You can delete only your own challenges" });
+    }
+
+    // If you have relations — delete children first (safe)
+    await prisma.$transaction([
+      prisma.challengeSubmission.deleteMany({ where: { challengeId: id } }),
+      prisma.challengeParticipant.deleteMany({ where: { challengeId: id } }),
+      prisma.challenge.delete({ where: { id } }),
+    ]);
+
+    return res.json({ ok: true, deletedId: id });
+  } catch (err) {
+    console.error("Delete challenge error:", err);
+    return res.status(500).json({ ok: false, error: "Failed to delete challenge" });
+  }
+});
+
+
 export default router;
