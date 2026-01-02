@@ -11,6 +11,8 @@ import followRouter from "./routes/follow.js";
 import chatsRouter from "./routes/chats.js";
 import { prisma } from "./lib/prisma.js";
 import notificationsRouter from "./routes/notifications.js";
+import challengesRouter from "./routes/challenges.js";
+
 
 
 dotenv.config();
@@ -92,6 +94,8 @@ app.use("/api/follow", followRouter);
 app.use("/api/chats", chatsRouter);
 
 app.use("/api/notifications", notificationsRouter);
+
+app.use("/api/challenges", challengesRouter);
 
 // -----------------------
 // USERS LIST (optional)

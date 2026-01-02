@@ -1,5 +1,5 @@
 // apps/web/src/api.ts
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import {
   getAccessToken,
   setAccessToken,
@@ -32,6 +32,8 @@ api.interceptors.request.use((config) => {
 // ------------------------
 // 401 interceptor → refresh
 // ------------------------
+type RetriableConfig = AxiosRequestConfig & { _retry?: boolean };
+
 let isRefreshing = false;
 let waiting: Array<(token: string | null) => void> = [];
 
@@ -42,13 +44,13 @@ function onRefreshed(newToken: string | null) {
 
 api.interceptors.response.use(
   (res) => res,
-  async (error: AxiosError & { config: any }) => {
-    const original = error.config || {};
+  async (error: AxiosError & { config: RetriableConfig }) => {
+    const original = (error.config || {}) as RetriableConfig;
     const status = error?.response?.status;
 
+    const url = typeof original?.url === "string" ? original.url : "";
     const isRefreshCall =
-      typeof original?.url === "string" &&
-      original.url.replace(BASE_URL, "").includes("/auth/refresh");
+      url.includes("/auth/refresh") || url.replace(BASE_URL, "").includes("/auth/refresh");
 
     if (status === 401 && !original._retry && !isRefreshCall) {
       original._retry = true;
@@ -58,7 +60,7 @@ api.interceptors.response.use(
           waiting.push((token) => {
             if (token) {
               original.headers = original.headers ?? {};
-              original.headers.Authorization = `Bearer ${token}`;
+              (original.headers as any).Authorization = `Bearer ${token}`;
             }
             resolve(api(original));
           });
@@ -78,7 +80,7 @@ api.interceptors.response.use(
           onRefreshed(data.accessToken);
 
           original.headers = original.headers ?? {};
-          original.headers.Authorization = `Bearer ${data.accessToken}`;
+          (original.headers as any).Authorization = `Bearer ${data.accessToken}`;
           return api(original);
         } else {
           clearAccessToken();
@@ -299,9 +301,13 @@ export interface FeedPage {
 export type FeedScope = "all" | "following";
 
 // ----------------------------------------------------
-// ✅ Notifications (NEW)
+// ✅ Notifications
 // ----------------------------------------------------
-export type NotificationType = "CHAT_MESSAGE";
+export type NotificationType =
+  | "CHAT_MESSAGE"
+  | "POST_COMMENT"
+  | "POST_LIKE"
+  | "COMMENT_LIKE";
 
 export type NotificationItem = {
   id: string;
@@ -365,6 +371,127 @@ export async function deleteReadNotifications() {
   return data;
 }
 
+// ----------------------------------------------------
+// ✅ Challenges
+// ----------------------------------------------------
+export type ChallengeLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "PRO";
+
+export type ChallengeItem = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  description: string;
+  style: string;
+  level: ChallengeLevel;
+  startsAt: string;
+  endsAt: string;
+  status: "ACTIVE" | "ENDED";
+  exampleVideoUrl?: string | null;
+
+  creator: ApiUserSummary;
+
+  _count: {
+    participants: number;
+    submissions: number;
+  };
+};
+
+export type ChallengeSubmissionItem = {
+  id: string;
+  createdAt: string;
+  videoUrl: string;
+  videoType?: string | null;
+  caption?: string | null;
+  user: ApiUserSummary;
+};
+
+export async function fetchNewChallenges(take = 12) {
+  const { data } = await api.get<{ items: ChallengeItem[] }>("/challenges/new", {
+    params: { take },
+  });
+  return data;
+}
+
+export async function fetchTrendingChallenges(take = 12) {
+  const { data } = await api.get<{ items: ChallengeItem[] }>(
+    "/challenges/trending",
+    { params: { take } }
+  );
+  return data;
+}
+
+export async function fetchMyAcceptedChallenges(take = 24) {
+  const { data } = await api.get<{ items: ChallengeItem[] }>(
+    "/challenges/mine/accepted",
+    { params: { take } }
+  );
+  return data;
+}
+
+export async function fetchMyCreatedChallenges(take = 24) {
+  const { data } = await api.get<{ items: ChallengeItem[] }>(
+    "/challenges/mine/created",
+    { params: { take } }
+  );
+  return data;
+}
+
+export async function acceptChallenge(challengeId: string) {
+  const { data } = await api.post<{ ok: true; acceptedAt: string }>(
+    `/challenges/${challengeId}/accept`
+  );
+  return data;
+}
+
+export async function createChallenge(form: {
+  title: string;
+  description: string;
+  style: string;
+  level: ChallengeLevel;
+  durationDays: number;
+  exampleFile?: File | null;
+}) {
+  const fd = new FormData();
+  fd.set("title", form.title);
+  fd.set("description", form.description);
+  fd.set("style", form.style);
+  fd.set("level", form.level);
+  fd.set("durationDays", String(form.durationDays));
+  if (form.exampleFile) fd.set("example", form.exampleFile);
+
+  const { data } = await api.post<{ challenge: ChallengeItem }>(
+    "/challenges",
+    fd,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return data;
+}
+
+export async function fetchChallengeSubmissions(challengeId: string, take = 20) {
+  const { data } = await api.get<{ items: ChallengeSubmissionItem[] }>(
+    `/challenges/${challengeId}/submissions`,
+    { params: { take } }
+  );
+  return data;
+}
+
+export async function submitChallengeVideo(
+  challengeId: string,
+  video: File,
+  caption?: string
+) {
+  const fd = new FormData();
+  fd.set("video", video);
+  if (caption?.trim()) fd.set("caption", caption.trim());
+
+  const { data } = await api.post<{ submission: ChallengeSubmissionItem }>(
+    `/challenges/${challengeId}/submissions`,
+    fd,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return data;
+}
 
 // ----------------------------------------------------
 // Posts
@@ -728,7 +855,7 @@ export async function deleteChatMessage(messageId: string) {
 export async function editConversationMessage(messageId: string, text: string) {
   const { data } = await api.patch<{
     ok: boolean;
-    message?: ChatMessage; // backend: ok + message (объект)
+    message?: ChatMessage;
     error?: string;
   }>(`/chats/messages/${messageId}`, { text: text.trim() });
 

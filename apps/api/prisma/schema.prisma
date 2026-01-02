@@ -68,6 +68,12 @@ model User {
 
   notifications Notification[]
 
+    // ===== Challenges =====
+  challengesCreated   Challenge[]
+  challengesAccepted  ChallengeParticipant[]
+  challengeSubmissions ChallengeSubmission[]
+
+
   @@index([lockUntil])
 }
 
@@ -355,4 +361,87 @@ model Notification {
   @@index([userId, isRead, createdAt])
 }
 
+enum DancerLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  PRO
+}
+
+enum ChallengeStatus {
+  ACTIVE
+  ENDED
+}
+
+model Challenge {
+  id            String          @id @default(cuid())
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  title         String
+  description   String
+
+  style         String
+  level         DancerLevel
+
+  // how long challenge is active
+  startsAt      DateTime        @default(now())
+  endsAt        DateTime
+
+  status        ChallengeStatus @default(ACTIVE)
+
+  // example video (Cloudinary URL recommended)
+  exampleVideoUrl String?
+  exampleVideoType String? // "video/mp4" etc
+
+  creatorId     String
+  creator       User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  participants  ChallengeParticipant[]
+  submissions   ChallengeSubmission[]
+
+  @@index([status, createdAt])
+  @@index([endsAt])
+  @@index([creatorId, createdAt])
+}
+
+model ChallengeParticipant {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+
+  challengeId  String
+  challenge    Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // when user accepted challenge
+  acceptedAt   DateTime @default(now())
+
+  // optional: completed flag
+  isCompleted  Boolean  @default(false)
+
+  @@unique([challengeId, userId])
+  @@index([userId, acceptedAt])
+}
+
+model ChallengeSubmission {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  challengeId  String
+  challenge    Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  videoUrl     String
+  videoType    String?
+
+  caption      String?
+
+  @@index([challengeId, createdAt])
+  @@index([userId, createdAt])
+}
 

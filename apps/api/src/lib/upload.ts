@@ -1,3 +1,4 @@
+// apps/api/src/lib/upload.ts
 import multer from "multer";
 import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -11,8 +12,10 @@ export const upload = multer({
     filename: (_req, file, cb) => {
       const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
       const ext = file.originalname.split(".").pop();
-      cb(null, `avatar-${unique}.${ext || "bin"}`);
+      // ✅ neutral name (not "avatar-")
+      cb(null, `upload-${unique}.${ext || "bin"}`);
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  // ✅ increase limit for videos (e.g. 100MB)
+  limits: { fileSize: 100 * 1024 * 1024 },
 });
