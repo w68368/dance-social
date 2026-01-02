@@ -54,9 +54,7 @@ model User {
   likedComments       CommentLike[]
 
   // Follows
-  // users who FOLLOW this user
   followers           Follow[] @relation("FollowFollowing")
-  // users that THIS user FOLLOWS
   following           Follow[] @relation("FollowFollower")
 
   // Chats
@@ -68,14 +66,19 @@ model User {
 
   notifications Notification[]
 
-    // ===== Challenges =====
-  challengesCreated   Challenge[]
-  challengesAccepted  ChallengeParticipant[]
-  challengeSubmissions ChallengeSubmission[]
+  // ===== Challenges =====
+  // ✅ Created challenges (bind explicitly to Challenge.creator)
+  challengesCreated     Challenge[] @relation("ChallengeCreator")
 
+  challengesAccepted    ChallengeParticipant[]
+  challengeSubmissions  ChallengeSubmission[]
+
+  // ✅ Winner relation (bind explicitly to Challenge.winner)
+  wonChallenges         Challenge[] @relation("ChallengeWinner")
 
   @@index([lockUntil])
 }
+
 
 model RefreshToken {
   id         String   @id @default(cuid())
@@ -391,11 +394,15 @@ model Challenge {
   status        ChallengeStatus @default(ACTIVE)
 
   // example video (Cloudinary URL recommended)
-  exampleVideoUrl String?
+  exampleVideoUrl  String?
   exampleVideoType String? // "video/mp4" etc
 
   creatorId     String
-  creator       User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  creator       User            @relation("ChallengeCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  // ✅ Winner (chosen by creator)
+  winnerId      String?
+  winner        User?           @relation("ChallengeWinner", fields: [winnerId], references: [id], onDelete: SetNull)
 
   participants  ChallengeParticipant[]
   submissions   ChallengeSubmission[]
@@ -403,7 +410,9 @@ model Challenge {
   @@index([status, createdAt])
   @@index([endsAt])
   @@index([creatorId, createdAt])
+  @@index([winnerId])
 }
+
 
 model ChallengeParticipant {
   id           String   @id @default(cuid())
@@ -444,4 +453,3 @@ model ChallengeSubmission {
   @@index([challengeId, createdAt])
   @@index([userId, createdAt])
 }
-

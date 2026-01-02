@@ -346,4 +346,38 @@ router.delete("/:id", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 
+router.post("/:id/winner", requireAuth, async (req: AuthedRequest, res) => {
+  const challengeId = req.params.id;
+  const userId = req.userId!;
+  const { winnerUserId } = req.body as { winnerUserId?: string };
+
+  if (!winnerUserId) return res.status(400).json({ error: "winnerUserId is required" });
+
+  const ch = await prisma.challenge.findUnique({ where: { id: challengeId } });
+  if (!ch) return res.status(404).json({ error: "Challenge not found" });
+
+  if (ch.creatorId !== userId) return res.status(403).json({ error: "Only creator can set winner" });
+
+  // winner must be a participant (or have submission)
+  const isParticipant = await prisma.challengeParticipant.findFirst({
+    where: { challengeId, userId: winnerUserId },
+    select: { id: true },
+  });
+
+  if (!isParticipant) {
+    return res.status(400).json({ error: "Winner must be a participant of this challenge" });
+  }
+
+  const updated = await prisma.challenge.update({
+    where: { id: challengeId },
+    data: { winnerId: winnerUserId },
+    include: {
+      winner: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+    },
+  });
+
+  res.json({ ok: true, challenge: updated });
+});
+
+
 export default router;

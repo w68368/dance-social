@@ -388,6 +388,8 @@ export type ChallengeItem = {
   endsAt: string;
   status: "ACTIVE" | "ENDED";
   exampleVideoUrl?: string | null;
+  winner?: ApiUserSummary | null;
+  winnerId?: string | null;       
 
   creator: ApiUserSummary;
 
@@ -504,6 +506,14 @@ export async function deleteChallenge(id: string) {
 export async function leaveChallenge(challengeId: string) {
   const { data } = await api.delete<{ ok: true }>(
     `/challenges/${challengeId}/accept`
+  );
+  return data;
+}
+
+export async function setChallengeWinner(challengeId: string, winnerUserId: string) {
+  const { data } = await api.post<{ ok: true; challenge: ChallengeItem }>(
+    `/challenges/${challengeId}/winner`,
+    { winnerUserId }
   );
   return data;
 }
