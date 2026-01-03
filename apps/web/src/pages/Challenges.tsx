@@ -1050,14 +1050,24 @@ function Section(props: {
                   ) : null}
 
                   {variant === "myAccepted" ? (
-                    <button
-                      className="chBtnPrimary"
-                      onClick={() => onOpenSubmit?.(c)}
-                      disabled={!me}
-                      title={!me ? "Sign in to upload" : "Upload your video"}
-                    >
-                      <FiUploadCloud /> Upload my video
-                    </button>
+                    isOwner ? (
+                      <button
+                        className="chBtnGhost"
+                        disabled
+                        title="As the creator, you can only upload the example video"
+                      >
+                        <FiUploadCloud /> Upload disabled
+                      </button>
+                    ) : (
+                      <button
+                        className="chBtnPrimary"
+                        onClick={() => onOpenSubmit?.(c)}
+                        disabled={!me}
+                        title={!me ? "Sign in to upload" : "Upload your video"}
+                      >
+                        <FiUploadCloud /> Upload my video
+                      </button>
+                    )
                   ) : variant === "myCreated" ? (
                     <button
                       className="chBtnPrimary"
