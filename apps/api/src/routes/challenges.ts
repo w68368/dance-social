@@ -379,5 +379,101 @@ router.post("/:id/winner", requireAuth, async (req: AuthedRequest, res) => {
   res.json({ ok: true, challenge: updated });
 });
 
+// PATCH /api/challenges/:id (multipart: optional fields + optional file "example")  ✅ NEW
+const updateChallengeSchema = z.object({
+  title: z.string().min(3).max(80).optional(),
+  description: z.string().min(10).max(1500).optional(),
+  // если захочешь дать менять стиль/уровень — просто раскомментируй
+  // style: z.string().min(2).max(50).optional(),
+  // level: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED", "PRO"]).optional(),
+});
+
+router.patch(
+  "/:id",
+  requireAuth,
+  upload.single("example"),
+  async (req: AuthedRequest & { file?: Express.Multer.File }, res) => {
+    const userId = req.userId;
+    const id = req.params.id;
+
+    if (!userId) return res.status(401).json({ ok: false, error: "Unauthorized" });
+
+    const parsed = updateChallengeSchema.safeParse({
+      title: typeof req.body.title === "string" ? req.body.title : undefined,
+      description: typeof req.body.description === "string" ? req.body.description : undefined,
+      // style: typeof req.body.style === "string" ? req.body.style : undefined,
+      // level: typeof req.body.level === "string" ? req.body.level : undefined,
+    });
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        ok: false,
+        error: "Invalid data",
+        details: parsed.error.flatten(),
+      });
+    }
+
+    try {
+      const ch = await prisma.challenge.findUnique({
+        where: { id },
+        select: { id: true, creatorId: true },
+      });
+
+      if (!ch) return res.status(404).json({ ok: false, error: "Challenge not found" });
+      if (ch.creatorId !== userId) {
+        return res.status(403).json({ ok: false, error: "Only creator can edit this challenge" });
+      }
+
+      const file = req.file;
+
+      let exampleVideoUrl: string | undefined = undefined;
+      let exampleVideoType: string | undefined = undefined;
+
+      if (file) {
+        if (!file.mimetype.startsWith("video/")) {
+          return res.status(400).json({ ok: false, error: "Only video files are allowed for example." });
+        }
+
+        const uploadResult = await cloudinary.uploader.upload(file.path, {
+          resource_type: "video",
+          folder: process.env.CLOUDINARY_UPLOAD_FOLDER || "stepunity/challenges",
+        });
+
+        exampleVideoUrl = uploadResult.secure_url;
+        exampleVideoType = file.mimetype;
+      }
+
+      const dataToUpdate: any = {};
+      if (typeof parsed.data.title === "string") dataToUpdate.title = parsed.data.title;
+      if (typeof parsed.data.description === "string") dataToUpdate.description = parsed.data.description;
+
+      if (exampleVideoUrl) {
+        dataToUpdate.exampleVideoUrl = exampleVideoUrl;
+        dataToUpdate.exampleVideoType = exampleVideoType;
+      }
+
+      // если ничего не пришло — не обновляем
+      if (Object.keys(dataToUpdate).length === 0) {
+        return res.status(400).json({ ok: false, error: "Nothing to update" });
+      }
+
+      const updated = await prisma.challenge.update({
+        where: { id },
+        data: dataToUpdate,
+        include: {
+          creator: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          winner: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+          _count: { select: { participants: true, submissions: true } },
+        },
+      });
+
+      return res.json({ ok: true, challenge: updated });
+    } catch (err) {
+      console.error("Update challenge error:", err);
+      return res.status(500).json({ ok: false, error: "Failed to update challenge" });
+    }
+  }
+);
+
 
 export default router;

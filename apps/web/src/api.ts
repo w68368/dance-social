@@ -518,6 +518,30 @@ export async function setChallengeWinner(challengeId: string, winnerUserId: stri
   return data;
 }
 
+export async function updateChallenge(
+  id: string,
+  form: {
+    title?: string;
+    description?: string;
+    exampleFile?: File | null;
+  }
+) {
+  const fd = new FormData();
+  if (typeof form.title === "string") fd.set("title", form.title);
+  if (typeof form.description === "string") fd.set("description", form.description);
+  if (form.exampleFile) fd.set("example", form.exampleFile);
+
+  const { data } = await api.patch<{ ok: boolean; challenge: ChallengeItem; error?: string }>(
+    `/challenges/${id}`,
+    fd,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+
+  if (!data.ok) throw new Error(data.error || "Failed to update challenge");
+  return data;
+}
+
+
 // ----------------------------------------------------
 // Posts
 // ----------------------------------------------------

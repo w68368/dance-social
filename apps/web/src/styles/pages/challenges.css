@@ -11,7 +11,6 @@
 
   --ch-accent: rgba(180,120,255,.22);
   --ch-accent-2: rgba(180,120,255,.14);
-  --ch-glow: rgba(160,90,255,.14);
 
   --ch-text: rgba(255,255,255,.92);
   --ch-muted: rgba(255,255,255,.78);
@@ -19,6 +18,10 @@
 
   --ch-radius: 18px;
   --ch-radius-sm: 14px;
+
+  --ch-shadow: 0 14px 40px rgba(0,0,0,.22);
+  --ch-shadow-2: 0 18px 55px rgba(0,0,0,.30);
+  --ch-ring: 0 0 0 1px rgba(255,255,255,.03) inset;
 }
 
 /* =========================
@@ -27,41 +30,45 @@
 .chPage{
   max-width: 1180px;
   margin: 0 auto;
-  padding: 18px 14px 44px;
+  padding: 22px 18px 60px;
 }
 
 .chTop{
   display:flex;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
 .chTitle h1{
   margin: 0;
-  font-size: 28px;
+  font-size: 30px;
   letter-spacing: .2px;
 }
 
 .chTitle p{
   margin: 6px 0 0;
   opacity: .82;
-  max-width: 66ch;
+  max-width: 72ch;
 }
 
 /* =========================
-   Buttons (Settings-like)
+   Buttons (base + variants)
 ========================= */
 .chCreateBtn,
 .chBtnPrimary,
-.chBtnGhost{
+.chBtnGhost,
+.chBtnAccepted,
+.chBtnDanger{
   display:inline-flex;
   align-items:center;
   justify-content:center;
   gap: 10px;
 
   padding: 10px 14px;
+  height: 44px;
+  line-height: 1;
   border-radius: var(--ch-radius-sm);
   border: 1px solid rgba(255,255,255,.12);
 
@@ -82,7 +89,8 @@
 
 .chCreateBtn:active,
 .chBtnPrimary:active,
-.chBtnGhost:active{
+.chBtnGhost:active,
+.chBtnDanger:active{
   transform: translateY(1px);
 }
 
@@ -90,46 +98,83 @@
   border-color: rgba(180,120,255,.26);
   background: rgba(180,120,255,.10);
 }
-
 .chBtnPrimary:hover{
   background: rgba(180,120,255,.14);
   border-color: rgba(180,120,255,.30);
   box-shadow: 0 14px 34px rgba(0,0,0,.22);
 }
 
+.chBtnDanger{
+  border: 1px solid rgba(255,0,0,.22);
+  background: rgba(255,0,0,.10);
+}
+.chBtnDanger:hover{
+  background: rgba(255,0,0,.14);
+  border-color: rgba(255,0,0,.28);
+}
+
+.chBtnAccepted{
+  border: 1px solid rgba(80, 220, 140, 0.35);
+  background: linear-gradient(90deg, rgba(60, 200, 120, 0.22), rgba(80, 220, 140, 0.14));
+  color: rgba(235, 255, 245, 0.98);
+  cursor: default;
+  text-align: center;
+}
+.chBtnAccepted:hover{
+  background: linear-gradient(90deg, rgba(60, 200, 120, 0.24), rgba(80, 220, 140, 0.16));
+}
+
 .chBtnPrimary:disabled,
 .chBtnGhost:disabled,
-.chCreateBtn:disabled{
+.chCreateBtn:disabled,
+.chBtnDanger:disabled{
   opacity: .55;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
 }
 
-/* ✅ Icons readability */
+.chBtnAccepted:disabled{ opacity: 1; }
+
+/* ✅ icons (single place, no repeats) */
+.chPage svg{
+  flex: 0 0 auto;
+}
 .chCreateBtn svg,
 .chBtnPrimary svg,
 .chBtnGhost svg,
 .chBtnAccepted svg,
-.chBtnDanger svg,
+.chBtnDanger svg{
+  width: 18px;
+  height: 18px;
+  opacity: .95;
+}
 .chMetaItem svg,
 .chKebabBtn svg{
   width: 18px;
   height: 18px;
-  flex: 0 0 auto;
-  opacity: .95;
+  opacity: .92;
 }
 
 /* =========================
    Sections
 ========================= */
-.chSection{ margin-top: 18px; }
+.chSection{
+  margin-top: 18px;
+  padding: 14px 14px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.14);
+}
 
 .chSectionHead{
   display:flex;
   justify-content: space-between;
   align-items:center;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .chSectionTitle{
@@ -139,15 +184,16 @@
 }
 
 .chIcon{
-  width: 38px;
-  height: 38px;
-  border-radius: 13px;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
   display:flex;
   align-items:center;
   justify-content:center;
 
   background: rgba(255,255,255,.05);
   border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
 }
 
 .chSection h2{ margin: 0; font-size: 18px; }
@@ -159,9 +205,12 @@
 .chGrid{
   display:grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px; /* ✅ bigger spacing */
+  gap: 16px;
 }
-.chGridCompact{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.chGridCompact{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 
 @media (max-width: 1040px){
   .chGrid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -172,50 +221,77 @@
 }
 
 /* =========================
-   Cards (bigger & clearer)
+   Cards
 ========================= */
 .chCard{
   position: relative;
-
   border-radius: var(--ch-radius);
-  padding: 18px; /* ✅ more padding */
+
+  /* reserve space for kebab button on the right */
+  padding: 18px 58px 18px 18px;
 
   background: linear-gradient(180deg, var(--ch-card-bg), var(--ch-card-bg2));
   border: 1px solid var(--ch-border);
-
-  box-shadow:
-    0 14px 40px rgba(0,0,0,.22),
-    0 0 0 1px rgba(255,255,255,.03) inset;
+  box-shadow: var(--ch-shadow), var(--ch-ring);
 
   display:flex;
   flex-direction: column;
-  gap: 12px; /* ✅ more breathing */
-  min-height: 244px; /* ✅ bigger card */
+  gap: 12px;
+  min-height: 252px;
+
+  overflow: hidden;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
 
-.chCardTop{ display:flex; flex-direction: column; gap: 7px; }
+.chCard::before{
+  content:"";
+  position:absolute;
+  inset: 0;
+  pointer-events:none;
+  background:
+    radial-gradient(800px 220px at 10% 0%, rgba(180,120,255,.10), transparent 60%),
+    radial-gradient(700px 240px at 90% 35%, rgba(255,215,120,.07), transparent 55%);
+  opacity: .9;
+}
+
+/* prevent layout blowups from long text/buttons */
+.chCard *{ min-width: 0; }
+.chCard > *{ position: relative; z-index: 1; }
+
+.chCard:hover{
+  transform: translateY(-2px);
+  border-color: rgba(255,215,120,.22);
+  box-shadow: var(--ch-shadow-2), 0 0 0 1px rgba(255,255,255,.04) inset;
+  background: linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.035));
+}
+
+.chCardTop{
+  display:flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
 .chCardTitle{
-  font-size: 18px; /* ✅ larger title */
-  font-weight: 750;
+  font-size: 18px;
+  font-weight: 780;
   color: var(--ch-text);
   letter-spacing: .15px;
 }
 
 .chBadge{
-  font-size: 13px; /* ✅ bigger */
+  font-size: 13px;
   opacity: .92;
   display:inline-flex;
   width: fit-content;
   padding: 6px 10px;
   border-radius: 999px;
-
-  background: rgba(255,255,255,.05);
+  background: rgba(0,0,0,.14);
   border: 1px solid rgba(255,255,255,.10);
 }
 
 .chDesc{
   color: var(--ch-muted);
-  font-size: 14px; /* ✅ bigger */
+  font-size: 14px;
   line-height: 1.38;
   display: -webkit-box;
   line-clamp: 4;
@@ -226,48 +302,121 @@
 .chMeta{
   display:flex;
   justify-content: space-between;
+  align-items:center;
   gap: 10px;
-  opacity: .88;
-  font-size: 13px; /* ✅ bigger */
-  margin-top: auto;
+
+  opacity: .9;
+  font-size: 13px;
   color: var(--ch-muted);
+
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.08);
 }
 
-.chMetaItem{ display:flex; align-items:center; gap: 8px; }
-.chMetaItem svg{ opacity: .92; }
-
-/* Card actions */
-.chCardActions{
+.chMetaItem{
   display:flex;
+  align-items:center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+/* actions: always safe, no overflow */
+.chCardActions{
+  display:grid;
+  grid-template-columns: 1fr;
   gap: 10px;
-  flex-wrap: wrap; /* ✅ allow 3 buttons nicely */
   margin-top: 10px;
 }
 
-/* ✅ make buttons bigger and readable */
-.chBtnPrimary, .chBtnGhost, .chBtnAccepted{
-  flex: 1;
-  padding: 10px 12px;
-  min-height: 42px;
+.chCardActions > a,
+.chCardActions > button{
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 14px;
 }
 
-/* If 3 buttons appear, they still look nice */
-.chCardActions > *{
-  min-width: 165px;
+/* =========================
+   Split + My block
+========================= */
+.chDivider{
+  margin: 22px 0 18px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(180,120,255,.22),
+    rgba(120,190,255,.14),
+    transparent
+  );
 }
 
-/* =========================
-   Split
-========================= */
+.chMyBlock{
+  padding: 18px;
+  border-radius: 22px;
+  background:
+    radial-gradient(1200px 500px at 15% 0%, rgba(180,120,255,.10), transparent 60%),
+    radial-gradient(900px 420px at 90% 30%, rgba(255,215,120,.06), transparent 55%),
+    rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 18px 55px rgba(0,0,0,.28);
+}
+
+.chMyHead{
+  display:flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.chMyHead h2{ margin: 0; font-size: 18px; }
+.chMyHead p{ margin: 0; opacity: .78; font-size: 13px; }
+
 .chSplit{
   margin-top: 18px;
   display:grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
 }
+
 @media (max-width: 900px){
   .chSplit{ grid-template-columns: 1fr; }
+}
+
+/* make inner sections in My Challenges lighter (no "double frame") */
+.chMyBlock .chSection{
+  margin-top: 0;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: none;
+}
+
+/* bigger cards inside My block */
+.chMyBlock .chCard{
+  min-height: 290px;
+  box-shadow: 0 16px 48px rgba(0,0,0,.30), 0 0 0 1px rgba(255,255,255,.03) inset;
+  border-color: rgba(255,255,255,.12);
+}
+.chMyBlock .chCard:hover{
+  border-color: rgba(180,120,255,.28);
+  box-shadow: 0 20px 60px rgba(0,0,0,.36), 0 0 0 1px rgba(255,255,255,.04) inset;
+}
+
+/* 2 columns in compact grid only inside My block on wide screens */
+@media (min-width: 1100px){
+  .chMyBlock .chGridCompact{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1099px){
+  .chMyBlock .chGridCompact{
+    grid-template-columns: 1fr;
+  }
 }
 
 /* =========================
@@ -289,7 +438,106 @@
 }
 
 /* =========================
-   Modal (notification-style)
+   Kebab menu (three dots on the right)
+========================= */
+.chKebabWrap{
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 6;
+
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+.chCard:hover .chKebabWrap{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.chKebabBtn{
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.22);
+  backdrop-filter: blur(6px);
+
+  color: rgba(255,255,255,.92);
+  cursor: pointer;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.chKebabBtn:hover{
+  background: rgba(0,0,0,.28);
+  border-color: rgba(255,255,255,.14);
+}
+
+.chKebabMenu{
+  position: absolute;
+  top: 42px;
+  right: 0;
+  min-width: 190px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(18,12,28,.96), rgba(12,8,20,.96));
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 18px 50px rgba(0,0,0,.55);
+  padding: 6px;
+}
+
+.chKebabItem{
+  width: 100%;
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,.92);
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+
+.chKebabItem:hover{ background: rgba(255,255,255,.06); }
+
+.chKebabDanger{ color: rgba(255, 180, 180, .95); }
+.chKebabDanger:hover{ background: rgba(255,0,0,.10); }
+
+/* =========================
+   Winner UI
+========================= */
+.chWinnerBadge,
+.chWinnerPill,
+.chWinnerTag{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  width: fit-content;
+  color: rgba(255,255,255,.92);
+  border: 1px solid rgba(255, 215, 120, 0.25);
+  background: rgba(255, 215, 120, 0.10);
+}
+
+.chWinnerBadge{ padding: 6px 10px; font-size: 13px; }
+.chWinnerLine{ margin-top: 8px; }
+.chWinnerPill{ padding: 7px 12px; font-size: 12.5px; }
+.chWinnerTag{ padding: 6px 10px; font-size: 12px; gap: 7px; }
+
+.chSubmissionCardWinner{
+  border-color: rgba(255, 215, 120, 0.28) !important;
+  background: rgba(255, 215, 120, 0.08) !important;
+}
+
+/* =========================
+   Modals
 ========================= */
 .chModalOverlay{
   position: fixed;
@@ -304,20 +552,19 @@
 }
 
 .chModal{
-  width: min(760px, 100%); /* ✅ wider but not huge */
-  max-height: 84vh;       /* ✅ constrain height */
-  overflow: hidden;       /* ✅ internal scroll areas */
+  width: min(760px, 100%);
+  max-height: 84vh;
+  overflow: hidden;
   border-radius: 18px;
 
   background: linear-gradient(180deg, rgba(18, 12, 28, 0.92), rgba(12, 8, 20, 0.92));
   border: 1px solid rgba(255,255,255,.10);
 
-  box-shadow:
-    0 16px 40px rgba(0,0,0,.45),
-    0 0 0 1px rgba(255,255,255,.04) inset;
-
+  box-shadow: 0 16px 40px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04) inset;
   padding: 12px;
 }
+
+.chConfirmModal{ width: min(560px, 100%); }
 
 .chModalHead{
   display:flex;
@@ -326,7 +573,7 @@
   gap: 10px;
   padding: 6px 8px 10px;
 
-  position: sticky; /* ✅ keeps header visible */
+  position: sticky;
   top: 0;
   z-index: 2;
   backdrop-filter: blur(10px);
@@ -336,7 +583,7 @@
 .chModalHead p{ margin: 4px 0 0; font-size: 12px; opacity: .78; }
 
 .chModalClose{
-  width: 36px; /* ✅ slightly bigger */
+  width: 36px;
   height: 36px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,.10);
@@ -352,14 +599,14 @@
 }
 
 /* =========================
-   Form (Settings-like)
+   Form
 ========================= */
 .chForm{
   display:flex;
   flex-direction: column;
   gap: 10px;
   padding: 4px 8px 10px;
-  max-height: calc(84vh - 90px); /* ✅ internal scroll for long forms */
+  max-height: calc(84vh - 90px);
   overflow: auto;
 }
 
@@ -367,7 +614,7 @@
   display:flex;
   flex-direction: column;
   gap: 6px;
-  position: relative; /* for select arrow */
+  position: relative;
 }
 
 .chForm span{
@@ -407,7 +654,6 @@
   cursor: pointer;
 }
 
-/* Custom arrow for selects */
 .chForm label:has(select)::after{
   content: "▾";
   position: absolute;
@@ -418,13 +664,10 @@
   font-size: 14px;
 }
 
-/* Dropdown options */
 .chForm select option{
   background: rgb(16, 11, 24);
   color: rgba(255,255,255,.92);
 }
-
-.chForm small{ opacity: .75; }
 
 .chRow{
   display:grid;
@@ -442,14 +685,8 @@
   margin-top: 4px;
 }
 
-.chHint{
-  opacity: .75;
-  font-size: 12px;
-  margin-top: 6px;
-}
-
 /* =========================
-   Submissions modal content (NEW)
+   Submissions list
 ========================= */
 .chSubmissionsList{
   display:grid;
@@ -469,6 +706,7 @@
 .chSubmissionAuthor{
   display:flex;
   align-items:center;
+  justify-content: space-between;
   gap: 10px;
   font-size: 13px;
   opacity: .92;
@@ -477,269 +715,10 @@
 
 .chSubmissionVideo{
   width: 100%;
-  max-height: 360px; /* ✅ NOT huge */
+  max-height: 360px;
   border-radius: 14px;
   background: rgba(0,0,0,.35);
-  object-fit: contain; /* ✅ keep proportions */
-}
-
-/* =========================
-   Kebab menu (owner + leave)
-========================= */
-.chKebabWrap{
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  opacity: 0;
-  transform: translateY(-2px);
-  transition: opacity .12s ease, transform .12s ease;
-  z-index: 5;
-}
-
-.chCard:hover .chKebabWrap{
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.chKebabBtn{
-  width: 40px; /* ✅ bigger click area */
-  height: 40px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.05);
-  color: rgba(255,255,255,.92);
-  cursor: pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-.chKebabBtn:hover{
-  background: rgba(255,255,255,.08);
-  border-color: rgba(255,255,255,.14);
-}
-
-.chKebabBtn svg{
-  width: 20px;
-  height: 20px;
-}
-
-.chKebabMenu{
-  position: absolute;
-  top: 46px;
-  right: 0;
-  min-width: 190px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(18,12,28,.96), rgba(12,8,20,.96));
-  border: 1px solid rgba(255,255,255,.10);
-  box-shadow: 0 18px 50px rgba(0,0,0,.55);
-  padding: 6px;
-}
-
-.chKebabItem{
-  width: 100%;
-  display:flex;
-  align-items:center;
-  gap: 10px;
-  padding: 10px 10px;
-  border-radius: 12px;
-  border: 0;
-  background: transparent;
-  color: rgba(255,255,255,.92);
-  cursor: pointer;
-  text-align: left;
-  font-size: 13px;
-}
-
-.chKebabItem svg{
-  width: 18px;
-  height: 18px;
-}
-
-.chKebabItem:hover{
-  background: rgba(255,255,255,.06);
-}
-
-.chKebabDanger{
-  color: rgba(255, 180, 180, .95);
-}
-.chKebabDanger:hover{
-  background: rgba(255,0,0,.10);
-}
-
-/* =========================
-   Confirm modal tweaks
-========================= */
-.chConfirmModal{
-  width: min(560px, 100%);
-}
-
-/* Danger button */
-.chBtnDanger{
-  flex: 1;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap: 10px;
-  padding: 10px 12px;
-  min-height: 42px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,0,0,.22);
-  background: rgba(255,0,0,.10);
-  color: rgba(255,255,255,.92);
-  cursor: pointer;
-  box-shadow: 0 10px 30px rgba(0,0,0,.18);
-}
-
-.chBtnDanger:hover{
-  background: rgba(255,0,0,.14);
-  border-color: rgba(255,0,0,.28);
-}
-
-.chBtnDanger:disabled{
-  opacity: .55;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-/* =========================
-   Accepted button (green)
-========================= */
-.chBtnAccepted{
-  flex: 1;
-  border-radius: 14px;
-  padding: 10px 12px;
-  min-height: 42px;
-  border: 1px solid rgba(80, 220, 140, 0.35);
-  background: linear-gradient(
-    90deg,
-    rgba(60, 200, 120, 0.22),
-    rgba(80, 220, 140, 0.14)
-  );
-  color: rgba(235, 255, 245, 0.98);
-  cursor: default;
-  text-align: center;
-}
-
-.chBtnAccepted:hover{
-  background: linear-gradient(
-    90deg,
-    rgba(60, 200, 120, 0.24),
-    rgba(80, 220, 140, 0.16)
-  );
-}
-
-.chBtnAccepted:disabled{
-  opacity: 1; /* keep it readable */
-}
-
-/* =========================
-   Split divider + "My" block
-========================= */
-.chDivider{
-  margin: 22px 0 18px;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(180,120,255,.22),
-    rgba(120,190,255,.14),
-    transparent
-  );
-}
-
-.chMyBlock{
-  border-radius: 18px;
-  padding: 14px;
-  background: rgba(255,255,255,.03);
-  border: 1px solid rgba(180,120,255,.10);
-  box-shadow: 0 14px 40px rgba(0,0,0,.18);
-}
-
-.chMyHead{
-  display:flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.chMyHead h2{
-  margin: 0;
-  font-size: 18px;
-}
-
-.chMyHead p{
-  margin: 0;
-  opacity: .78;
-  font-size: 13px;
-}
-
-.chWinnerBadge{
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  width: fit-content;
-  font-size: 13px;
-  border: 1px solid rgba(255, 215, 120, 0.25);
-  background: rgba(255, 215, 120, 0.10);
-  color: rgba(255,255,255,.92);
-}
-.chWinnerBadge svg{
-  width: 18px;
-  height: 18px;
-}
-
-/* =========================
-   Winner UI (View/Award modals)
-========================= */
-
-.chWinnerLine{
-  margin-top: 8px;
-}
-
-.chWinnerPill{
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  width: fit-content;
-  font-size: 12.5px;
-
-  border: 1px solid rgba(255, 215, 120, 0.25);
-  background: rgba(255, 215, 120, 0.10);
-  color: rgba(255,255,255,.92);
-}
-
-.chWinnerPill svg{
-  width: 18px;
-  height: 18px;
-}
-
-.chWinnerTag{
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  border-radius: 999px;
-
-  font-size: 12px;
-  color: rgba(255,255,255,.92);
-
-  border: 1px solid rgba(255, 215, 120, 0.22);
-  background: rgba(255, 215, 120, 0.10);
-}
-
-.chWinnerTag svg{
-  width: 16px;
-  height: 16px;
-}
-
-.chSubmissionCardWinner{
-  border-color: rgba(255, 215, 120, 0.28) !important;
-  background: rgba(255, 215, 120, 0.08) !important;
+  object-fit: contain;
 }
 
 .chSubmissionCaption{
@@ -749,18 +728,13 @@
   line-height: 1.35;
 }
 
-.chSubmitPickRow{
-  margin-top: 10px;
-}
+.chSubmitPickRow{ margin-top: 10px; }
+
 .chAwardHead{
   display: inline-flex;
   align-items: center;
   gap: 10px;
   margin: 0;
-}
-.chAwardHead svg{
-  width: 20px;
-  height: 20px;
 }
 .chAwardSub{
   margin: 6px 0 0;
@@ -768,20 +742,99 @@
   opacity: .78;
 }
 
-
 /* =========================
    Small screens polish
 ========================= */
 @media (max-width: 520px){
   .chCard{
-    padding: 14px;
-    min-height: 228px;
+    padding: 14px 50px 14px 14px;
+    min-height: 236px;
   }
   .chCardTitle{ font-size: 16px; }
-  .chCardActions > *{
-    min-width: 100%;
+  .chSubmissionVideo{ max-height: 260px; }
+}
+
+
+/* =========================
+   My Challenges — Premium polish
+========================= */
+
+/* 1) Внутренние секции в MyBlock — меньше "рамки", больше воздуха */
+.chMyBlock .chSection{
+  border-color: rgba(255,255,255,.06);
+  background: rgba(255,255,255,.015);
+}
+
+/* 2) Грид внутри MyBlock: 2 колонки чаще (чтобы карточки не были "одна и маленькая") */
+@media (min-width: 980px){
+  .chMyBlock .chGridCompact{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
   }
-  .chSubmissionVideo{
-    max-height: 260px;
+}
+
+/* 3) Карточки в MyBlock: чуть шире визуально и аккуратнее */
+.chMyBlock .chCard{
+  min-height: 300px;
+  padding: 18px 56px 18px 18px; /* место под ⋯ */
+  border-color: rgba(255,255,255,.10);
+}
+
+/* 4) Премиум “cover” сверху карточки */
+.chMyBlock .chCard::after{
+  content:"";
+  position:absolute;
+  left: 10px;
+  right: 10px;
+  top: 10px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(
+    90deg,
+    rgba(180,120,255,.12),
+    rgba(255,215,120,.08),
+    rgba(120,190,255,.08)
+  );
+  opacity: .55;
+  pointer-events:none;
+}
+
+/* 5) Заголовок чуть выше по иерархии */
+.chMyBlock .chCardTitle{
+  font-size: 19px;
+  letter-spacing: .2px;
+}
+
+/* 6) META: фиксируем "слипание" — 2 колонки */
+.chMeta{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.chMetaItem:last-child{
+  justify-content: flex-end;
+  gap: 8px;
+  opacity: .92;
+}
+
+/* если совсем узко — переносим вторую строку вниз */
+@media (max-width: 420px){
+  .chMeta{
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
+  .chMetaItem:last-child{
+    justify-content: flex-start;
+  }
+}
+
+/* 7) Кнопки: одинаковая ширина и без прыжков */
+.chCardActions{
+  gap: 10px;
+}
+
+.chCardActions > *{
+  border-radius: 14px;
 }
