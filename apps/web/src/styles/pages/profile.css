@@ -1,27 +1,29 @@
 /* apps/web/src/styles/pages/profile.css */
 
 /* =========================
-   Tokens (StepUnity premium)
+   Minimal tokens (StepUnity)
 ========================= */
 :root{
   --pf-text: rgba(255,255,255,.92);
-  --pf-muted: rgba(255,255,255,.74);
-  --pf-subtle: rgba(255,255,255,.58);
+  --pf-muted: rgba(255,255,255,.72);
+  --pf-subtle: rgba(255,255,255,.56);
 
-  --pf-card: rgba(255,255,255,.04);
-  --pf-card2: rgba(255,255,255,.06);
+  --pf-surface: rgba(255,255,255,.04);
+  --pf-surface2: rgba(255,255,255,.06);
   --pf-border: rgba(255,255,255,.10);
   --pf-border2: rgba(255,255,255,.14);
 
-  --pf-accent: rgba(180,120,255,.22);
-  --pf-accent2: rgba(180,120,255,.14);
-  --pf-gold: rgba(255,215,120,.18);
+  --pf-accent: rgba(180,120,255,.18);
+  --pf-accentBorder: rgba(180,120,255,.22);
 
-  --pf-r: 22px;
-  --pf-r-sm: 16px;
+  --pf-success: rgba(80,220,140,.16);
+  --pf-successBorder: rgba(80,220,140,.28);
 
-  --pf-shadow: 0 18px 55px rgba(0,0,0,.30);
-  --pf-shadow2: 0 24px 70px rgba(0,0,0,.38);
+  --pf-radius: 20px;
+  --pf-radius-sm: 14px;
+
+  --pf-shadow: 0 14px 42px rgba(0,0,0,.22);
+  --pf-shadow-soft: 0 10px 28px rgba(0,0,0,.18);
   --pf-inset: 0 0 0 1px rgba(255,255,255,.03) inset;
 }
 
@@ -38,61 +40,53 @@
   padding: 26px 18px 64px;
 }
 
-/* Utility safety (prevents layout blowups) */
+/* Utility safety */
 .profile-container *{
   min-width: 0;
 }
 
 /* =========================
-   Header (Hero card)
+   Header (Minimal hero card)
 ========================= */
 .profile-header{
   position: relative;
   display: grid;
-  grid-template-columns: 118px 1fr;
+  grid-template-columns: 96px 1fr;
   gap: 18px;
   align-items: center;
 
-  padding: 18px 18px;
-  border-radius: var(--pf-r);
-  border: 1px solid rgba(255,255,255,.08);
+  padding: 18px;
+  border-radius: var(--pf-radius);
+  border: 1px solid var(--pf-border);
 
-  background:
-    radial-gradient(900px 420px at 12% 0%, rgba(180,120,255,.13), transparent 60%),
-    radial-gradient(900px 420px at 88% 18%, rgba(255,215,120,.09), transparent 55%),
-    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+  background: var(--pf-surface);
+  backdrop-filter: blur(10px);
 
-  backdrop-filter: blur(12px);
   box-shadow: var(--pf-shadow), var(--pf-inset);
   overflow: hidden;
 }
 
+/* убираем “сияние” полностью */
 .profile-header::before{
   content:"";
   position:absolute;
   inset: 0;
   pointer-events:none;
-  background:
-    radial-gradient(700px 240px at 18% 10%, rgba(180,120,255,.10), transparent 60%),
-    radial-gradient(650px 220px at 92% 35%, rgba(120,190,255,.08), transparent 55%);
-  opacity: .9;
+  background: none;
 }
 
 /* Avatar */
 .profile-avatar{
-  width: 110px;
-  height: 110px;
+  width: 88px;
+  height: 88px;
   border-radius: 999px;
   overflow: hidden;
   display: grid;
   place-items: center;
 
-  background: rgba(0,0,0,.22);
-  border: 1px solid rgba(255,255,255,.10);
-  box-shadow:
-    0 0 0 4px rgba(255,255,255,.03),
-    0 0 0 1px rgba(255,255,255,.05) inset,
-    0 18px 40px rgba(0,0,0,.35);
+  background: rgba(0,0,0,.18);
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: none;
 }
 
 .profile-avatar img{
@@ -103,9 +97,9 @@
 }
 
 .profile-avatar span{
-  font-size: 34px;
+  font-size: 30px;
   font-weight: 800;
-  color: rgba(255,255,255,.92);
+  color: var(--pf-text);
   letter-spacing: .5px;
 }
 
@@ -113,45 +107,51 @@
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   align-content: start;
 }
 
 .profile-username{
   margin: 0;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 820;
   letter-spacing: .2px;
   color: var(--pf-text);
 }
 
+/* handle under name */
+.profile-handle{
+  margin-top: -8px;
+  font-size: 13px;
+  color: rgba(255,255,255,.68);
+  letter-spacing: .2px;
+}
+
 /* =========================
-   Stats (chips)
+   Stats (minimal metrics)
 ========================= */
 .profile-stats{
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  align-items: stretch;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 2px;
 }
 
 .profile-stat{
   display: grid;
-  gap: 4px;
-  text-align: left;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 
-  padding: 10px 12px;
-  border-radius: 16px;
-
-  background: rgba(0,0,0,.18);
-  border: 1px solid rgba(255,255,255,.10);
-  box-shadow: 0 10px 28px rgba(0,0,0,.22);
-
+  min-width: unset;
   color: var(--pf-text);
 }
 
 .profile-stat-number{
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 820;
   line-height: 1.05;
 }
@@ -160,30 +160,113 @@
   font-size: 11px;
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.70);
+  color: rgba(255,255,255,.56);
+}
+
+/* divider between stats */
+.profile-stat + .profile-stat{
+  position: relative;
+  padding-left: 16px;
+}
+
+.profile-stat + .profile-stat::before{
+  content:"";
+  position:absolute;
+  left: 7px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: rgba(255,255,255,.10);
 }
 
 /* clickable stat (followers) */
 .profile-stat-clickable{
   cursor: pointer;
-  background:
-    linear-gradient(180deg, rgba(180,120,255,.12), rgba(0,0,0,.18));
-  border-color: rgba(180,120,255,.20);
-}
-
-.profile-stat:hover{
-  border-color: rgba(255,255,255,.16);
-  background: rgba(0,0,0,.22);
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin-left: -10px; /* чтобы hover был “подсветкой”, без сдвига */
 }
 
 .profile-stat-clickable:hover{
-  border-color: rgba(180,120,255,.28);
-  background:
-    linear-gradient(180deg, rgba(180,120,255,.16), rgba(0,0,0,.22));
+  background: rgba(255,255,255,.06);
 }
 
-.profile-stat:active{
+/* =========================
+   Actions (Follow / Message)
+========================= */
+.profile-actions{
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* shared button base */
+.profile-actions .btn-follow,
+.profile-actions .btn-message{
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 12px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.16);
+  color: rgba(255,255,255,.92);
+
+  cursor: pointer;
+  user-select: none;
+
+  box-shadow: none;
+  transition: background .15s ease, border-color .15s ease, transform .12s ease;
+}
+
+.profile-actions .btn-follow:hover,
+.profile-actions .btn-message:hover{
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.18);
+}
+
+.profile-actions .btn-follow:active,
+.profile-actions .btn-message:active{
   transform: translateY(1px);
+}
+
+.profile-actions .btn-follow:disabled,
+.profile-actions .btn-message:disabled{
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* FOLLOW (subtle accent) */
+.profile-actions .btn-follow{
+  border-color: var(--pf-accentBorder);
+  background: rgba(180,120,255,.10);
+}
+
+/* FOLLOWING (success) */
+.profile-actions .btn-follow.following{
+  border-color: var(--pf-successBorder);
+  background: var(--pf-success);
+  color: rgba(235,255,245,.98);
+}
+
+/* MESSAGE (neutral) */
+.profile-actions .btn-message{
+  background: rgba(0,0,0,.18);
+}
+
+/* small meta line under buttons (loading/no posts) */
+.profile-meta{
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,.70);
+  opacity: .92;
 }
 
 /* =========================
@@ -192,16 +275,8 @@
 .profile-bottom-line{
   height: 1px;
   margin: 18px 0 18px;
-
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(180,120,255,.26),
-    rgba(255,215,120,.18),
-    rgba(120,190,255,.14),
-    transparent
-  );
-  opacity: .9;
+  background: rgba(255,255,255,.10);
+  opacity: .8;
 }
 
 /* =========================
@@ -210,14 +285,13 @@
 .profile-empty{
   margin-top: 14px;
   padding: 14px 14px;
-  border-radius: 16px;
+  border-radius: 14px;
 
   border: 1px dashed rgba(255,255,255,.14);
   background: rgba(255,255,255,.03);
   color: rgba(255,255,255,.82);
 }
 
-/* feed-error comes from feed.css, but we ensure spacing */
 .feed-error{
   margin: 12px 0 10px;
 }
@@ -227,7 +301,7 @@
 ========================= */
 .profile-section-title{
   margin: 10px 0 12px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -235,7 +309,7 @@
 }
 
 /* =========================
-   Posts grid (premium)
+   Posts grid (clean)
 ========================= */
 .profile-posts-grid{
   display: grid;
@@ -247,48 +321,33 @@
   .profile-posts-grid{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-@media (max-width: 760px){
-  .profile-header{
-    grid-template-columns: 92px 1fr;
-    padding: 16px;
-  }
-  .profile-avatar{ width: 88px; height: 88px; }
-  .profile-username{ font-size: 22px; }
-  .profile-stats{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .profile-posts-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (max-width: 420px){
-  .profile-container{ padding: 20px 14px 56px; }
-  .profile-posts-grid{ grid-template-columns: 1fr; }
-}
-
-/* Tile wrapper */
+/* =========================
+   Post tile
+========================= */
 .profile-post-tile-wrap{
   position: relative;
 }
 
-/* Clickable tile */
 .profile-post-tile{
   width: 100%;
   border: 0;
   padding: 0;
   cursor: pointer;
 
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
 
-  background: linear-gradient(180deg, var(--pf-card), var(--pf-card2));
+  background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.10);
-  box-shadow: 0 16px 44px rgba(0,0,0,.30), var(--pf-inset);
+  box-shadow: none;
 
-  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
 }
 
 .profile-post-tile:hover{
   transform: translateY(-2px);
-  border-color: rgba(255,215,120,.22);
-  box-shadow: 0 22px 60px rgba(0,0,0,.38), 0 0 0 1px rgba(255,255,255,.04) inset;
+  border-color: rgba(255,255,255,.16);
+  background: rgba(255,255,255,.06);
 }
 
 /* Aspect ratio thumb */
@@ -296,7 +355,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  background: rgba(0,0,0,.25);
+  background: rgba(0,0,0,.22);
 }
 
 .profile-post-media-thumb img,
@@ -309,7 +368,7 @@
   display:block;
 }
 
-/* Overlay info */
+/* Overlay info — тоньше и спокойнее */
 .profile-post-overlay-info{
   position: absolute;
   inset: 0;
@@ -318,9 +377,9 @@
   justify-content: flex-start;
   padding: 12px;
 
-  background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,.42));
+  background: linear-gradient(180deg, transparent 62%, rgba(0,0,0,.38));
   opacity: 0;
-  transition: opacity .18s ease;
+  transition: opacity .16s ease;
 }
 
 .profile-post-tile:hover .profile-post-overlay-info{
@@ -332,10 +391,10 @@
   align-items:center;
   gap: 8px;
 
-  padding: 8px 10px;
+  padding: 7px 10px;
   border-radius: 999px;
 
-  background: rgba(0,0,0,.35);
+  background: rgba(0,0,0,.28);
   border: 1px solid rgba(255,255,255,.12);
   color: rgba(255,255,255,.92);
 
@@ -344,7 +403,7 @@
 }
 
 /* =========================
-   ⋯ menu (top-right, premium)
+   ⋯ menu (top-right)
 ========================= */
 .profile-post-more{
   position: absolute;
@@ -362,12 +421,12 @@
 }
 
 .profile-post-more-btn{
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,.12);
 
-  background: rgba(0,0,0,.28);
+  background: rgba(0,0,0,.22);
   backdrop-filter: blur(8px);
   color: rgba(255,255,255,.92);
 
@@ -375,17 +434,17 @@
   display:grid;
   place-items:center;
 
-  box-shadow: 0 14px 30px rgba(0,0,0,.28);
+  box-shadow: none;
 }
 
 .profile-post-more-btn:hover{
-  background: rgba(0,0,0,.34);
+  background: rgba(0,0,0,.30);
   border-color: rgba(255,255,255,.16);
 }
 
 .profile-post-menu{
   position: absolute;
-  top: 42px;
+  top: 40px;
   right: 0;
   min-width: 190px;
   padding: 6px;
@@ -393,7 +452,7 @@
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,.10);
 
-  background: linear-gradient(180deg, rgba(18,12,28,.96), rgba(12,8,20,.96));
+  background: rgba(14,10,22,.96);
   box-shadow: 0 22px 60px rgba(0,0,0,.55);
 }
 
@@ -424,7 +483,7 @@
 }
 
 /* =========================
-   Followers modal (match premium)
+   Followers modal (minimal match)
 ========================= */
 .post-modal-backdrop{
   position: fixed;
@@ -446,8 +505,8 @@
   border-radius: 18px;
   border: 1px solid rgba(255,255,255,.10);
 
-  background: linear-gradient(180deg, rgba(18,12,28,.94), rgba(12,8,20,.94));
-  box-shadow: 0 22px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04) inset;
+  background: rgba(14,10,22,.96);
+  box-shadow: 0 22px 60px rgba(0,0,0,.55);
 }
 
 .followers-modal-header{
@@ -525,7 +584,7 @@
   display:grid;
   place-items:center;
 
-  background: rgba(0,0,0,.22);
+  background: rgba(0,0,0,.18);
   border: 1px solid rgba(255,255,255,.10);
 }
 
@@ -548,123 +607,55 @@
 }
 
 /* =========================
-   UserProfile actions (Follow / Message)
+   CLICK & LAYER FIX (IMPORTANT)
 ========================= */
 
-/* handle under name */
-.profile-handle{
-  margin-top: -6px;
-  font-size: 13px;
-  color: rgba(255,255,255,.70);
-  letter-spacing: .2px;
+/* Header must be above posts grid */
+.profile-header{
+  position: relative;
+  z-index: 5;
 }
 
-/* small meta line under buttons (loading/no posts) */
-.profile-meta{
-  margin-top: 10px;
-  font-size: 12px;
-  color: rgba(255,255,255,.70);
-  opacity: .92;
+/* Prevent any pseudo-elements from catching clicks */
+.profile-header::before{
+  pointer-events: none;
 }
 
-/* actions row */
-.profile-actions{
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
+/* Posts grid must stay below header */
+.profile-posts-grid{
+  position: relative;
+  z-index: 1;
 }
 
-/* shared button base */
-.profile-actions .btn-follow,
-.profile-actions .btn-message{
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 14px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.92);
-
-  cursor: pointer;
-  user-select: none;
-
-  box-shadow: 0 14px 34px rgba(0,0,0,.22), 0 0 0 1px rgba(255,255,255,.03) inset;
-  transition: transform .12s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+/* Extra safety: post tiles never catch clicks above header */
+.profile-post-tile{
+  position: relative;
+  z-index: 1;
 }
 
-.profile-actions .btn-follow:hover,
-.profile-actions .btn-message:hover{
-  background: rgba(255,255,255,.09);
-  border-color: rgba(255,255,255,.16);
-  box-shadow: 0 18px 46px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.04) inset;
-}
-
-.profile-actions .btn-follow:active,
-.profile-actions .btn-message:active{
-  transform: translateY(1px);
-}
-
-.profile-actions .btn-follow:disabled,
-.profile-actions .btn-message:disabled{
-  opacity: .55;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* FOLLOW primary look */
-.profile-actions .btn-follow{
-  border-color: rgba(180,120,255,.26);
-  background: linear-gradient(
-    180deg,
-    rgba(180,120,255,.16),
-    rgba(255,255,255,.04)
-  );
-}
-
-/* FOLLOWING state (green, premium) */
-.profile-actions .btn-follow.following{
-  border-color: rgba(80, 220, 140, 0.34);
-  background: linear-gradient(
-    90deg,
-    rgba(60, 200, 120, 0.22),
-    rgba(80, 220, 140, 0.12)
-  );
-  color: rgba(235,255,245,.98);
-}
-
-/* MESSAGE button: darker “glass”, subtle gold rim */
-.profile-actions .btn-message{
-  background: rgba(0,0,0,.18);
-  border-color: rgba(255,215,120,.18);
-}
-
-/* nicer spacing on small screens */
+/* =========================
+   Responsive
+========================= */
 @media (max-width: 760px){
-  .profile-actions{
-    gap: 8px;
+  .profile-header{
+    grid-template-columns: 76px 1fr;
+    padding: 16px;
   }
+  .profile-avatar{ width: 70px; height: 70px; }
+  .profile-username{ font-size: 20px; }
+  .profile-actions{ gap: 8px; }
   .profile-actions .btn-follow,
   .profile-actions .btn-message{
-    height: 42px;
-    padding: 0 14px;
-    border-radius: 14px;
+    height: 40px;
+    border-radius: 12px;
   }
+  .profile-posts-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 420px){
-  .profile-actions{
-    width: 100%;
-  }
+  .profile-container{ padding: 20px 14px 56px; }
+  .profile-actions{ width: 100%; }
   .profile-actions .btn-follow,
-  .profile-actions .btn-message{
-    width: 100%;
-  }
+  .profile-actions .btn-message{ width: 100%; }
+  .profile-posts-grid{ grid-template-columns: 1fr; }
 }

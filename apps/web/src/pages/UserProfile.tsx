@@ -26,24 +26,31 @@ export default function UserProfile() {
   const [owner, setOwner] = useState<ApiUserSummary | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // follow stats state
-  const [followStats, setFollowStats] = useState<FollowStatsResponse | null>(
-    null
-  );
+  const [followStats, setFollowStats] = useState<FollowStatsResponse | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
 
-  // message button state
   const [messageLoading, setMessageLoading] = useState(false);
 
-  // followers modal
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followersList, setFollowersList] = useState<ApiUserSummary[]>([]);
   const [followersLoading, setFollowersLoading] = useState(false);
 
   const me = getUser();
+
+  // -----------------------------
+  // Reset transient UI on user change
+  // -----------------------------
+  useEffect(() => {
+    setSelectedPost(null);
+    setFollowersOpen(false);
+    setFollowersList([]);
+    setFollowersLoading(false);
+    setError(null);
+  }, [userId]);
 
   // -----------------------------
   // Load posts + public profile
@@ -71,14 +78,12 @@ export default function UserProfile() {
         if (userResp.data?.ok && userResp.data.user) {
           setOwner(userResp.data.user);
         } else if (loadedPosts.length > 0) {
-          // fallback: take the author of the first post
           setOwner(loadedPosts[0].author);
         } else {
           setOwner(null);
         }
       } catch (err: any) {
         if (!alive) return;
-
         const message =
           err?.response?.data?.message ?? "Failed to load user profile.";
         setError(message);
@@ -96,7 +101,7 @@ export default function UserProfile() {
   }, [userId]);
 
   // -----------------------------
-  // Load follow stats
+  // Load follow stats (requires auth on your backend)
   // -----------------------------
   useEffect(() => {
     if (!userId) return;
@@ -107,11 +112,11 @@ export default function UserProfile() {
       try {
         const { data } = await fetchFollowStats(id);
         if (!alive) return;
-        if (data.ok) {
-          setFollowStats(data);
-        }
+        if (data.ok) setFollowStats(data);
       } catch (err) {
         console.error("Follow stats error", err);
+        if (!alive) return;
+        setFollowStats(null);
       }
     }
 
@@ -127,28 +132,40 @@ export default function UserProfile() {
   // -----------------------------
   const postsCount = posts.length;
 
-  const totalLikes = useMemo(
-    () =>
-      posts.reduce(
-        (sum, p) => sum + (typeof p.likesCount === "number" ? p.likesCount : 0),
-        0
-      ),
-    [posts]
-  );
+  const totalLikes = useMemo(() => {
+    return posts.reduce(
+      (sum, p) => sum + (typeof p.likesCount === "number" ? p.likesCount : 0),
+      0
+    );
+  }, [posts]);
 
   const followersCount = followStats?.followers ?? 0;
   const followingCount = followStats?.following ?? 0;
 
-  const isOwnProfile = me && owner && me.id === owner.id;
+  const isOwnProfile = !!(me && owner && me.id === owner.id);
 
   const ownerName = owner ? owner.displayName || owner.username : "User";
   const ownerHandle = owner ? `@${owner.username}` : "";
+
+  const showFollowArea = !!owner && !isOwnProfile;
+  const canFollow = !!me && !!followStats;
+  const isFollowing = !!followStats?.isFollowing;
+
+  // Message only for following
+  const showMessage = showFollowArea && isFollowing;
 
   // -----------------------------
   // Follow / unfollow
   // -----------------------------
   async function handleFollowToggle() {
-    if (!userId || !followStats || followLoading) return;
+    if (!userId) return;
+
+    if (!me) {
+      navigate(`/login?next=/users/${userId}`);
+      return;
+    }
+
+    if (!followStats || followLoading) return;
 
     try {
       setFollowLoading(true);
@@ -188,17 +205,26 @@ export default function UserProfile() {
   }
 
   // -----------------------------
-  // Message button
+  // Message button (only if following)
   // -----------------------------
   async function handleMessage() {
-    if (!userId || messageLoading) return;
+    if (!userId) return;
+
+    if (!me) {
+      navigate(`/login?next=/users/${userId}`);
+      return;
+    }
+
+    if (!followStats?.isFollowing) return;
+    if (messageLoading) return;
+
     try {
       setMessageLoading(true);
-      await openDm(userId); // create/get DM on backend
+      await openDm(userId);
       navigate(`/chats/${userId}`);
     } catch (err: any) {
       console.error("Open DM error", err);
-      setError(err?.message || "Failed to open chat.");
+      setError(err?.response?.data?.message ?? "Failed to open chat.");
     } finally {
       setMessageLoading(false);
     }
@@ -210,13 +236,17 @@ export default function UserProfile() {
   async function openFollowersModal() {
     if (!userId) return;
 
+    if (!me) {
+      navigate(`/login?next=/users/${userId}`);
+      return;
+    }
+
     setFollowersOpen(true);
     setFollowersLoading(true);
+
     try {
       const { data } = await fetchFollowers(userId);
-      if (data.ok) {
-        setFollowersList(data.users);
-      }
+      if (data.ok) setFollowersList(data.users ?? []);
     } catch (err) {
       console.error("Followers list error", err);
     } finally {
@@ -239,19 +269,21 @@ export default function UserProfile() {
   const handleCommentAdded = (postId: string) => {
     setPosts((prev) =>
       prev.map((p) =>
-        p.id === postId ? { ...p, commentsCount: p.commentsCount + 1 } : p
+        p.id === postId
+          ? { ...p, commentsCount: (p.commentsCount ?? 0) + 1 }
+          : p
       )
     );
 
     setSelectedPost((prev) =>
       prev && prev.id === postId
-        ? { ...prev, commentsCount: prev.commentsCount + 1 }
+        ? { ...prev, commentsCount: (prev.commentsCount ?? 0) + 1 }
         : prev
     );
   };
 
   // -----------------------------
-  // Render
+  // Render guards
   // -----------------------------
   if (!userId) {
     return (
@@ -283,14 +315,13 @@ export default function UserProfile() {
     );
   }
 
-  const showFollow = followStats && !isOwnProfile;
-  const showMessage = showFollow && !!followStats?.isFollowing;
-
   return (
     <main className="profile-page">
       <div className="profile-container">
         {/* Profile header */}
-        <section className="profile-header">
+        <section
+          className="profile-header"
+        >
           <div className="profile-avatar">
             {owner.avatarUrl ? (
               <img src={owner.avatarUrl} alt={ownerName} />
@@ -318,6 +349,7 @@ export default function UserProfile() {
                 type="button"
                 className="profile-stat profile-stat-clickable"
                 onClick={openFollowersModal}
+                title={!me ? "Sign in to view followers" : "View followers"}
               >
                 <span className="profile-stat-number">{followersCount}</span>
                 <span className="profile-stat-label">followers</span>
@@ -330,15 +362,19 @@ export default function UserProfile() {
             </div>
 
             {/* Actions */}
-            {showFollow && (
+            {showFollowArea && (
               <div className="profile-actions">
                 <button
                   type="button"
-                  className={"btn-follow" + (followStats.isFollowing ? " following" : "")}
-                  disabled={followLoading}
+                  className={"btn-follow" + (isFollowing ? " following" : "")}
+                  disabled={followLoading || !canFollow}
                   onClick={handleFollowToggle}
                 >
-                  {followLoading ? "..." : followStats.isFollowing ? "Following" : "Follow"}
+                  {followLoading
+                    ? "Please wait…"
+                    : isFollowing
+                    ? "Following"
+                    : "Follow"}
                 </button>
 
                 {showMessage && (
@@ -347,6 +383,7 @@ export default function UserProfile() {
                     className="btn-message"
                     disabled={messageLoading}
                     onClick={handleMessage}
+                    title="Open chat"
                   >
                     {messageLoading ? "Opening…" : "Message"}
                   </button>
@@ -397,22 +434,28 @@ export default function UserProfile() {
         )}
       </div>
 
-      {/* Selected post modal — same as in Feed/Profile */}
+      {/* Selected post modal */}
       <PostCommentsModal
         post={selectedPost}
         isOpen={selectedPost !== null}
         onClose={closePostModal}
         onCommentAdded={() => {
-          if (selectedPost) {
-            handleCommentAdded(selectedPost.id);
-          }
+          if (selectedPost) handleCommentAdded(selectedPost.id);
         }}
       />
 
       {/* Followers list modal */}
       {followersOpen && (
-        <div className="post-modal-backdrop" onClick={closeFollowersModal}>
-          <div className="followers-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="post-modal-backdrop"
+          onClick={closeFollowersModal}
+          role="presentation"
+        >
+          <div
+            className="followers-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="presentation"
+          >
             <div className="followers-modal-header">
               <h2>Followers</h2>
               <button
@@ -436,7 +479,6 @@ export default function UserProfile() {
               <ul className="followers-list">
                 {followersList.map((u) => {
                   const name = u.displayName || u.username || "User";
-
                   return (
                     <li key={u.id} className="followers-item">
                       <Link to={`/users/${u.id}`} onClick={closeFollowersModal}>
