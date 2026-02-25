@@ -937,3 +937,24 @@ export async function sendConversationMedia(
   // backend returns { ok: true, messages: [...] }
   return data.messages as ChatMessage[];
 }
+
+// ----------------------------------
+// Ranking
+// ----------------------------------
+
+export type RankingUser = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  points: number;
+};
+
+export async function fetchRanking(take = 50) {
+  const { data } = await api.get<{ ok: boolean; items: RankingUser[] }>(
+    "/ranking",
+    { params: { take } }
+  );
+
+  return data.items;
+}

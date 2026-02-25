@@ -39,6 +39,11 @@ model User {
   // whether the email is verified
   emailVerifiedAt     DateTime?
 
+  // ===== Ranking / Points =====
+  points              Int             @default(0)
+  pointsUpdatedAt     DateTime        @default(now())
+  pointsLedger        PointsLedger[]
+
   // ===== Relations =====
   refreshTokens       RefreshToken[]
   passwordResets      PasswordReset[]
@@ -64,7 +69,7 @@ model User {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
-  notifications Notification[]
+  notifications       Notification[]
 
   // ===== Challenges =====
   // ✅ Created challenges (bind explicitly to Challenge.creator)
@@ -77,6 +82,8 @@ model User {
   wonChallenges         Challenge[] @relation("ChallengeWinner")
 
   @@index([lockUntil])
+  @@index([points])
+  @@index([pointsUpdatedAt])
 }
 
 
@@ -452,4 +459,25 @@ model ChallengeSubmission {
 
   @@index([challengeId, createdAt])
   @@index([userId, createdAt])
+}
+
+enum PointsAction {
+  POST_PUBLISHED
+  // позже добавим: COMMENT_CREATED, REACTION_GIVEN, CHALLENGE_WON и т.д.
+}
+
+model PointsLedger {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  action      PointsAction
+  points      Int
+  entityType  String?       // "post" (или "comment", "challenge"...)
+  entityId    String?       // id сущности
+  createdAt   DateTime      @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@unique([action, entityType, entityId, userId]) // защита от двойного начисления за одно и то же
 }

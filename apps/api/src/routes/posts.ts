@@ -6,10 +6,12 @@ import path from "path";
 import fs from "fs";
 import multer from "multer";
 
+import { awardPoints } from "../lib/awardPoints.js";
+import { POINTS } from "../lib/points.js";
 import { prisma } from "../lib/prisma.js";
 import { cloudinary } from "../lib/cloudinary.js";
 import {
-  requireAuth,
+  requireAuth, 
   optionalAuth,
   type AuthedRequest,
 } from "../middlewares/requireAuth.js";
@@ -153,6 +155,18 @@ router.post(
             },
           },
         },
+      });
+
+      // ✅ Ranking points: +5 for publishing a post
+      awardPoints({
+        userId: req.userId,
+        action: "POST_PUBLISHED",
+        points: POINTS.POST_PUBLISHED,
+        entityType: "post",
+        entityId: post.id,
+      }).catch((e) => {
+        // do not fail post creation if points system fails
+        console.error("Award points error:", e);
       });
 
       // =====================================
