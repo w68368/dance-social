@@ -1,40 +1,40 @@
-# StepUnity -- Social Platform for Dancers
+# StepUnity -- Społecznościowa Platforma dla Tancerzy
 
-## Project Description
+## Opis projektu
 
-StepUnity is a social web platform designed for individual dancers and
-dance teams. The application allows users to publish choreography
-videos, interact with other dancers, participate in challenges and track
-activity through rankings.
+StepUnity to aplikacja internetowa typu social media przeznaczona dla
+indywidualnych tancerzy oraz zespołów tanecznych. System umożliwia
+publikowanie nagrań choreografii, interakcję z innymi użytkownikami oraz
+udział w wyzwaniach tanecznych i rankingach aktywności.
 
-The goal of the system is to create an online environment that supports
-the development of dancers, promotes creativity and enables interaction
-between members of the dance community.
+Celem projektu jest stworzenie środowiska online wspierającego rozwój
+tancerzy, umożliwiającego prezentację umiejętności oraz budowanie
+społeczności tanecznej.
 
-The project was developed as part of a diploma thesis.
-
-------------------------------------------------------------------------
-
-# Main Features
-
-The platform provides the following functionalities:
-
-• User registration and authentication\
-• User profiles with avatars and personal information\
-• Publishing choreography videos\
-• Comments and reactions under posts\
-• Follow system between users\
-• Dance challenges\
-• Activity ranking\
-• Private chats between users\
-• Notifications system
-
-The system combines social media mechanisms with elements of
-gamification to increase user engagement.
+Projekt został zrealizowany w ramach pracy dyplomowej.
 
 ------------------------------------------------------------------------
 
-# Technologies Used
+# Główne funkcjonalności
+
+Platforma oferuje między innymi:
+
+• rejestrację i logowanie użytkowników\
+• profile użytkowników z awatarami i informacjami\
+• publikowanie nagrań wideo choreografii\
+• komentarze i reakcje pod postami\
+• system obserwowania użytkowników\
+• wyzwania taneczne (dance challenges)\
+• ranking aktywności użytkowników\
+• prywatny czat między użytkownikami\
+• system powiadomień
+
+System łączy mechanizmy typowe dla mediów społecznościowych z elementami
+grywalizacji zwiększającymi zaangażowanie użytkowników.
+
+------------------------------------------------------------------------
+
+# Wykorzystane technologie
 
 ## Backend
 
@@ -43,8 +43,8 @@ gamification to increase user engagement.
 -   TypeScript
 -   Prisma ORM
 -   PostgreSQL
--   JWT Authentication
--   Cloudinary (media storage)
+-   JWT (autoryzacja użytkowników)
+-   Cloudinary (przechowywanie multimediów)
 
 ## Frontend
 
@@ -54,7 +54,7 @@ gamification to increase user engagement.
 -   React Router
 -   Axios
 
-## Other Tools
+## Inne narzędzia
 
 -   Prisma Migrations
 -   ESLint
@@ -62,33 +62,30 @@ gamification to increase user engagement.
 
 ------------------------------------------------------------------------
 
-# Project Architecture
+# Architektura systemu
 
-The application uses a **client--server architecture**.
+Aplikacja została zaprojektowana w architekturze **klient--serwer**.
 
-Frontend (React SPA) communicates with the backend through a REST API.
+Frontend (aplikacja SPA w React) komunikuje się z backendem za pomocą
+interfejsu REST API.
 
-Frontend (React + Vite)\
-↓ REST API\
-Backend (Node.js + Express)\
-↓\
-PostgreSQL Database
+Frontend (React + Vite) ↓ REST API Backend (Node.js + Express) ↓ Baza
+danych PostgreSQL
 
 ------------------------------------------------------------------------
 
-# Project Structure
+# Struktura projektu
 
-apps\
-│\
-├── api \# Backend application\
-│ ├── prisma \# Prisma schema and migrations\
+apps
+
+├── api \# aplikacja backendowa\
+│ ├── prisma \# schemat bazy danych i migracje\
 │ ├── src\
-│ │ ├── routes \# API routes\
+│ │ ├── routes \# trasy API\
 │ │ ├── middlewares\
-│ │ ├── lib \# helper modules (auth, mailer, prisma etc.)\
+│ │ ├── lib \# moduły pomocnicze (auth, mailer, prisma itd.)\
 │ │ └── scripts\
-│\
-└── web \# Frontend application\
+│ └── web \# aplikacja frontendowa\
 ├── public\
 ├── src\
 │ ├── components\
@@ -99,125 +96,122 @@ apps\
 
 ------------------------------------------------------------------------
 
-# Requirements
+# Wymagania
 
-Before running the project make sure the following software is
-installed:
+Przed uruchomieniem projektu należy zainstalować:
 
--   Node.js (version 18 or newer)
+-   Node.js (wersja 18 lub nowsza)
 -   npm
 -   PostgreSQL
 -   Git
 
 ------------------------------------------------------------------------
 
-# Installation
+# Instalacja projektu
 
-Clone the repository:
+Sklonuj repozytorium:
 
 git clone https://github.com/your-repository/stepunity.git
 
-Go to the project folder:
+Przejdź do folderu projektu:
 
 cd stepunity
 
 ------------------------------------------------------------------------
 
-# Backend Setup
+# Konfiguracja backendu
 
-Navigate to backend directory:
+Przejdź do katalogu backendu:
 
 cd apps/api
 
-Install dependencies:
+Zainstaluj zależności:
 
 npm install
 
-Create `.env` file:
+Utwórz plik `.env`:
 
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/stepunity"
 JWT_SECRET="your_secret_key"
 
-Run database migrations:
+Wykonaj migracje bazy danych:
 
 npx prisma migrate dev
 
-Start the backend server:
+Uruchom serwer backendowy:
 
 npm run dev
 
-Backend server:
+Backend będzie dostępny pod adresem:
 
 http://localhost:3000
 
 ------------------------------------------------------------------------
 
-# Frontend Setup
+# Konfiguracja frontendu
 
-Open a new terminal and go to frontend folder:
+W nowym terminalu przejdź do katalogu frontendu:
 
 cd apps/web
 
-Install dependencies:
+Zainstaluj zależności:
 
 npm install
 
-Create `.env` file:
+Utwórz plik `.env`:
 
 VITE_API_URL=http://localhost:3000
 
-Start the frontend:
+Uruchom aplikację frontendową:
 
 npm run dev
 
-Frontend:
+Frontend będzie dostępny pod adresem:
 
 http://localhost:5173
 
 ------------------------------------------------------------------------
 
-# Running the Application
+# Uruchomienie aplikacji
 
-1.  Start the backend server
-2.  Start the frontend application
-3.  Open the browser:
+1.  Uruchom backend
+2.  Uruchom frontend
+3.  Otwórz przeglądarkę:
 
 http://localhost:5173
 
-You can now register a new user and start using the platform.
+Po uruchomieniu można zarejestrować użytkownika i rozpocząć korzystanie
+z platformy.
 
 ------------------------------------------------------------------------
 
-# Example User Flow
+# Przykładowy scenariusz użytkowania
 
-Typical user interaction:
-
-1.  User registers an account
-2.  Logs into the platform
-3.  Creates a profile
-4.  Publishes choreography videos
-5.  Interacts with other users through comments and reactions
-6.  Participates in dance challenges
-7.  Earns points in the ranking system
+1.  Użytkownik tworzy konto
+2.  Loguje się do systemu
+3.  Uzupełnia swój profil
+4.  Publikuje nagrania choreografii
+5.  Komentuje i ocenia posty innych użytkowników
+6.  Bierze udział w wyzwaniach tanecznych
+7.  Zdobywa punkty w rankingach aktywności
 
 ------------------------------------------------------------------------
 
-# Future Improvements
+# Możliwe kierunki rozwoju
 
-Possible directions for future development:
+Potencjalne rozszerzenia systemu:
 
--   Mobile application
--   AI-based choreography recommendations
--   Advanced ranking algorithms
--   Video editing tools
--   Integration with dance schools and instructors
+-   aplikacja mobilna
+-   rekomendacje choreografii oparte na AI
+-   bardziej zaawansowany system rankingów
+-   narzędzia do edycji wideo
+-   integracja ze szkołami tańca
 
 ------------------------------------------------------------------------
 
-# Author
+# Autor
 
-Mykhailo Mamin\
-Computer Science -- Software Engineering
+Anastasia Bialkevich\
+68368
 
-Diploma Project\
-WSIiZ University
+
