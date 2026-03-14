@@ -1,242 +1,223 @@
-# ✨ StepUnity — Premium Tech / Startup Edition  
-Platforma Społecznościowa dla Tancerzy
+# StepUnity -- Social Platform for Dancers
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Monorepo-pnpm%20workspaces-7b3fe4?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Backend-Express%20%2B%20Prisma-6f42c1?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-ffca28?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Database-PostgreSQL-31648c?style=for-the-badge" />
-</p>
+## Project Description
 
----
+StepUnity is a social web platform designed for individual dancers and
+dance teams. The application allows users to publish choreography
+videos, interact with other dancers, participate in challenges and track
+activity through rankings.
 
-# 🚀 Vision
+The goal of the system is to create an online environment that supports
+the development of dancers, promotes creativity and enables interaction
+between members of the dance community.
 
-**StepUnity** to profesjonalna platforma społecznościowa nowej generacji, zaprojektowana dla tancerzy.  
-Łączy szybki frontend, bezpieczny backend oraz zaawansowany system tworzenia treści — w stylu nowoczesnych aplikacji startupowych.
+The project was developed as part of a diploma thesis.
 
----
+------------------------------------------------------------------------
 
-# 🌌 Highlights
+# Main Features
 
-### 🟣 Super-fast Frontend (React + Vite + TS)
-- zaawansowany kreator postów **AddPost Wizard** (3 kroki),
-- automatyczne hashtagi + rozpoznawanie @mentions,
-- dynamiczny preview wideo/zdjęcia,
-- modalny system komentarzy z threadingiem,
-- system lajków i powiadomień,
-- profil użytkownika ala Instagram (grid + modal feed),
-- obliczanie statystyk followers/following.
+The platform provides the following functionalities:
 
-### 🟡 Secure Backend (Express + Prisma)
-- JWT access/refresh + rotacja tokenów,
-- blokada konta i anty-bot,
-- reCAPTCHA v2,
-- reset hasła + email verification,
-- wykrywanie disposable email,
-- HIBP + zxcvbn password strength,
-- pełny system postów, komentarzy, followów.
+• User registration and authentication\
+• User profiles with avatars and personal information\
+• Publishing choreography videos\
+• Comments and reactions under posts\
+• Follow system between users\
+• Dance challenges\
+• Activity ranking\
+• Private chats between users\
+• Notifications system
 
-### 🔵 Cloud-ready Architecture
-- monorepo pnpm,
-- Docker-ready,
-- czysty podział: `apps/api`, `apps/web`, `packages/shared`,
-- automatyczne migracje Prisma, seed, studio.
+The system combines social media mechanisms with elements of
+gamification to increase user engagement.
 
----
+------------------------------------------------------------------------
 
-# 🧩 Systemy dostępne w projekcie
+# Technologies Used
 
-## 🔐 System Autoryzacji i Bezpieczeństwa
-- rejestracja z kodem e-mail (6 cyfr),  
-- logowanie + refresh token rotation,  
-- blokada konta przy złych próbach,  
-- reset hasła e-mail,  
-- sprawdzanie haseł w wyciekach (HIBP),  
-- zxcvbn analiza siły hasła,  
-- reCAPTCHA v2,  
-- HttpOnly Secure Cookies.
+## Backend
 
----
+-   Node.js
+-   Express
+-   TypeScript
+-   Prisma ORM
+-   PostgreSQL
+-   JWT Authentication
+-   Cloudinary (media storage)
 
-## 📸 System Postów (Wideo & Zdjęcia)
-- upload plików (lokalnie / Cloudinary),  
-- generowanie miniatur,  
-- opisy, hashtagi, mentions,  
-- limit rozmiaru, walidacja,  
-- paginacja feedu,  
-- pełny AddPost Wizard z live preview.
+## Frontend
 
----
+-   React
+-   Vite
+-   TypeScript
+-   React Router
+-   Axios
 
-## 💬 System Komentarzy
-- komentarze pierwszego poziomu,  
-- odpowiedzi (threading),  
-- modalny interfejs z przewijaniem,  
-- polubienia komentarzy,  
-- przypinanie komentarza przez autora posta.
+## Other Tools
 
----
+-   Prisma Migrations
+-   ESLint
+-   dotenv
 
-## ❤️ System Lajków
-- lajkowanie postów,  
-- lajkowanie komentarzy,  
-- synchronizacja stanu likedByMe,  
-- automatyczne aktualizowanie liczników.
+------------------------------------------------------------------------
 
----
+# Project Architecture
 
-## 👤 System Profili
-- slug użytkownika,  
-- własny grid postów,  
-- modalny podgląd posta,  
-- statystyki followów,  
-- własny avatar + upload + kompresja,  
-- edycja profilu (planowane w kolejnych iteracjach).
+The application uses a **client--server architecture**.
 
----
+Frontend (React SPA) communicates with the backend through a REST API.
 
-## 🔔 System Follow
-- follow / unfollow,  
-- liczniki followers / following,  
-- pobieranie statystyk profilu,  
-- filtrowanie feedu (planowane).
+Frontend (React + Vite)\
+↓ REST API\
+Backend (Node.js + Express)\
+↓\
+PostgreSQL Database
 
----
+------------------------------------------------------------------------
 
-## 🧵 System Feed
-- pobieranie postów stronami,  
-- sortowanie chrono,  
-- stan ładowania i infinite scroll (frontend-ready),  
-- lekkie API do strumieniowania postów.
+# Project Structure
 
----
+apps\
+│\
+├── api \# Backend application\
+│ ├── prisma \# Prisma schema and migrations\
+│ ├── src\
+│ │ ├── routes \# API routes\
+│ │ ├── middlewares\
+│ │ ├── lib \# helper modules (auth, mailer, prisma etc.)\
+│ │ └── scripts\
+│\
+└── web \# Frontend application\
+├── public\
+├── src\
+│ ├── components\
+│ ├── pages\
+│ ├── routes\
+│ ├── hooks\
+│ └── styles
 
-# 🏛 Architektura Monorepo
+------------------------------------------------------------------------
 
-```
-dance-social/
-│
-├── apps/
-│   ├── api/        → Backend (Express, Prisma, TS)
-│   └── web/        → Frontend (React, Vite, TS)
-│
-├── packages/
-│   └── shared/     → Common types
-│
-├── docker-compose.yml
-├── pnpm-workspace.yaml
-└── package.json
-```
+# Requirements
 
----
+Before running the project make sure the following software is
+installed:
 
-# ⚡ AddPost Wizard — System Tworzenia Postów
+-   Node.js (version 18 or newer)
+-   npm
+-   PostgreSQL
+-   Git
 
-### 🧩 **Krok 1 – Upload**
-- obsługa wideo i zdjęć  
-- podgląd media preview  
-- walidacja rozmiaru i formatu  
+------------------------------------------------------------------------
 
-### ✏️ **Krok 2 – Edycja**
-- opis, podpis, tagi, hashtagi  
-- @mention system (autodetekcja)  
-- kolorowanie tagów w czasie rzeczywistym  
-- bezpieczne czyszczenie inputu  
+# Installation
 
-### 🚀 **Krok 3 – Publikacja**
-- upload miniatury  
-- progress bar  
-- obsługa błędów i retry  
+Clone the repository:
 
----
+git clone https://github.com/your-repository/stepunity.git
 
-# 🔐 Security Stack
+Go to the project folder:
 
-| Feature | Status |
-|--------|--------|
-| Email verification (6-digit code) | ✅ |
-| reCAPTCHA v2 | ✅ |
-| Reset password (email link) | ✅ |
-| Disposable email detection | ✅ |
-| HIBP leaked password check | ✅ |
-| zxcvbn password strength | ✅ |
-| Account lockout | ✅ |
-| HttpOnly Secure Refresh Cookies | ✅ |
-| Refresh Token Rotation | ✅ |
+cd stepunity
 
----
+------------------------------------------------------------------------
 
-# 🗄 Endpointy API Premium (2025)
+# Backend Setup
 
-## 🔑 Auth
-- `POST /auth/register-start`
-- `POST /auth/register-verify`
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /auth/logout`
-- `POST /auth/logout-all`
-- `POST /auth/forgot`
-- `POST /auth/reset`
-- `GET /auth/me`
+Navigate to backend directory:
 
-## 📝 Posty
-- `GET /posts`
-- `POST /posts`
-- `GET /posts/:id`
-- `POST /posts/:id/like`
-- `GET /posts/:id/comments`
-- `POST /posts/:id/comments`
-
-## 👤 Użytkownicy
-- `GET /users/:slug`
-- `POST /users/:id/follow`
-- `GET /users/:id/stats`
-
----
-
-# 🛠 Instalacja (Premium Setup)
-
-### 1️⃣ Clone
-```
-git clone https://github.com/w68368/dance-social.git
-cd dance-social
-```
-
-### 2️⃣ Install
-```
-pnpm install
-```
-
-### 3️⃣ Start Database
-```
-docker-compose up -d
-```
-
-### 4️⃣ ENV (API)
-```
 cd apps/api
-```
 
-### 5️⃣ Migracje Prisma
-```
-pnpm --filter @app/api prisma:generate
-pnpm --filter @app/api prisma:migrate
-```
+Install dependencies:
 
-### 6️⃣ Dev Servers
-Backend:
-```
-pnpm dev:api
-```
+npm install
+
+Create `.env` file:
+
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/stepunity"
+JWT_SECRET="your_secret_key"
+
+Run database migrations:
+
+npx prisma migrate dev
+
+Start the backend server:
+
+npm run dev
+
+Backend server:
+
+http://localhost:3000
+
+------------------------------------------------------------------------
+
+# Frontend Setup
+
+Open a new terminal and go to frontend folder:
+
+cd apps/web
+
+Install dependencies:
+
+npm install
+
+Create `.env` file:
+
+VITE_API_URL=http://localhost:3000
+
+Start the frontend:
+
+npm run dev
 
 Frontend:
-```
-pnpm dev:web
-```
 
----
+http://localhost:5173
 
-# 🧑‍💻 Autor
-**Anastasiya Bialkevich**  
-GitHub: https://github.com/w68368
+------------------------------------------------------------------------
+
+# Running the Application
+
+1.  Start the backend server
+2.  Start the frontend application
+3.  Open the browser:
+
+http://localhost:5173
+
+You can now register a new user and start using the platform.
+
+------------------------------------------------------------------------
+
+# Example User Flow
+
+Typical user interaction:
+
+1.  User registers an account
+2.  Logs into the platform
+3.  Creates a profile
+4.  Publishes choreography videos
+5.  Interacts with other users through comments and reactions
+6.  Participates in dance challenges
+7.  Earns points in the ranking system
+
+------------------------------------------------------------------------
+
+# Future Improvements
+
+Possible directions for future development:
+
+-   Mobile application
+-   AI-based choreography recommendations
+-   Advanced ranking algorithms
+-   Video editing tools
+-   Integration with dance schools and instructors
+
+------------------------------------------------------------------------
+
+# Author
+
+Mykhailo Mamin\
+Computer Science -- Software Engineering
+
+Diploma Project\
+WSIiZ University
