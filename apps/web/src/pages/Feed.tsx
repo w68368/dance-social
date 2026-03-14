@@ -395,7 +395,9 @@ export default function Feed() {
     } catch (err: any) {
       console.error(err);
       setError(
-        err?.response?.data?.message || err?.message || "Failed to update caption."
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to update caption."
       );
 
       // rollback
@@ -583,20 +585,25 @@ export default function Feed() {
                   )}
                 </header>
 
-                {post.mediaUrl && post.mediaType === "image" && (
-                  <img
-                    src={post.mediaUrl}
-                    className="feed-media feed-media-image"
-                    alt="post media"
-                  />
-                )}
-
-                {post.mediaUrl && post.mediaType === "video" && (
-                  <video
-                    src={post.mediaUrl}
-                    controls
-                    className="feed-media feed-media-video"
-                  />
+                {/*unified media container (same height for image/video) */}
+                {post.mediaUrl && (
+                  <div className="feed-media">
+                    {post.mediaType === "image" ? (
+                      <img
+                        src={post.mediaUrl}
+                        className="feed-media-item feed-media-image"
+                        alt="post media"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <video
+                        src={post.mediaUrl}
+                        controls
+                        className="feed-media-item feed-media-video"
+                        preload="metadata"
+                      />
+                    )}
+                  </div>
                 )}
 
                 {post.caption && <p className="feed-caption">{post.caption}</p>}

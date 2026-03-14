@@ -321,7 +321,7 @@ router.post(
       select: { id: true },
     });
 
-    // ✅ create notifications for recipients
+    // create notifications for recipients
     try {
       await notifyChatMessage({
         conversationId: convId,

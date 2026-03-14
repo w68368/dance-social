@@ -72,13 +72,13 @@ model User {
   notifications       Notification[]
 
   // ===== Challenges =====
-  // ✅ Created challenges (bind explicitly to Challenge.creator)
+  // Created challenges (bind explicitly to Challenge.creator)
   challengesCreated     Challenge[] @relation("ChallengeCreator")
 
   challengesAccepted    ChallengeParticipant[]
   challengeSubmissions  ChallengeSubmission[]
 
-  // ✅ Winner relation (bind explicitly to Challenge.winner)
+  // Winner relation (bind explicitly to Challenge.winner)
   wonChallenges         Challenge[] @relation("ChallengeWinner")
 
   @@index([lockUntil])
@@ -163,7 +163,7 @@ model Post {
 }
 
 //
-// 🆕 Follow table
+// Follow table
 // followerId  — the user who follows
 // followingId — the user being followed
 //
@@ -215,7 +215,7 @@ model PostComment {
 }
 
 //
-// 🆕 Comment likes table
+// Comment likes table
 //
 model CommentLike {
   id        String   @id @default(cuid())
@@ -234,7 +234,7 @@ model CommentLike {
 }
 
 //
-// 🆕 Table of post reactions
+// Table of post reactions
 // one row = one reaction from one user to one post
 //
 model PostReaction {
@@ -256,7 +256,7 @@ model PostReaction {
 }
 
 //
-// 🆕 Hashtag table for autocomplete and analytics
+// Hashtag table for autocomplete and analytics
 //
 model Hashtag {
   id        String        @id @default(cuid())
@@ -270,7 +270,7 @@ model Hashtag {
 }
 
 //
-// 🆕 Linking table "post ↔ hashtag"
+// Linking table "post ↔ hashtag"
 //
 model PostHashtag {
   id        String   @id @default(cuid())
@@ -310,7 +310,7 @@ model ConversationParticipant {
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId         String
 
-  // ✅ read receipts
+  // read receipts
   lastReadAt     DateTime?    // when user last viewed this conversation
 
   @@unique([conversationId, userId])
@@ -332,7 +332,7 @@ model Message {
   createdAt      DateTime     @default(now())
   editedAt       DateTime?
 
-  // ✅ Media (image/video)
+  // Media (image/video)
   mediaType      String?
   mediaUrl       String?
 
@@ -407,7 +407,7 @@ model Challenge {
   creatorId     String
   creator       User            @relation("ChallengeCreator", fields: [creatorId], references: [id], onDelete: Cascade)
 
-  // ✅ Winner (chosen by creator)
+  // Winner (chosen by creator)
   winnerId      String?
   winner        User?           @relation("ChallengeWinner", fields: [winnerId], references: [id], onDelete: SetNull)
 

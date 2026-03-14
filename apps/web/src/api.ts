@@ -216,7 +216,7 @@ export interface ApiUserSummary {
   avatarUrl?: string | null;
 }
 
-// 🔥 Reaction types for posts
+// Reaction types for posts
 export type ReactionType = "LIKE" | "FIRE" | "WOW" | "CUTE" | "CLAP";
 
 export interface PostReactionsSummary {
@@ -278,7 +278,7 @@ export interface FollowStatsResponse {
   isFollowing: boolean;
 }
 
-// 🆕 Type for hashtag suggestions
+// Type for hashtag suggestions
 export interface HashtagSuggestion {
   id: string;
   tag: string; // without #, lowercase
@@ -289,7 +289,7 @@ export interface HashtagDto {
   tag: string; // without #
 }
 
-// ✅ Feed pagination response
+// Feed pagination response
 export interface FeedPage {
   ok: boolean;
   posts: Post[];
@@ -297,11 +297,11 @@ export interface FeedPage {
   hasMore: boolean;
 }
 
-// ✅ Feed scope for filter
+// Feed scope for filter
 export type FeedScope = "all" | "following";
 
 // ----------------------------------------------------
-// ✅ Notifications
+// Notifications
 // ----------------------------------------------------
 export type NotificationType =
   | "CHAT_MESSAGE"
@@ -372,7 +372,7 @@ export async function deleteReadNotifications() {
 }
 
 // ----------------------------------------------------
-// ✅ Challenges
+// Challenges
 // ----------------------------------------------------
 export type ChallengeLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "PRO";
 
@@ -583,7 +583,7 @@ export function createPost(caption: string, media?: File | null) {
   return api.post<{ ok: boolean; post: Post }>("/posts", { caption: trimmed });
 }
 
-// 🆕 Add / change reaction on a post
+// Add / change reaction on a post
 export async function reactToPost(postId: string, type: ReactionType) {
   const { data } = await api.post<{
     ok: boolean;
@@ -593,7 +593,7 @@ export async function reactToPost(postId: string, type: ReactionType) {
   return data.reactions;
 }
 
-// 🆕 Get reactions summary for a post
+// Get reactions summary for a post
 export async function fetchPostReactions(
   postId: string
 ): Promise<PostReactionsSummary> {
@@ -610,7 +610,7 @@ export function toggleLike(postId: string) {
   return reactToPost(postId, "LIKE");
 }
 
-// 🆕 Delete a post (author only)
+// Delete a post (author only)
 export async function deletePost(postId: string) {
   const { data } = await api.delete<{ ok: boolean; message?: string }>(
     `/posts/${postId}`
@@ -735,7 +735,7 @@ export function fetchFollowers(userId: string) {
   );
 }
 
-// 🆕 Search users by username / displayName (for @mentions and search)
+// Search users by username / displayName (for @mentions and search)
 export async function searchUsers(query: string): Promise<ApiUserSummary[]> {
   const q = query.trim();
   if (!q) return [];
@@ -751,7 +751,7 @@ export async function searchUsers(query: string): Promise<ApiUserSummary[]> {
   return data.users ?? [];
 }
 
-// 🆕 Search hashtags for autocomplete (#tag)
+// Search hashtags for autocomplete (#tag)
 // NOTE: backend returns { ok, hashtags }, NOT an array.
 export async function searchTags(query: string): Promise<HashtagSuggestion[]> {
   const q = query.trim().toLowerCase();
@@ -768,7 +768,7 @@ export async function searchTags(query: string): Promise<HashtagSuggestion[]> {
   return (data.hashtags ?? []).map((h) => ({ id: h.id, tag: h.tag }));
 }
 
-// 🆕 Search hashtags by prefix (for autocomplete)
+// Search hashtags by prefix (for autocomplete)
 export async function searchHashtags(query: string): Promise<HashtagDto[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -803,7 +803,7 @@ export type ChatLastMessage = {
   id: string;
   text: string;
   createdAt: string;
-  editedAt?: string | null; // ✅ NEW
+  editedAt?: string | null;
   senderId: string;
 } | null;
 
@@ -821,7 +821,7 @@ export type ChatMessage = {
   senderId: string;
   editedAt?: string | null;
 
-  // ✅ reply
+  // reply
   replyToId?: string | null;
   replyTo?: {
     id: string;
@@ -830,7 +830,7 @@ export type ChatMessage = {
     senderId: string;
   } | null;
 
-  // ✅ media
+  // media
   mediaType?: "image" | "video" | null;
   mediaUrl?: string | null;
 };
@@ -900,7 +900,7 @@ export async function deleteChatMessage(messageId: string) {
   return data;
 }
 
-// ✅ NEW: Edit message
+// Edit message
 export async function editConversationMessage(messageId: string, text: string) {
   const { data } = await api.patch<{
     ok: boolean;
@@ -915,7 +915,7 @@ export async function editConversationMessage(messageId: string, text: string) {
   return data.message;
 }
 
-// ✅ Send message with media (image/video) - multipart/form-data
+// Send message with media (image/video) - multipart/form-data
 export async function sendConversationMedia(
   conversationId: string,
   files: File[],
@@ -924,7 +924,7 @@ export async function sendConversationMedia(
 ): Promise<ChatMessage[]> {
   const fd = new FormData();
 
-  for (const f of files) fd.append("media", f); // ✅ same key as backend
+  for (const f of files) fd.append("media", f); // same key as backend
   if (text && text.trim()) fd.append("text", text.trim());
   if (replyToId) fd.append("replyToId", replyToId);
 

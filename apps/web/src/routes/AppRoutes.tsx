@@ -18,7 +18,7 @@ import UserProfile from "../pages/UserProfile";
 import AddVideo from "../pages/AddVideo";
 import Settings from "../pages/Settings";
 import Chats from "../pages/Chats";
-import Dashboard from "../pages/Dashboard"; // ✅ NEW
+import Dashboard from "../pages/Dashboard";
 
 // system
 import NotFound from "../pages/NotFound";
@@ -43,7 +43,7 @@ export default function AppRoutes() {
       {/* Protected routes (login required) */}
       <Route element={<ProtectedRoute />}>
         {/* main user pages */}
-        <Route path="/dashboard" element={<Dashboard />} /> {/* ✅ NEW */}
+        <Route path="/dashboard" element={<Dashboard />} /> 
         <Route path="/profile" element={<Profile />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/add-video" element={<AddVideo />} />

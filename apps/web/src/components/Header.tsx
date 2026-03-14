@@ -343,9 +343,6 @@ export default function Header() {
             <li>
               <NavItem to="/challenges">Challenges</NavItem>
             </li>
-            <li>
-              <NavItem to="/recommendations">Recommendations</NavItem>
-            </li>
             <li className="divider" />
             <li>
               <Link to="/add-video" className="su-btn su-btn--accent">
@@ -503,9 +500,6 @@ export default function Header() {
               </Link>
               <Link className="mobile-link" to="/challenges">
                 Challenges
-              </Link>
-              <Link className="mobile-link" to="/recommendations">
-                Recommendations
               </Link>
               <Link className="mobile-link" to="/chats">
                 Chats

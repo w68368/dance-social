@@ -48,7 +48,7 @@ export default function NotificationsBell() {
 
   useEffect(() => {
     refreshCount();
-    const t = window.setInterval(refreshCount, 12000); // polling count
+    const t = window.setInterval(refreshCount, 12000);
     return () => window.clearInterval(t);
   }, []);
 
@@ -70,7 +70,6 @@ export default function NotificationsBell() {
   }
 
   async function onClickItem(n: NotificationItem) {
-    // mark read then navigate
     if (!n.isRead) {
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
       setCount((c) => Math.max(0, c - 1));

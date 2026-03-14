@@ -179,8 +179,6 @@ router.post(
           status: "ACTIVE",
           exampleVideoUrl: exampleVideoUrl ?? undefined,
           exampleVideoType: exampleVideoType ?? undefined,
-          // если в Prisma нет поля exampleLocalPath — убери следующую строку
-          // exampleLocalPath: exampleLocalPath ?? undefined,
           creatorId: req.userId,
         },
         include: {
@@ -228,11 +226,9 @@ router.delete("/:id/accept", requireAuth, async (req: AuthedRequest, res) => {
   if (!ch) return res.status(404).json({ error: "Challenge not found" });
 
   await prisma.$transaction([
-    // удаляем видео-сабмиты этого юзера по этому челленджу
     prisma.challengeSubmission.deleteMany({
       where: { challengeId: id, userId: req.userId },
     }),
-    // удаляем участие
     prisma.challengeParticipant.deleteMany({
       where: { challengeId: id, userId: req.userId },
     }),
@@ -379,11 +375,10 @@ router.post("/:id/winner", requireAuth, async (req: AuthedRequest, res) => {
   res.json({ ok: true, challenge: updated });
 });
 
-// PATCH /api/challenges/:id (multipart: optional fields + optional file "example")  ✅ NEW
+// PATCH /api/challenges/:id (multipart: optional fields + optional file "example")
 const updateChallengeSchema = z.object({
   title: z.string().min(3).max(80).optional(),
   description: z.string().min(10).max(1500).optional(),
-  // если захочешь дать менять стиль/уровень — просто раскомментируй
   // style: z.string().min(2).max(50).optional(),
   // level: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED", "PRO"]).optional(),
 });
@@ -452,7 +447,6 @@ router.patch(
         dataToUpdate.exampleVideoType = exampleVideoType;
       }
 
-      // если ничего не пришло — не обновляем
       if (Object.keys(dataToUpdate).length === 0) {
         return res.status(400).json({ ok: false, error: "Nothing to update" });
       }

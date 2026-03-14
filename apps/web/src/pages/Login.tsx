@@ -80,7 +80,7 @@ export default function Login() {
         setAccessToken(data.accessToken);
         setUser(data.user);
 
-        // ⬇️ main part: redirect back to where the user came from
+        // main part: redirect back to where the user came from
         navigate(nextPath);
       } else {
         setError("Incorrect email or password");

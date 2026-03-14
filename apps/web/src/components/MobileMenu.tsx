@@ -13,7 +13,6 @@ export default function MobileMenu({ onClose }: Props) {
     try {
       await api.post("/auth/logout");
     } catch (e) {
-      // ignore
     }
 
     try {

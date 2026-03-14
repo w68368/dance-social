@@ -6,7 +6,7 @@ import {
   fetchConversationMessages,
   openDm,
   sendConversationMessage,
-  sendConversationMedia, // ✅ now should support multiple files + text + replyToId
+  sendConversationMedia, // now should support multiple files + text + replyToId
   deleteChatMessage,
   editConversationMessage,
   type ChatConversationListItem,
@@ -16,7 +16,7 @@ import {
 import { getUser } from "../lib/auth";
 import "../styles/pages/chats.css";
 
-// ✅ react-icons
+// react-icons
 import {
   FiMoreHorizontal,
   FiPaperclip,
@@ -40,7 +40,7 @@ function clip(s: string, n = 80) {
 }
 
 /**
- * ✅ We keep the imported ChatMessage, but the server may return different fields for media:
+ * We keep the imported ChatMessage, but the server may return different fields for media:
  * - mediaUrl/mediaType
  * - imageUrl/videoUrl
  * - fileUrl/fileType
@@ -62,7 +62,7 @@ type MessageVM = ChatMessage & {
   fileType?: "image" | "video" | null;
 };
 
-/** ✅ Universal media extractor (works with any backend shape) */
+/** Universal media extractor (works with any backend shape) */
 function extractMedia(m: any): { url: string | null; type: "image" | "video" | null } {
   if (!m) return { url: null, type: null };
 
@@ -119,7 +119,7 @@ export default function Chats() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
-  // ✅ upload state (now: pending attachments)
+  // upload state (now: pending attachments)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false); // sending attachments
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -135,7 +135,7 @@ export default function Chats() {
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const editInputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // ✅ reply state
+  // reply state
   const [replyTo, setReplyTo] = useState<MessageVM | null>(null);
 
   const listLoadedRef = useRef(false);
@@ -311,7 +311,7 @@ export default function Chats() {
     else navigate(`/chats`);
   };
 
-  // ✅ Reply start (for any message)
+  // Reply start (for any message)
   const beginReply = (m: MessageVM) => {
     if (m.id.startsWith("tmp_")) return;
     setOpenMsgMenuId(null);
@@ -407,7 +407,7 @@ export default function Chats() {
       return;
     }
 
-    // ✅ files exist -> send attachments (and optional text as caption)
+    // files exist -> send attachments (and optional text as caption)
     setUploading(true);
     setChatError(null);
 
@@ -448,7 +448,7 @@ export default function Chats() {
           activeConvId,
           files,
           trimmed,
-          replyToId ?? undefined // ✅ FIX: null -> undefined
+          replyToId ?? undefined // FIX: null -> undefined
         )) as any as MessageVM[];
 
 
@@ -509,7 +509,7 @@ export default function Chats() {
         });
       }
 
-      // ✅ clear pending attachments and revoke local blob urls
+      // clear pending attachments and revoke local blob urls
       for (const p of pendingFiles) {
         try {
           URL.revokeObjectURL(p.localUrl);
@@ -644,7 +644,7 @@ export default function Chats() {
   };
 
   // ==========================
-  // ✅ MEDIA PICKING (draft attachments)
+  // MEDIA PICKING (draft attachments)
   // ==========================
   const pickMedia = () => {
     if (!activeConvId) return;
@@ -1025,7 +1025,7 @@ export default function Chats() {
                   </div>
                 ) : null}
 
-                {/* ✅ Attachments draft (only shows when user picked files) */}
+                {/* Attachments draft (only shows when user picked files) */}
                 {pendingFiles.length > 0 ? (
                   <div className="chat-attachments">
                     <div className="chat-attachments-head">

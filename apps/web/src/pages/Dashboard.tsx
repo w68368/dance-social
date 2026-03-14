@@ -19,7 +19,7 @@ type CardItem = {
   id: string;
   title: string;
   subtitle?: string;
-  meta?: string; // date/time, location, status
+  meta?: string;
   href?: string;
 };
 
@@ -100,8 +100,7 @@ export default function Dashboard() {
     });
   }, [acceptedActive]);
 
-  // ✅ Keep your existing structure and style
-  // ... выше код тот же
+  // Keep your existing structure and style
 
 const sections: Section[] = useMemo(
   () => [
@@ -131,7 +130,6 @@ const sections: Section[] = useMemo(
       subtitle: "Accepted, in progress, or completed",
       icon: <FiAward />,
       items: me ? challengeItems : [],
-      // ✅ фиксируем текст — НЕ меняем во время загрузки
       emptyText: me ? "No active challenges" : "Sign in to track challenges",
       emptyHint: me
         ? "Accept a challenge to start tracking it here."

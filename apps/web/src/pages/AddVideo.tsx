@@ -649,7 +649,7 @@ export default function AddVideo() {
                     {!isCaptionTooLong && isCaptionLongButOk && (
                       <span className="add-post-char-warning">
                         The caption is quite long — consider splitting it into
-                        paragraphs 😊
+                        paragraphs.
                       </span>
                     )}
                   </div>

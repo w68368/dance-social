@@ -386,7 +386,7 @@
 
 .pcm-body {
   flex: 1;
-  min-width: 0; /* 👉 text and inputs respect width */
+  min-width: 0;
 }
 
 /* top row of the comment: name + badges on the left, time + menu on the right */

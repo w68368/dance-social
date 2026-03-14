@@ -12,7 +12,7 @@ import {
   submitChallengeVideo,
   fetchChallengeSubmissions,
   setChallengeWinner,
-  updateChallenge, // ✅ NEW
+  updateChallenge,
   type ChallengeItem,
   type ChallengeLevel,
   type ChallengeSubmissionItem,
@@ -33,7 +33,7 @@ import {
   FiPlayCircle,
   FiAward,
   FiCheck,
-  FiEdit2, // ✅ NEW
+  FiEdit2,
 } from "react-icons/fi";
 
 type CreateForm = {
@@ -140,7 +140,7 @@ export default function Challenges() {
   const [awardItems, setAwardItems] = useState<ChallengeSubmissionItem[]>([]);
   const [awardBusy, setAwardBusy] = useState(false);
 
-  // edit modal ✅ NEW
+  // edit modal
   const [editFor, setEditFor] = useState<ChallengeItem | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -394,7 +394,7 @@ export default function Challenges() {
     }
   }
 
-  // ✅ NEW: edit flow
+  // edit flow
   function openEditModal(ch: ChallengeItem) {
     setMenuOpenId(null);
     setEditError(null);
@@ -477,7 +477,7 @@ export default function Challenges() {
             setMenuOpenId={setMenuOpenId}
             onDelete={openDeleteConfirm}
             onLeave={openLeaveConfirm}
-            onEdit={openEditModal} // ✅ NEW
+            onEdit={openEditModal}
             onOpenView={openViewModal}
           />
 
@@ -494,7 +494,7 @@ export default function Challenges() {
             setMenuOpenId={setMenuOpenId}
             onDelete={openDeleteConfirm}
             onLeave={openLeaveConfirm}
-            onEdit={openEditModal} // ✅ NEW
+            onEdit={openEditModal}
             onOpenView={openViewModal}
           />
 
@@ -521,7 +521,7 @@ export default function Challenges() {
                 setMenuOpenId={setMenuOpenId}
                 onDelete={openDeleteConfirm}
                 onLeave={openLeaveConfirm}
-                onEdit={openEditModal} // ✅ NEW
+                onEdit={openEditModal}
                 variant="myAccepted"
                 onOpenSubmit={openSubmitModal}
                 onOpenView={openViewModal}
@@ -541,7 +541,7 @@ export default function Challenges() {
                 setMenuOpenId={setMenuOpenId}
                 onDelete={openDeleteConfirm}
                 onLeave={openLeaveConfirm}
-                onEdit={openEditModal} // ✅ NEW
+                onEdit={openEditModal}
                 onOpenView={openViewModal}
                 variant="myCreated"
                 onOpenAward={openAwardModal}
@@ -659,7 +659,7 @@ export default function Challenges() {
         </div>
       )}
 
-      {/* EDIT MODAL ✅ NEW */}
+      {/* EDIT MODAL */}
       {editFor && (
         <div
           className="chModalOverlay"
@@ -1042,7 +1042,7 @@ function Section(props: {
   setMenuOpenId: (id: string | null) => void;
   onDelete: (ch: ChallengeItem) => void;
   onLeave: (ch: ChallengeItem) => void;
-  onEdit: (ch: ChallengeItem) => void; // ✅ NEW
+  onEdit: (ch: ChallengeItem) => void;
 
   variant?: "default" | "myAccepted" | "myCreated";
   onOpenSubmit?: (ch: ChallengeItem) => void;

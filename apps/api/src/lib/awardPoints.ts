@@ -10,7 +10,6 @@ export async function awardPoints(params: {
   const { userId, action, points, entityType, entityId } = params;
 
   return prisma.$transaction(async (tx) => {
-    // 1) запись в ledger (уникальность защитит от дублей)
     await tx.pointsLedger.create({
       data: {
         userId,
@@ -21,7 +20,6 @@ export async function awardPoints(params: {
       },
     });
 
-    // 2) инкремент user.points
     const updatedUser = await tx.user.update({
       where: { id: userId },
       data: {

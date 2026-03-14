@@ -192,7 +192,7 @@
   overflow: hidden;
   height: 100%;
   display: grid;
-  grid-template-rows: 64px 1fr auto; /* ✅ composer auto height */
+  grid-template-rows: 64px 1fr auto;
 }
 
 .chats-chat-header {
@@ -469,8 +469,6 @@
    Message edit UI (inline)
 ============================ */
 
-
-
 .msg-edit {
   display: grid;
   gap: 8px;
@@ -598,8 +596,8 @@
 }
 
 .chats-input {
-  flex: 1 1 auto; /* ✅ take remaining space */
-  min-width: 0;   /* ✅ prevent overflow */
+  flex: 1 1 auto;
+  min-width: 0;   
   height: 44px;
 
   border-radius: 14px;
@@ -615,7 +613,7 @@
 }
 
 .chats-send {
-  flex: 0 0 110px; /* ✅ fixed width like before */
+  flex: 0 0 110px; 
   height: 44px;
 
   border-radius: 14px;

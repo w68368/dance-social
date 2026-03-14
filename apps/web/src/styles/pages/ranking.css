@@ -66,7 +66,7 @@
   color: var(--rk-text-2);
 }
 
-/* ✅ Make dropdown readable */
+/* Make dropdown readable */
 .rk-select select {
   border: none;
   outline: none;
@@ -249,7 +249,7 @@
   display: grid;
   place-items: center;
   border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(0,0,0,0.24); /* темнее => лучше читается */
+  background: rgba(0,0,0,0.24);
   font-weight: 950;
   color: rgba(255,255,255,0.88);
   text-shadow: var(--rk-shadow-txt);
@@ -344,8 +344,195 @@
   text-shadow: var(--rk-shadow-txt);
 }
 
-/* (остальные стили таблицы/скелета/прогресса можешь оставить как были у тебя,
-   но если у тебя весь файл именно такой — оно уже будет читабельно) */
+/* ===== TABLE (reworked like screenshot) ===== */
+
+.rk-card--table { padding: 0; }
+.rk-table2 { padding: 14px; }
+
+/* Head row */
+.rk-table2__head {
+  display: grid;
+  grid-template-columns: 120px 1fr 140px;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.14);
+  font-weight: 900;
+  color: rgba(255,255,255,0.86);
+  text-shadow: var(--rk-shadow-txt);
+  margin-bottom: 12px;
+}
+
+.rk-table2__head .h-points { text-align: right; }
+
+/* Row */
+.rk-rowCard {
+  display: grid;
+  grid-template-columns: 120px 1fr 140px;
+  gap: 12px;
+  align-items: center;
+
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(12, 10, 24, 0.20);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 22px 70px rgba(0,0,0,0.22);
+
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.rk-rowCard + .rk-rowCard { margin-top: 12px; }
+
+.rk-rowCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.03);
+}
+
+/* Left rank: make it a circular badge like on screenshot */
+.rk-rankChip {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(0,0,0,0.22);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+
+  text-shadow: var(--rk-shadow-txt);
+}
+
+.rk-rankChip__hash { display: none; }
+
+.rk-rankChip__num {
+  font-size: 13px;
+  font-weight: 950;
+  color: rgba(255,255,255,0.92);
+}
+
+/* Middle user cell */
+.rk-userCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rk-userCard .rk-avatar {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04);
+}
+
+.rk-userCard__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rk-userCard__name {
+  font-weight: 950;
+  color: rgba(255,255,255,0.94);
+  text-shadow: var(--rk-shadow-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rk-userCard__user {
+  font-size: 12px;
+  color: var(--rk-text-2);
+  text-shadow: var(--rk-shadow-txt);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Thin bar under username (subtle) */
+.rk-userCard__bar {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.26);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.18) inset;
+  max-width: 320px;
+}
+
+.rk-userCard__barFill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 215, 120, 0.90),
+    rgba(180, 120, 255, 0.90)
+  );
+  transition: width 280ms ease;
+}
+
+/* Right points pill (compact like screenshot) */
+.rk-pointsBlock {
+  justify-self: end;
+
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+
+  min-width: 108px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.18);
+
+  text-shadow: var(--rk-shadow-txt);
+}
+
+.rk-pointsBlock__value {
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1;
+  color: rgba(255,255,255,0.94);
+}
+
+.rk-pointsBlock__label {
+  font-size: 12px;
+  color: var(--rk-text-2);
+}
+
+/* Hide head on mobile and make row stack nicely */
+@media (max-width: 760px) {
+  .rk-table2__head { display: none; }
+
+  .rk-rowCard {
+    grid-template-columns: 56px 1fr;
+    grid-template-areas:
+      "rank user"
+      "rank points";
+    align-items: start;
+    gap: 10px;
+  }
+
+  .rk-rankChip { grid-area: rank; }
+  .rk-userCard { grid-area: user; }
+  .rk-pointsBlock {
+    grid-area: points;
+    justify-self: start;
+    justify-items: start;
+    min-width: 140px;
+  }
+
+  .rk-userCard__bar { max-width: 100%; }
+}
 
 /* Responsive */
 @media (max-width: 760px) {

@@ -1,3 +1,7 @@
+/* ============================= */
+/*            FEED               */
+/* ============================= */
+
 .feed-container {
   max-width: 960px;
   margin: 0 auto;
@@ -19,7 +23,7 @@
   color: #ff8a8a;
 }
 
-/* ✅ Topbar + filter buttons */
+/* Topbar + filter buttons */
 .feed-topbar {
   display: flex;
   align-items: baseline;
@@ -77,6 +81,7 @@
   transform: none;
 }
 
+/* list */
 .feed-list {
   display: flex;
   flex-direction: column;
@@ -90,6 +95,7 @@
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--ring);
   max-width: 600px;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -143,44 +149,50 @@
   color: var(--muted);
 }
 
-/* media */
+/* ============================= */
+/*            MEDIA              */
+/* ============================= */
+
 .feed-media {
   width: 100%;
   border-radius: 18px;
   overflow: hidden;
   margin-top: 12px;
   background: #000;
+
+  height: clamp(340px, 58vh, 520px);
+
   display: flex;
+  align-items: center;
   justify-content: center;
 }
-
-/* video and images take full card width */
-.feed-media-video,
-.feed-media-image {
+.feed-media-item {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover; 
 }
 
-/* vertical and horizontal video fill the block without huge borders */
 .feed-media-video {
-  width: 100%;
-  height: auto;
-  max-height: 80vh;
-  object-fit: contain;
-  border-radius: 18px;
-}
-
-/* images also without extra empty space */
-.feed-media-image {
-  max-height: 70vh;
   object-fit: cover;
 }
 
-/* caption */
+.feed-media-image {
+  object-fit: cover;
+}
+
+/* ============================= */
+/*           CAPTION             */
+/* ============================= */
+
 .feed-caption {
   white-space: pre-wrap;
   margin-top: 10px;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 3; 
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* footer */
@@ -273,7 +285,7 @@
 }
 
 /* ======================================== */
-/*  🔥 REACTIONS POPOVER (mini-popover)     */
+/*   REACTIONS POPOVER (mini-popover)     */
 /* ======================================== */
 
 .feed-like-wrapper {
@@ -509,22 +521,7 @@
   cursor: not-allowed;
 }
 
-.feed-edit-textarea {
-  width: 100%;
-  margin: 10px 0 14px;
-  padding: 12px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text, #f1ecff);
-  resize: vertical;
-  outline: none;
-}
-.feed-edit-textarea:focus {
-  border-color: rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.08);
-}
-
+/* edit caption textarea (single definition, without duplicates) */
 .feed-edit-textarea {
   width: 100%;
   max-width: 100%;
@@ -540,18 +537,25 @@
 
   outline: none;
 
-  /* ✅ fixed sizing */
-  resize: none;          /* нельзя растягивать мышкой */
-  overflow: auto;        /* если много текста — появится скролл внутри */
-  min-height: 110px;     /* чтобы выглядело стабильно */
-  max-height: 180px;     /* чтобы не раздувало модалку */
+  resize: none;
+  overflow: auto;
+  min-height: 110px;
+  max-height: 180px;
 }
 
+.feed-edit-textarea:focus {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+}
 
 /* on mobile we can simplify a bit */
 @media (max-width: 600px) {
   .feed-container {
     padding: 16px;
+  }
+
+  .feed-media {
+    height: clamp(300px, 56vh, 460px);
   }
 
   .feed-reactions-popover {

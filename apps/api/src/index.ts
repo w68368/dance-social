@@ -208,7 +208,7 @@ app.get("/api/tags/search", async (req, res) => {
   }
 });
 
-// 🆕 Single user by id (for UserProfile)
+// Single user by id (for UserProfile)
 app.get("/api/users/:id", async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
