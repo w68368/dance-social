@@ -1,4 +1,4 @@
-# StepUnity -- Społecznościowa Platforma dla Tancerzy
+# StepUnity - Społecznościowa Platforma dla Tancerzy
 
 ## Opis projektu
 
@@ -140,7 +140,7 @@ npx prisma migrate dev
 
 Uruchom serwer backendowy:
 
-npm run dev
+pnpm dev:api
 
 Backend będzie dostępny pod adresem:
 
@@ -164,7 +164,7 @@ VITE_API_URL=http://localhost:3000
 
 Uruchom aplikację frontendową:
 
-npm run dev
+pnpm dev:web
 
 Frontend będzie dostępny pod adresem:
 
