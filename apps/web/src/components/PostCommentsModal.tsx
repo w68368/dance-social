@@ -132,11 +132,11 @@ export default function PostCommentsModal({
     const diffHours = Math.floor(diffMin / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffSec < 60) return "только что";
-    if (diffMin < 60) return `${diffMin} мин назад`;
-    if (diffHours < 24) return `${diffHours} ч назад`;
-    if (diffDays === 1) return "вчера";
-    if (diffDays < 7) return `${diffDays} дн назад`;
+    if (diffSec < 60) return "just now";
+    if (diffMin < 60) return `${diffMin} min ago`;
+    if (diffHours < 24) return `${diffHours} h ago`;
+    if (diffDays === 1) return "yesterday";
+    if (diffDays < 7) return `${diffDays} d ago`;
     return date.toLocaleDateString();
   };
 
