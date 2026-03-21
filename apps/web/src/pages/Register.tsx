@@ -1,7 +1,7 @@
 // apps/web/src/pages/Register.tsx
 import type React from "react";
 import { useMemo, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import ReCAPTCHA from "react-google-recaptcha";
 import zxcvbn from "zxcvbn";
 import { api } from "../api";
@@ -50,8 +50,8 @@ export default function Register() {
     const card = cardRef.current?.getBoundingClientRect();
     const input = pwInputRef.current?.getBoundingClientRect();
     if (card && input) {
-      const offset = input.bottom - card.top; // px from the top edge of the card
-      setPwOverlayTop(Math.max(0, Math.round(offset) + 8)); // +8px spacing below the input
+      const offset = input.bottom - card.top;
+      setPwOverlayTop(Math.max(0, Math.round(offset) + 8));
     }
   };
 
@@ -65,7 +65,6 @@ export default function Register() {
 
   useEffect(() => {
     if (pwFocused) {
-      // when typing/validating password, geometry can change
       recomputeOverlayTop();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,7 +78,6 @@ export default function Register() {
   const score = strength?.score ?? 0;
 
   const { levelLabel, progressPct, colorVar } = useMemo(() => {
-    // 0–1 → Very weak (33%), 2 → Weak (66%), 3–4 → Strong (100%)
     if (!password || score <= 1) {
       return {
         levelLabel: "Very weak",
@@ -113,8 +111,9 @@ export default function Register() {
       if (password.length < 8) out.push("Use at least 8 characters.");
       if (!/[0-9]/.test(password)) out.push("Add some digits (0–9).");
       if (!/[A-Z]/.test(password)) out.push("Add an uppercase letter.");
-      if (!/[!@#$%^&*()_\-+=\[{\]};:,.?/~`]/.test(password))
+      if (!/[!@#$%^&*()_\-+=\[{\]};:,.?/~`]/.test(password)) {
         out.push("Add a symbol.");
+      }
     }
     return out.slice(0, 4);
   }, [password, strength]);
@@ -131,7 +130,6 @@ export default function Register() {
     fd.append("username", username.trim());
     fd.append("password", password);
     if (avatar) fd.append("avatar", avatar);
-    // reCAPTCHA token
     fd.append("captchaToken", captchaToken || "");
 
     const { data } = await api.post("/auth/register-start", fd, {
@@ -179,7 +177,7 @@ export default function Register() {
 
   // === Successful verification ===
   const handleVerified = (token: string, _user: any) => {
-    setAccessToken(token); // refresh-cookie is set by backend; access token is for UX
+    setAccessToken(token);
     setVerifyOpen(false);
     setEmail("");
     setUsername("");
@@ -255,7 +253,7 @@ export default function Register() {
             style={{
               position: "relative",
               zIndex: 20,
-            }} /* input above overlay */
+            }}
           >
             <label>Password</label>
             <input
@@ -328,7 +326,6 @@ export default function Register() {
             </div>
           </div>
 
-          {/* reCAPTCHA */}
           <div className="form-row">
             <label>Verification</label>
 
@@ -351,9 +348,17 @@ export default function Register() {
 
           {error && <p className="msg error">{error}</p>}
           {success && <p className="msg success">{success}</p>}
+
+          <div className="auth-links">
+            <div className="auth-links-row">
+              <span className="auth-muted">Already have an account?</span>{" "}
+              <Link to="/login" className="auth-link-blue">
+                Sign in
+              </Link>
+            </div>
+          </div>
         </div>
 
-        {/* === Overlay: visually above the card, geometrically tied to the password field === */}
         {pwFocused && (
           <div
             className="pw-overlay"
@@ -389,7 +394,6 @@ export default function Register() {
         )}
       </form>
 
-      {/* Email verification modal */}
       <EmailCodeModal
         email={email}
         open={verifyOpen}
